@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../rentitforward-shared"
+		},
+		{
+			"path": "../rentitforward-web"
+		}
+	],
+	"settings": {}
+}
