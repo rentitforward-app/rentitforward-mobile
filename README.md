@@ -1,290 +1,85 @@
-# Rent It Forward - Mobile App
+# Rent It Forward – Mobile App
 
-A React Native mobile application built with Expo for the Rent It Forward rental marketplace.
+This project is part of a multi-repository workspace for **Rent It Forward** (`RENTITFORWARD-WORKSPACE`), a peer-to-peer rental marketplace.
 
-## 🚀 Quick Start
+Workspace contains:
+- `rentitforward-web/`: Next.js + Tailwind web app
+- `rentitforward-mobile/`: Expo + React Native mobile app
+- `rentitforward-shared/`: Shared logic (types, utils, API clients, design system)
 
-### Prerequisites
+This is the cross-platform mobile app built with **Expo**, **React Native**, and **NativeWind**.
 
-- Node.js 18+ 
-- npm or yarn
-- Expo CLI: `npm install -g @expo/cli`
-- For iOS development: Xcode (Mac only)
-- For Android development: Android Studio
+---
 
-### Installation
+## 🔧 Key Technologies
 
-1. Install dependencies:
-```bash
-npm install
-```
+- Expo + React Native (TypeScript)
+- NativeWind (Tailwind for RN)
+- Supabase (auth, db, storage)
+- Stripe Connect (Express accounts, escrow-style payment flow)
+- Shared logic via `rentitforward-shared`
 
-2. Start the development server:
-```bash
-npm start
-```
+---
 
-3. Run on specific platforms:
-```bash
-# iOS Simulator (Mac only)
-npm run ios
-
-# Android Emulator
-npm run android
-
-# Web browser
-npm run web
-```
-
-## 📱 Features
-
-- **Tab Navigation**: Home, Browse, Create Listing, Bookings, Profile
-- **Shared Types**: Uses the shared package for consistent type definitions
-- **Expo Router**: File-based routing system
-- **TypeScript**: Full type safety
-- **Cross-Platform**: iOS, Android, and Web support
-
-## 🏗️ Project Structure
-
-```
+## 📁 Project Structure
 rentitforward-mobile/
-├── app/                    # Expo Router screens
-│   ├── (tabs)/            # Tab navigator screens
-│   │   ├── index.tsx      # Home screen
-│   │   ├── browse.tsx     # Browse listings
-│   │   ├── create.tsx     # Create listing
-│   │   ├── bookings.tsx   # User bookings
-│   │   └── profile.tsx    # User profile
-│   └── _layout.tsx        # Root layout
-├── assets/                # Images, icons, splash screens
-├── src/                   # Source code (to be created)
-│   ├── components/        # Reusable components
-│   ├── hooks/             # Custom hooks
-│   ├── utils/             # Utility functions
-│   └── constants/         # App constants
-├── app.json               # Expo configuration
-├── eas.json               # EAS Build configuration
-└── package.json           # Dependencies
-```
+├── app/ # Screens and navigation
+│ └── (tabs)/ # Tab-based nested routes
+├── assets/ # Fonts, icons, images
+├── src/
+│ ├── components/ # Reusable React Native UI components
+│ ├── lib/ # API clients, helper functions, constants
+│ └── design-system.ts # Optionally imports from shared tokens
+├── tailwind.config.js # Tailwind (NativeWind) config
 
-## 🛠️ Development
 
-### Running the App
+---
 
-```bash
-# Start Expo development server
-npm start
+## 📦 Shared Modules
 
-# Or with specific options
-npx expo start --clear  # Clear cache
-npx expo start --tunnel # Use tunnel for external access
-```
+Uses shared packages from `../rentitforward-shared/`, including:
+- `types/`: User, Listing, Booking, etc.
+- `utils/`: Pricing, validation, date helpers
+- `api/`: Supabase and Typesense clients
+- `design-system/`: Design tokens (colors, fonts, spacing)
 
-### Building for Production
+---
 
-#### Setup EAS Build
+## 🧠 Notes
 
-1. Install EAS CLI:
-```bash
-npm install -g eas-cli
-```
+- Use **shared logic** and **design system** wherever possible to ensure consistency with the web app.
+- Avoid duplicating types or constants—extend shared interfaces if needed.
+- Stripe Connect is used to onboard item owners (sharers) as Express accounts.
+- The platform holds renter payments in escrow until the rental is completed.
+- Funds are released to owners minus a 20% platform commission (see Pricing model).
+- Deposits (if required) are held separately and refunded post-return confirmation.
+- All design tokens come from the shared design system.
+- If mobile-specific styles are needed, extend the shared tokens locally (e.g. `mobile-tokens.ts`) instead of duplicating.
 
-2. Login to Expo:
-```bash
-eas login
-```
 
-3. Configure your project:
-```bash
-eas build:configure
-```
+## 🎨 Design System Details
 
-#### Build Commands
+Located in: `/rentitforward-shared/src/design-system/`
 
-```bash
-# Build for development
-eas build --profile development
+This directory provides a central, token-based design system for both web (Tailwind) and mobile (NativeWind) usage.
 
-# Build for app store preview
-eas build --profile preview
+Includes:
+- **Colors**: Brand palette
+- **Spacing**: Margin/padding system
+- **Typography**: Fonts, weights, sizes
+- **Breakpoints**: Responsive design tokens
+- **Tokens.ts**: Flattened export for global usage
 
-# Build for production
-eas build --profile production
+## 🛠 Usage
 
-# Build for specific platform
-eas build --platform ios
-eas build --platform android
-```
+In web:
+import { theme } from 'rentitforward-shared/src/design-system/theme';
 
-## 📦 Deployment
+In mobile:
+import { tokens } from 'rentitforward-shared/src/design-system/tokens';
 
-### iOS App Store
+🚫 Do not copy web components using HTML tags, `next/link`, or `className` directly.
 
-1. **Prerequisites**:
-   - Apple Developer Account ($99/year)
-   - App Store Connect app created
-   - iOS distribution certificate
+✅ Use React Native components (`View`, `Text`, `TouchableOpacity`, etc.) or NativeWind styling in mobile.
 
-2. **Build and Submit**:
-```bash
-# Build for iOS
-eas build --platform ios --profile production
-
-# Submit to App Store
-eas submit --platform ios
-```
-
-3. **App Store Connect**:
-   - Complete app metadata
-   - Add screenshots
-   - Set pricing and availability
-   - Submit for review
-
-### Google Play Store
-
-1. **Prerequisites**:
-   - Google Play Console account ($25 one-time)
-   - Android app bundle created
-   - Google Play service account JSON
-
-2. **Build and Submit**:
-```bash
-# Build for Android
-eas build --platform android --profile production
-
-# Submit to Play Store
-eas submit --platform android
-```
-
-3. **Play Console**:
-   - Complete store listing
-   - Add screenshots
-   - Set content rating
-   - Publish app
-
-## 🔧 Configuration
-
-### App Configuration (`app.json`)
-
-Update the following for your app:
-
-```json
-{
-  "expo": {
-    "name": "Your App Name",
-    "slug": "your-app-slug",
-    "ios": {
-      "bundleIdentifier": "com.yourcompany.yourapp"
-    },
-    "android": {
-      "package": "com.yourcompany.yourapp"
-    }
-  }
-}
-```
-
-### EAS Configuration (`eas.json`)
-
-Update the submit configuration:
-
-```json
-{
-  "submit": {
-    "production": {
-      "ios": {
-        "appleId": "your-apple-id@example.com",
-        "ascAppId": "your-app-store-connect-id"
-      },
-      "android": {
-        "serviceAccountKeyPath": "./google-play-service-account.json"
-      }
-    }
-  }
-}
-```
-
-## 📄 Store Listing Requirements
-
-### App Store (iOS)
-
-- **App Name**: Rent It Forward
-- **Category**: Lifestyle
-- **Description**: Rent tools, equipment, and more from people in your community
-- **Keywords**: rental, tools, equipment, sharing, community
-- **Screenshots**: iPhone 6.7", 6.5", 5.5" and iPad Pro 12.9", 12.9" (2nd gen)
-- **Privacy Policy**: Required
-- **Support URL**: Required
-
-### Play Store (Android)
-
-- **App Name**: Rent It Forward
-- **Category**: Lifestyle
-- **Description**: Same as iOS
-- **Screenshots**: Phone and tablet screenshots
-- **Feature Graphic**: 1024x500 pixels
-- **Privacy Policy**: Required
-- **Target Audience**: 18+
-
-## 🎨 Assets Needed
-
-Create the following assets before building:
-
-- **App Icon**: 1024x1024 PNG
-- **Splash Screen**: 1242x2208 PNG
-- **Adaptive Icon** (Android): 1024x1024 PNG
-- **Favicon**: 48x48 PNG
-- **Store Screenshots**: Various sizes for both platforms
-
-## 🔐 Environment Variables
-
-Create a `.env` file for sensitive configuration:
-
-```env
-EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
-
-## 📱 Testing
-
-### Device Testing
-
-1. **iOS**: Use Expo Go app or create development build
-2. **Android**: Use Expo Go app or create development build
-3. **Web**: Runs in browser at `http://localhost:8081`
-
-### Real Device Testing
-
-```bash
-# Create development build
-eas build --profile development
-
-# Install on device and test
-```
-
-## 🚀 Next Steps
-
-1. **Complete UI Implementation**:
-   - Browse and search functionality
-   - Listing details and creation
-   - User authentication
-   - Booking system
-
-2. **Add Core Features**:
-   - Image upload
-   - Location services
-   - Push notifications
-   - Payment integration
-
-3. **App Store Preparation**:
-   - Create app store assets
-   - Write app descriptions
-   - Set up analytics
-   - Prepare for submission
-
-## 📞 Support
-
-For deployment assistance:
-- [Expo Documentation](https://docs.expo.dev/)
-- [EAS Build Documentation](https://docs.expo.dev/build/introduction/)
-- [App Store Guidelines](https://developer.apple.com/app-store/guidelines/)
-- [Play Store Guidelines](https://developer.android.com/distribute/play-policies) 
+✅ Wrap navigation with `useNavigation()` from `@react-navigation/native`.
