@@ -105,7 +105,8 @@ ehthumbs.db
 Thumbs.db
 
 # Cursor
-.cursor/
+.cursor
+.cursorignore
 
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
@@ -117,3 +118,6 @@ Thumbs.db
 
 expo-env.d.ts
 # @end expo-cli 
+
+# MCP
+mcp.json
