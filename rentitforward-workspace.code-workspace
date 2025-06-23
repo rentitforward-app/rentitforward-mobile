@@ -10,5 +10,7 @@
 			"path": "../rentitforward-web"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"powershell.cwd": "rentitforward-web"
+	}
 }
