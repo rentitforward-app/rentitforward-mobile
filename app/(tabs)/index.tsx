@@ -1,126 +1,102 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { DevTest } from '../../src/components/DevTest';
 
 export default function HomeScreen() {
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Rent It Forward</Text>
-          <Text style={styles.subtitle}>Rent. Share. Repeat.</Text>
-        </View>
-
-        <View style={styles.searchContainer}>
-          <Text style={styles.searchText}>Find what you need</Text>
-          <TouchableOpacity style={styles.searchButton}>
-            <Text style={styles.searchButtonText}>Search Items</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.categoriesContainer}>
-          <Text style={styles.sectionTitle}>Popular Categories</Text>
-          <View style={styles.categoryGrid}>
-            {['Tools & DIY', 'Electronics', 'Sports', 'Events'].map((category) => (
-              <TouchableOpacity key={category} style={styles.categoryCard}>
-                <Text style={styles.categoryText}>{category}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.featuredContainer}>
-          <Text style={styles.sectionTitle}>Featured Items</Text>
-          <Text style={styles.placeholderText}>
-            Featured items will appear here once you have listings
+    <ScrollView style={styles.container}>
+      <View style={styles.content}>
+        <Text style={styles.title}>
+          🏠 Welcome to Rent It Forward
+        </Text>
+        
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>
+            Development Environment Test
+          </Text>
+          <Text style={styles.cardText}>
+            This screen confirms that our development environment is working correctly!
           </Text>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+
+        <DevTest />
+        
+        <View style={styles.statusCard}>
+          <Text style={styles.statusTitle}>
+            ✅ Development Environment Status
+          </Text>
+          <Text style={styles.statusText}>
+            • React Native: Working
+          </Text>
+          <Text style={styles.statusText}>
+            • Component imports: Working
+          </Text>
+          <Text style={styles.statusText}>
+            • TypeScript: Working
+          </Text>
+          <Text style={styles.statusText}>
+            • State management: Ready
+          </Text>
+        </View>
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#f9fafb',
   },
-  scrollView: {
-    flex: 1,
-  },
-  header: {
-    alignItems: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 20,
+  content: {
+    padding: 16,
+    paddingTop: 32,
   },
   title: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 24,
+  },
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    padding: 24,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '600',
     color: '#44D62C',
     marginBottom: 8,
   },
-  subtitle: {
+  cardText: {
     fontSize: 16,
-    color: '#343C3E',
+    color: '#6b7280',
   },
-  searchContainer: {
-    margin: 20,
-    padding: 20,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  searchText: {
-    fontSize: 18,
-    color: '#343C3E',
-    marginBottom: 16,
-  },
-  searchButton: {
-    backgroundColor: '#44D62C',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+  statusCard: {
+    marginTop: 32,
+    padding: 16,
+    backgroundColor: '#eff6ff',
     borderRadius: 8,
   },
-  searchButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  categoriesContainer: {
-    margin: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#343C3E',
-    marginBottom: 16,
-  },
-  categoryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  categoryCard: {
-    backgroundColor: '#F0F9FF',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    minWidth: '45%',
-    alignItems: 'center',
-  },
-  categoryText: {
-    color: '#343C3E',
+  statusTitle: {
     fontSize: 14,
     fontWeight: '500',
+    color: '#1e40af',
+    marginBottom: 8,
   },
-  featuredContainer: {
-    margin: 20,
-    marginBottom: 40,
-  },
-  placeholderText: {
-    color: '#6B7280',
+  statusText: {
     fontSize: 14,
-    textAlign: 'center',
-    fontStyle: 'italic',
+    color: '#1e40af',
+    marginBottom: 4,
   },
 }); 

@@ -1,28 +1,60 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../src/components/AuthProvider';
+
+const INTRO_SEEN_KEY = '@intro_seen';
 
 export default function IndexScreen() {
   const router = useRouter();
   const { user, profile, loading } = useAuth();
+  const [introSeen, setIntroSeen] = useState<boolean | null>(null);
 
   useEffect(() => {
-    if (loading) return; // Wait for auth to load
+    // Check if user has seen intro before
+    const checkIntroStatus = async () => {
+      try {
+        // DEVELOPMENT: Uncomment the line below to reset intro for testing
+        // await AsyncStorage.removeItem(INTRO_SEEN_KEY);
+        
+        const seen = await AsyncStorage.getItem(INTRO_SEEN_KEY);
+        setIntroSeen(seen === 'true');
+        console.log('Intro seen status:', seen);
+      } catch (error) {
+        console.error('Error checking intro status:', error);
+        setIntroSeen(false); // Default to not seen
+      }
+    };
 
+    checkIntroStatus();
+  }, []);
+
+  useEffect(() => {
+    if (loading || introSeen === null) return; // Wait for auth and intro check to complete
+
+    console.log('Routing decision - introSeen:', introSeen, 'user:', !!user, 'profile complete:', !!(profile?.phone_number && profile?.city));
+
+    // Show intro for signed-out users (either first-time or returning users who signed out)
     if (!user) {
-      // User not authenticated, redirect to welcome
-      router.replace('/(auth)/welcome');
-    } else if (!profile?.phone_number || !profile?.city) {
+      console.log('User signed out - showing intro screen');
+      router.replace('/(auth)/intro');
+      return;
+    }
+
+    // User is authenticated - check profile completion
+    if (!profile?.phone_number || !profile?.city) {
       // User authenticated but profile incomplete, redirect to onboarding
+      console.log('Navigating to onboarding screen');
       router.replace('/(auth)/onboarding');
     } else {
       // User authenticated and profile complete, redirect to main app
+      console.log('Navigating to main tabs');
       router.replace('/(tabs)');
     }
-  }, [user, profile, loading, router]);
+  }, [user, profile, loading, introSeen, router]);
 
-  // Show loading spinner while determining auth state
+  // Show loading spinner while determining auth state and intro status
   return (
     <View style={styles.container}>
       <ActivityIndicator size="large" color="#16A34A" />

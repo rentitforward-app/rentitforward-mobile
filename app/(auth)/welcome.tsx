@@ -1,37 +1,68 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StatusBar, StyleSheet } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, TouchableOpacity, StatusBar, StyleSheet, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const { width: screenWidth } = Dimensions.get('window');
+const INTRO_SEEN_KEY = '@intro_seen';
 
 export default function WelcomeScreen() {
   const router = useRouter();
 
+  useEffect(() => {
+    // Mark intro as seen when user reaches welcome screen
+    const markIntroAsSeen = async () => {
+      try {
+        await AsyncStorage.setItem(INTRO_SEEN_KEY, 'true');
+      } catch (error) {
+        console.error('Error marking intro as seen:', error);
+      }
+    };
+
+    markIntroAsSeen();
+  }, []);
+
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="dark-content" backgroundColor="white" />
       
-      {/* Header with Logo */}
+      {/* Main Content */}
       <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.title}>
-            Rent It Forward
-          </Text>
-          <Text style={styles.subtitle}>
-            Share. Rent. Build Community.
-          </Text>
+        {/* Brand Header */}
+        <View style={styles.brandSection}>
+          <View style={styles.logoContainer}>
+            <Text style={styles.logoEmoji}>🔄</Text>
+          </View>
+          <Text style={styles.title}>Rent It Forward</Text>
+          <Text style={styles.tagline}>Share. Rent. Build Community.</Text>
         </View>
 
-        {/* Hero Illustration Placeholder */}
-        <View style={styles.heroImage}>
-          <Text style={styles.emoji}>📱</Text>
+        {/* Hero Section */}
+        <View style={styles.heroSection}>
+          <View style={styles.heroImageContainer}>
+            <View style={styles.heroCircle1}>
+              <Text style={styles.heroEmoji}>🔧</Text>
+            </View>
+            <View style={styles.heroCircle2}>
+              <Text style={styles.heroEmoji}>📱</Text>
+            </View>
+            <View style={styles.heroCircle3}>
+              <Text style={styles.heroEmoji}>🏠</Text>
+            </View>
+          </View>
+          
+          <Text style={styles.description}>
+            Access tools, electronics, sports gear, and more from people in your community.
+          </Text>
+          
+          <Text style={styles.subDescription}>
+            Save money, live sustainably, and make sharing second nature.
+          </Text>
         </View>
-
-        <Text style={styles.description}>
-          Discover amazing items from your neighbors or share your own to earn extra income.
-        </Text>
       </View>
 
-      {/* Bottom Action Buttons */}
-      <View style={styles.buttonContainer}>
+      {/* Bottom Action Section */}
+      <View style={styles.actionSection}>
         <TouchableOpacity
           onPress={() => router.push('/(auth)/sign-up')}
           style={styles.primaryButton}
@@ -46,12 +77,31 @@ export default function WelcomeScreen() {
           style={styles.secondaryButton}
         >
           <Text style={styles.secondaryButtonText}>
-            Sign In
+            I already have an account
           </Text>
         </TouchableOpacity>
 
+        <View style={styles.socialSection}>
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+          
+          <TouchableOpacity
+            onPress={() => router.push('/(tabs)')}
+            style={styles.browseButton}
+          >
+            <Text style={styles.browseButtonText}>
+              Browse available items
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         <Text style={styles.termsText}>
-          By continuing, you agree to our Terms of Service and Privacy Policy
+          By continuing, you agree to our{' '}
+          <Text style={styles.linkText}>Terms of Service</Text> and{' '}
+          <Text style={styles.linkText}>Privacy Policy</Text>
         </Text>
       </View>
     </View>
@@ -65,13 +115,25 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 80,
+  },
+  brandSection: {
+    alignItems: 'center',
+    marginBottom: 60,
+  },
+  logoContainer: {
+    width: 80,
+    height: 80,
+    backgroundColor: '#16A34A',
+    borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 64,
+    marginBottom: 20,
   },
-  header: {
-    marginBottom: 32,
+  logoEmoji: {
+    fontSize: 40,
+    color: 'white',
   },
   title: {
     fontSize: 36,
@@ -80,39 +142,88 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 8,
   },
-  subtitle: {
+  tagline: {
     fontSize: 18,
-    color: '#6B7280',
+    color: '#16A34A',
     textAlign: 'center',
+    fontWeight: '500',
   },
-  heroImage: {
-    width: 256,
-    height: 256,
+  heroSection: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  heroImageContainer: {
+    position: 'relative',
+    width: 240,
+    height: 240,
+    marginBottom: 40,
+  },
+  heroCircle1: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+    width: 80,
+    height: 80,
     backgroundColor: '#DCFCE7',
-    borderRadius: 128,
-    marginBottom: 32,
+    borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  emoji: {
-    fontSize: 64,
+  heroCircle2: {
+    position: 'absolute',
+    top: 80,
+    right: 10,
+    width: 100,
+    height: 100,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heroCircle3: {
+    position: 'absolute',
+    bottom: 20,
+    left: 40,
+    width: 90,
+    height: 90,
+    backgroundColor: '#DBEAFE',
+    borderRadius: 45,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heroEmoji: {
+    fontSize: 32,
   },
   description: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#374151',
     textAlign: 'center',
-    marginBottom: 32,
-    paddingHorizontal: 16,
+    lineHeight: 26,
+    marginBottom: 16,
+    paddingHorizontal: 20,
   },
-  buttonContainer: {
+  subDescription: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 24,
+    paddingHorizontal: 20,
+  },
+  actionSection: {
     paddingHorizontal: 24,
     paddingBottom: 48,
   },
   primaryButton: {
     backgroundColor: '#16A34A',
-    borderRadius: 8,
-    paddingVertical: 16,
+    borderRadius: 12,
+    paddingVertical: 18,
     marginBottom: 16,
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   primaryButtonText: {
     color: 'white',
@@ -121,21 +232,53 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   secondaryButton: {
-    borderWidth: 1,
-    borderColor: '#16A34A',
-    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
     paddingVertical: 16,
+    marginBottom: 24,
   },
   secondaryButtonText: {
+    color: '#374151',
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  socialSection: {
+    marginBottom: 24,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  dividerText: {
+    color: '#9CA3AF',
+    fontSize: 14,
+    marginHorizontal: 16,
+  },
+  browseButton: {
+    paddingVertical: 12,
+  },
+  browseButtonText: {
     color: '#16A34A',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '500',
     textAlign: 'center',
   },
   termsText: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#9CA3AF',
     textAlign: 'center',
-    marginTop: 16,
+    lineHeight: 18,
   },
-}); 
+     linkText: {
+     color: '#16A34A',
+     fontWeight: '500',
+   },
+ }); 

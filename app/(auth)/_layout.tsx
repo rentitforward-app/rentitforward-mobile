@@ -8,6 +8,7 @@ export default function AuthLayout() {
         gestureEnabled: true,
       }}
     >
+      <Stack.Screen name="intro" />
       <Stack.Screen name="welcome" />
       <Stack.Screen name="sign-in" />
       <Stack.Screen name="sign-up" />

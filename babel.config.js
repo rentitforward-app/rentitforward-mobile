@@ -15,9 +15,12 @@ module.exports = function (api) {
             '@/utils': './src/utils',
             '@/types': './src/types',
             '@/constants': './src/constants',
+            '@shared': '../rentitforward-shared/src',
           },
         },
       ],
+      // Temporarily disable NativeWind babel plugin
+      // 'nativewind/babel',
       'react-native-reanimated/plugin',
     ],
   };
