@@ -1,12 +1,14 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { Alert } from 'react-native';
+import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { AuthContextType, AuthState, Profile } from '../types/auth';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [state, setState] = useState<AuthState>({
     user: null,
     profile: null,
@@ -158,6 +160,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setState(prev => ({ ...prev, loading: true }));
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      
+      // Direct navigation to welcome screen after successful signout
+      console.log('Signing out - redirecting to welcome screen');
+      router.replace('/(auth)/welcome');
     } catch (error: any) {
       setState(prev => ({ ...prev, loading: false, error: error.message }));
       Alert.alert('Sign Out Error', error.message);

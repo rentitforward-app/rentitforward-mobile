@@ -1,103 +1,68 @@
-import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StatusBar, StyleSheet, Dimensions } from 'react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity, StatusBar, StyleSheet, Dimensions, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { mobileTokens } from '../../src/lib/design-system';
 
-const { width: screenWidth } = Dimensions.get('window');
-const INTRO_SEEN_KEY = '@intro_seen';
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function WelcomeScreen() {
   const router = useRouter();
 
-  useEffect(() => {
-    // Mark intro as seen when user reaches welcome screen
-    const markIntroAsSeen = async () => {
-      try {
-        await AsyncStorage.setItem(INTRO_SEEN_KEY, 'true');
-      } catch (error) {
-        console.error('Error marking intro as seen:', error);
-      }
-    };
-
-    markIntroAsSeen();
-  }, []);
-
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="white" />
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       
-      {/* Main Content */}
-      <View style={styles.content}>
-        {/* Brand Header */}
-        <View style={styles.brandSection}>
-          <View style={styles.logoContainer}>
-            <Text style={styles.logoEmoji}>🔄</Text>
-          </View>
-          <Text style={styles.title}>Rent It Forward</Text>
-          <Text style={styles.tagline}>Share. Rent. Build Community.</Text>
+      {/* Hero Section with Overlaid Text */}
+      <View style={styles.heroSection}>
+        <Image 
+          source={require('../../assets/images/RIF_Onboarding_Image.png')}
+          style={styles.heroImage}
+          resizeMode="cover"
+        />
+        
+        {/* PNG Logo in Top Right */}
+        <View style={styles.logoContainer}>
+          <Image 
+            source={require('../../assets/images/Rent it Forward Inverted Color Transparent bg.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
         </View>
-
-        {/* Hero Section */}
-        <View style={styles.heroSection}>
-          <View style={styles.heroImageContainer}>
-            <View style={styles.heroCircle1}>
-              <Text style={styles.heroEmoji}>🔧</Text>
-            </View>
-            <View style={styles.heroCircle2}>
-              <Text style={styles.heroEmoji}>📱</Text>
-            </View>
-            <View style={styles.heroCircle3}>
-              <Text style={styles.heroEmoji}>🏠</Text>
-            </View>
+        
+        {/* Overlay Content */}
+        <View style={styles.overlay}>
+          <View style={styles.overlayContent}>
+            <Text style={styles.heroTitle}>Rent What You Need</Text>
+            <Text style={styles.heroSubtitle}>Share What You Have</Text>
           </View>
-          
-          <Text style={styles.description}>
-            Access tools, electronics, sports gear, and more from people in your community.
-          </Text>
-          
-          <Text style={styles.subDescription}>
-            Save money, live sustainably, and make sharing second nature.
-          </Text>
         </View>
       </View>
 
-      {/* Bottom Action Section */}
-      <View style={styles.actionSection}>
+      {/* Content Section */}
+      <View style={styles.contentSection}>
+        <Text style={styles.description}>
+          Access tools, electronics, sports gear, and more from people in your community.
+        </Text>
+        
+        <Text style={styles.subDescription}>
+          Save money, live sustainably, and make sharing second nature.
+        </Text>
+        
+        {/* Action Buttons */}
         <TouchableOpacity
           onPress={() => router.push('/(auth)/sign-up')}
           style={styles.primaryButton}
         >
-          <Text style={styles.primaryButtonText}>
-            Get Started
-          </Text>
+          <Text style={styles.primaryButtonText}>Get Started</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={() => router.push('/(auth)/sign-in')}
           style={styles.secondaryButton}
         >
-          <Text style={styles.secondaryButtonText}>
-            I already have an account
-          </Text>
+          <Text style={styles.secondaryButtonText}>Sign In</Text>
         </TouchableOpacity>
-
-        <View style={styles.socialSection}>
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
-          </View>
-          
-          <TouchableOpacity
-            onPress={() => router.push('/(tabs)')}
-            style={styles.browseButton}
-          >
-            <Text style={styles.browseButtonText}>
-              Browse available items
-            </Text>
-          </TouchableOpacity>
-        </View>
-
+        
         <Text style={styles.termsText}>
           By continuing, you agree to our{' '}
           <Text style={styles.linkText}>Terms of Service</Text> and{' '}
@@ -113,113 +78,84 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'white',
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 80,
+  heroSection: {
+    height: screenHeight * 0.55,
+    position: 'relative',
   },
-  brandSection: {
-    alignItems: 'center',
-    marginBottom: 60,
+  heroImage: {
+    width: '100%',
+    height: '100%',
   },
   logoContainer: {
-    width: 80,
-    height: 80,
-    backgroundColor: '#16A34A',
-    borderRadius: 40,
+    position: 'absolute',
+    top: 50,
+    right: 20,
+        zIndex: 10,
+  },
+  logoImage: {
+    width: 100,
+    height: 46,
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
   },
-  logoEmoji: {
-    fontSize: 40,
-    color: 'white',
+  overlayContent: {
+    alignItems: 'center',
+    paddingHorizontal: 32,
   },
-  title: {
-    fontSize: 36,
+  heroTitle: {
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#111827',
+    color: 'white',
     textAlign: 'center',
     marginBottom: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
-  tagline: {
-    fontSize: 18,
-    color: '#16A34A',
+  heroSubtitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: 'white',
     textAlign: 'center',
-    fontWeight: '500',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
-  heroSection: {
-    alignItems: 'center',
+  contentSection: {
     flex: 1,
-    justifyContent: 'center',
-  },
-  heroImageContainer: {
-    position: 'relative',
-    width: 240,
-    height: 240,
-    marginBottom: 40,
-  },
-  heroCircle1: {
-    position: 'absolute',
-    top: 20,
-    left: 20,
-    width: 80,
-    height: 80,
-    backgroundColor: '#DCFCE7',
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  heroCircle2: {
-    position: 'absolute',
-    top: 80,
-    right: 10,
-    width: 100,
-    height: 100,
-    backgroundColor: '#FEF3C7',
-    borderRadius: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  heroCircle3: {
-    position: 'absolute',
-    bottom: 20,
-    left: 40,
-    width: 90,
-    height: 90,
-    backgroundColor: '#DBEAFE',
-    borderRadius: 45,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  heroEmoji: {
-    fontSize: 32,
+    paddingHorizontal: 32,
+    paddingTop: 40,
+    paddingBottom: 48,
+    justifyContent: 'space-between',
   },
   description: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#374151',
     textAlign: 'center',
-    lineHeight: 26,
+    lineHeight: 24,
     marginBottom: 16,
-    paddingHorizontal: 20,
   },
   subDescription: {
     fontSize: 16,
-    color: '#6B7280',
+    color: '#374151',
     textAlign: 'center',
     lineHeight: 24,
-    paddingHorizontal: 20,
-  },
-  actionSection: {
-    paddingHorizontal: 24,
-    paddingBottom: 48,
+    marginBottom: 40,
   },
   primaryButton: {
-    backgroundColor: '#16A34A',
+    backgroundColor: mobileTokens.colors.primary,
     borderRadius: 12,
     paddingVertical: 18,
     marginBottom: 16,
-    shadowColor: '#16A34A',
+    shadowColor: mobileTokens.colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -232,41 +168,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   secondaryButton: {
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
     borderRadius: 12,
     paddingVertical: 16,
-    marginBottom: 24,
+    marginBottom: 32,
+    backgroundColor: 'white',
   },
   secondaryButtonText: {
     color: '#374151',
-    fontSize: 16,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  socialSection: {
-    marginBottom: 24,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E5E7EB',
-  },
-  dividerText: {
-    color: '#9CA3AF',
-    fontSize: 14,
-    marginHorizontal: 16,
-  },
-  browseButton: {
-    paddingVertical: 12,
-  },
-  browseButtonText: {
-    color: '#16A34A',
     fontSize: 16,
     fontWeight: '500',
     textAlign: 'center',
@@ -275,10 +185,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#9CA3AF',
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 16,
   },
-     linkText: {
-     color: '#16A34A',
-     fontWeight: '500',
-   },
- }); 
+  linkText: {
+    color: mobileTokens.colors.primary,
+    fontWeight: '500',
+  },
+}); 

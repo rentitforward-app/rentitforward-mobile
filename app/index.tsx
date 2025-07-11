@@ -35,10 +35,17 @@ export default function IndexScreen() {
 
     console.log('Routing decision - introSeen:', introSeen, 'user:', !!user, 'profile complete:', !!(profile?.phone_number && profile?.city));
 
-    // Show intro for signed-out users (either first-time or returning users who signed out)
+    // User is not authenticated
     if (!user) {
-      console.log('User signed out - showing intro screen');
-      router.replace('/(auth)/intro');
+      if (introSeen) {
+        // Returning user who has seen intro before - go directly to welcome
+        console.log('Returning user signed out - showing welcome screen');
+        router.replace('/(auth)/welcome');
+      } else {
+        // First-time user - show intro slides
+        console.log('First-time user - showing intro screen');
+        router.replace('/(auth)/intro');
+      }
       return;
     }
 
@@ -57,7 +64,7 @@ export default function IndexScreen() {
   // Show loading spinner while determining auth state and intro status
   return (
     <View style={styles.container}>
-      <ActivityIndicator size="large" color="#16A34A" />
+      <ActivityIndicator size="large" color="#44D62C" />
     </View>
   );
 }

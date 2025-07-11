@@ -9,8 +9,10 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: screenWidth } = Dimensions.get('window');
+const INTRO_SEEN_KEY = '@intro_seen';
 
 interface IntroSlide {
   id: number;
@@ -53,6 +55,14 @@ export default function IntroScreen() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
 
+  const markIntroAsSeen = async () => {
+    try {
+      await AsyncStorage.setItem(INTRO_SEEN_KEY, 'true');
+    } catch (error) {
+      console.error('Error marking intro as seen:', error);
+    }
+  };
+
   const goToSlide = (slideIndex: number) => {
     setCurrentSlide(slideIndex);
     scrollViewRef.current?.scrollTo({
@@ -61,15 +71,17 @@ export default function IntroScreen() {
     });
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentSlide < slides.length - 1) {
       goToSlide(currentSlide + 1);
     } else {
+      await markIntroAsSeen();
       router.push('/(auth)/welcome');
     }
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
+    await markIntroAsSeen();
     router.push('/(auth)/welcome');
   };
 

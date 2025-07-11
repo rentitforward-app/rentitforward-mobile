@@ -9,9 +9,14 @@ import {
   ScrollView,
   ActivityIndicator,
   StyleSheet,
+  Dimensions,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/components/AuthProvider';
+import { mobileTokens } from '../../src/lib/design-system';
+
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function SignUpScreen() {
   const router = useRouter();
@@ -83,123 +88,144 @@ export default function SignUpScreen() {
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>
-            Join the community and start sharing
-          </Text>
+        {/* Hero Image Section */}
+        <View style={styles.heroSection}>
+          <Image
+            source={require('../../assets/images/RIF_Onboarding_SoscialSignin2.png')}
+            style={styles.heroImage}
+            resizeMode="cover"
+          />
+          <View style={styles.heroOverlay}>
+            {/* Logo */}
+            <Image
+              source={require('../../assets/images/Rent it Forward Inverted Color Transparent bg.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </View>
         </View>
 
-        <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Full Name</Text>
-            <TextInput
-              style={[styles.input, errors.fullName && styles.inputError]}
-              value={fullName}
-              onChangeText={(text) => {
-                setFullName(text);
-                if (errors.fullName) {
-                  setErrors(prev => ({ ...prev, fullName: undefined }));
-                }
-              }}
-              placeholder="Enter your full name"
-              autoCapitalize="words"
-              autoCorrect={false}
-              editable={!loading}
-            />
-            {errors.fullName && <Text style={styles.errorText}>{errors.fullName}</Text>}
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={[styles.input, errors.email && styles.inputError]}
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text);
-                if (errors.email) {
-                  setErrors(prev => ({ ...prev, email: undefined }));
-                }
-              }}
-              placeholder="Enter your email"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!loading}
-            />
-            {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              style={[styles.input, errors.password && styles.inputError]}
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                if (errors.password) {
-                  setErrors(prev => ({ ...prev, password: undefined }));
-                }
-              }}
-              placeholder="Create a password"
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!loading}
-            />
-            {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Confirm Password</Text>
-            <TextInput
-              style={[styles.input, errors.confirmPassword && styles.inputError]}
-              value={confirmPassword}
-              onChangeText={(text) => {
-                setConfirmPassword(text);
-                if (errors.confirmPassword) {
-                  setErrors(prev => ({ ...prev, confirmPassword: undefined }));
-                }
-              }}
-              placeholder="Confirm your password"
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!loading}
-            />
-            {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
-          </View>
-
-          <TouchableOpacity
-            onPress={handleSignUp}
-            style={[styles.signUpButton, loading && styles.buttonDisabled]}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text style={styles.signUpButtonText}>Create Account</Text>
-            )}
-          </TouchableOpacity>
-
-          <Text style={styles.termsText}>
-            By creating an account, you agree to our{'\n'}
-            <Text style={styles.linkText}>Terms of Service</Text> and{' '}
-            <Text style={styles.linkText}>Privacy Policy</Text>
-          </Text>
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Already have an account?{' '}
-            <Text
-              style={styles.linkText}
-              onPress={() => router.push('/(auth)/sign-in')}
-            >
-              Sign In
+        {/* Content Section */}
+        <View style={styles.contentSection}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Create Account</Text>
+            <Text style={styles.subtitle}>
+              Join the community and start sharing
             </Text>
-          </Text>
+          </View>
+
+          <View style={styles.form}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Full Name</Text>
+              <TextInput
+                style={[styles.input, errors.fullName && styles.inputError]}
+                value={fullName}
+                onChangeText={(text) => {
+                  setFullName(text);
+                  if (errors.fullName) {
+                    setErrors(prev => ({ ...prev, fullName: undefined }));
+                  }
+                }}
+                placeholder="Enter your full name"
+                autoCapitalize="words"
+                autoCorrect={false}
+                editable={!loading}
+              />
+              {errors.fullName && <Text style={styles.errorText}>{errors.fullName}</Text>}
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={[styles.input, errors.email && styles.inputError]}
+                value={email}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  if (errors.email) {
+                    setErrors(prev => ({ ...prev, email: undefined }));
+                  }
+                }}
+                placeholder="Enter your email"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!loading}
+              />
+              {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Password</Text>
+              <TextInput
+                style={[styles.input, errors.password && styles.inputError]}
+                value={password}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  if (errors.password) {
+                    setErrors(prev => ({ ...prev, password: undefined }));
+                  }
+                }}
+                placeholder="Create a password"
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!loading}
+              />
+              {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Confirm Password</Text>
+              <TextInput
+                style={[styles.input, errors.confirmPassword && styles.inputError]}
+                value={confirmPassword}
+                onChangeText={(text) => {
+                  setConfirmPassword(text);
+                  if (errors.confirmPassword) {
+                    setErrors(prev => ({ ...prev, confirmPassword: undefined }));
+                  }
+                }}
+                placeholder="Confirm your password"
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!loading}
+              />
+              {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
+            </View>
+
+            <TouchableOpacity
+              onPress={handleSignUp}
+              style={[styles.signUpButton, loading && styles.buttonDisabled]}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.signUpButtonText}>Create Account</Text>
+              )}
+            </TouchableOpacity>
+
+            <Text style={styles.termsText}>
+              By creating an account, you agree to our{'\n'}
+              <Text style={styles.linkText}>Terms of Service</Text> and{' '}
+              <Text style={styles.linkText}>Privacy Policy</Text>
+            </Text>
+          </View>
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>
+              Already have an account?{' '}
+              <Text
+                style={styles.linkText}
+                onPress={() => router.push('/(auth)/sign-in')}
+              >
+                Sign In
+              </Text>
+            </Text>
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -209,19 +235,58 @@ export default function SignUpScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: '#f8fafc',
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 24,
+  },
+  heroSection: {
+    height: screenHeight * 0.4,
+    position: 'relative',
+  },
+  heroImage: {
+    width: screenWidth,
+    height: '100%',
+  },
+  heroOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
     paddingTop: 60,
+    paddingRight: 20,
+  },
+  logo: {
+    width: 120,
+    height: 40,
+  },
+  contentSection: {
+    flex: 1,
+    backgroundColor: 'white',
+    paddingHorizontal: 24,
+    paddingTop: 32,
     paddingBottom: 40,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    marginTop: -20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
   header: {
-    marginBottom: 40,
+    marginBottom: 32,
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#111827',
     marginBottom: 8,
@@ -229,6 +294,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: '#6B7280',
+    lineHeight: 24,
   },
   form: {
     flex: 1,
@@ -245,7 +311,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: '#D1D5DB',
-    borderRadius: 8,
+    borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 16,
     fontSize: 16,
@@ -260,28 +326,38 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   signUpButton: {
-    backgroundColor: '#16A34A',
-    borderRadius: 8,
+    backgroundColor: mobileTokens.colors.primary,
     paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
     marginBottom: 20,
+    shadowColor: mobileTokens.colors.primary,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   buttonDisabled: {
-    opacity: 0.6,
+    backgroundColor: '#9CA3AF',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   signUpButtonText: {
     color: 'white',
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   termsText: {
     fontSize: 14,
     color: '#6B7280',
     textAlign: 'center',
     lineHeight: 20,
+    marginBottom: 24,
   },
   footer: {
-    marginTop: 32,
     alignItems: 'center',
   },
   footerText: {
@@ -289,7 +365,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   linkText: {
-    color: '#16A34A',
+    color: mobileTokens.colors.primary,
     fontWeight: '600',
   },
 }); 
