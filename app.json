@@ -5,7 +5,10 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/images/RentItForwardFavicon2.png",
     "splash": {
+      "image": "./assets/images/RIF_Onboarding_Image.png",
+      "resizeMode": "contain",
       "backgroundColor": "#44D62C"
     },
     "assetBundlePatterns": [
@@ -13,13 +16,20 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.rentitforward.mobile"
+      "bundleIdentifier": "au.com.rentitforward.mobile",
+      "buildNumber": "1",
+      "icon": "./assets/images/RentItForwardFavicon2.png",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/images/RentItForwardFavicon2.png",
         "backgroundColor": "#44D62C"
       },
-      "package": "com.rentitforward.mobile",
+      "package": "au.com.rentitforward.mobile",
+      "versionCode": 1,
       "permissions": [
         "CAMERA",
         "WRITE_EXTERNAL_STORAGE",
@@ -40,8 +50,9 @@
         "origin": false
       },
       "eas": {
-        "projectId": "your-project-id-here"
+        "projectId": "c79578fa-7070-423e-a29e-64877b598b60"
       }
-    }
+    },
+    "owner": "rentitforward"
   }
-} 
+}

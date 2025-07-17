@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 12.0.0"
+    "version": ">= 12.0.0",
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -15,19 +16,19 @@
     },
     "production": {
       "ios": {
-        "buildType": "store"
+        "distribution": "store"
       },
       "android": {
-        "buildType": "app-bundle"
+        "distribution": "store"
       }
     }
   },
   "submit": {
     "production": {
       "ios": {
-        "appleId": "your-apple-id@example.com",
-        "ascAppId": "your-app-store-connect-app-id",
-        "appleTeamId": "your-apple-team-id"
+        "appleId": "rentitforward@gmail.com",
+        "ascAppId": "6748590879",
+        "appleTeamId": "752V3M4Q2S"
       },
       "android": {
         "serviceAccountKeyPath": "./google-play-service-account.json",

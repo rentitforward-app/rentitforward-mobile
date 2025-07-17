@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { Alert } from 'react-native';
-import { useRouter } from 'expo-router';
+import { SplashScreen, useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { AuthContextType, AuthState, Profile } from '../types/auth';
+
+SplashScreen.preventAutoHideAsync();
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -107,6 +109,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!state.loading) {
+      SplashScreen.hideAsync();
+    }
+  }, [state.loading]);
+
   const signIn = async (email: string, password: string) => {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
@@ -161,9 +169,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       
-      // Direct navigation to welcome screen after successful signout
-      console.log('Signing out - redirecting to welcome screen');
-      router.replace('/(auth)/welcome');
+      // Let the index.tsx routing logic handle the proper flow
+      // This will show intro for first-time users or welcome for returning users
+      console.log('Signing out - redirecting to index for proper routing');
+      router.replace('/');
     } catch (error: any) {
       setState(prev => ({ ...prev, loading: false, error: error.message }));
       Alert.alert('Sign Out Error', error.message);

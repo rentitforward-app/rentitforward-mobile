@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../src/lib/supabase';
 import Sentry from '../../src/lib/sentry';
+import { colors, spacing, typography, componentStyles } from '../../src/lib/design-system';
 
 // Categories
 const CATEGORIES = [
@@ -215,7 +216,7 @@ export default function BrowseScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#44D62C" />
+          <ActivityIndicator size="large" color={colors.primary.main} />
           <Text style={styles.loadingText}>Loading listings...</Text>
         </View>
       </SafeAreaView>
@@ -237,7 +238,7 @@ export default function BrowseScreen() {
             </TouchableOpacity>
           )}
           <TouchableOpacity style={styles.refreshButton} onPress={loadListings}>
-            <Ionicons name="refresh" size={24} color="#44D62C" />
+            <Ionicons name="refresh" size={24} color={colors.primary.main} />
           </TouchableOpacity>
         </View>
       </View>
@@ -303,7 +304,7 @@ export default function BrowseScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
   },
   loadingContainer: {
     flex: 1,
@@ -311,98 +312,98 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginTop: 16,
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
+    marginTop: spacing.md,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.neutral.lightGray,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#343C3E',
+    fontSize: typography.sizes['2xl'],
+    fontWeight: typography.weights.bold,
+    color: colors.text.primary,
   },
   refreshButton: {
-    padding: 8,
+    padding: spacing.xs,
   },
   searchContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: colors.neutral.lightGray,
     borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
-    marginLeft: 12,
-    color: '#343C3E',
+    fontSize: typography.sizes.base,
+    marginLeft: spacing.sm,
+    color: colors.text.primary,
   },
   categoryScroll: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
   },
   categoryChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: colors.neutral.lightGray,
     borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    marginRight: spacing.sm,
     borderWidth: 1,
-    borderColor: '#E5E5E5',
+    borderColor: colors.neutral.mediumGray,
   },
   categoryChipActive: {
-    backgroundColor: '#44D62C',
-    borderColor: '#44D62C',
+    backgroundColor: colors.primary.main,
+    borderColor: colors.primary.main,
   },
   categoryChipIcon: {
-    fontSize: 16,
+    fontSize: typography.sizes.base,
     marginRight: 6,
   },
   categoryChipText: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+    fontWeight: typography.weights.medium,
   },
   categoryChipTextActive: {
-    color: '#FFFFFF',
+    color: colors.white,
   },
   resultsContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
   },
   resultsText: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
   },
   listContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
   },
   row: {
     justifyContent: 'space-between',
   },
   listingCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderRadius: 12,
-    marginBottom: 16,
+    marginBottom: spacing.md,
     width: '48%',
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -420,7 +421,7 @@ const styles = StyleSheet.create({
   placeholderImage: {
     width: '100%',
     height: 120,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: colors.neutral.lightGray,
     justifyContent: 'center',
     alignItems: 'center',
     borderTopLeftRadius: 12,
@@ -428,44 +429,44 @@ const styles = StyleSheet.create({
   },
   priceBadge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: '#44D62C',
+    top: spacing.xs,
+    right: spacing.xs,
+    backgroundColor: colors.primary.main,
     borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs / 2,
   },
   priceText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
+    color: colors.white,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.semibold,
   },
   listingInfo: {
-    padding: 12,
+    padding: spacing.sm,
   },
   listingTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#343C3E',
-    marginBottom: 8,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
     lineHeight: 20,
   },
   categoryContainer: {
-    marginBottom: 8,
+    marginBottom: spacing.xs,
   },
   categoryText: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: typography.sizes.xs,
+    color: colors.text.secondary,
   },
   locationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: spacing.xs,
   },
   locationText: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginLeft: 4,
+    fontSize: typography.sizes.xs,
+    color: colors.text.secondary,
+    marginLeft: spacing.xs / 2,
   },
   ownerContainer: {
     flexDirection: 'row',
@@ -487,14 +488,14 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: colors.neutral.lightGray,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 6,
   },
   ownerName: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: typography.sizes.xs,
+    color: colors.text.secondary,
     flex: 1,
   },
   ratingContainer: {
@@ -502,39 +503,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ratingText: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: typography.sizes.xs,
+    color: colors.text.secondary,
     marginLeft: 2,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: spacing.xl,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#343C3E',
-    marginTop: 16,
-    marginBottom: 8,
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.primary,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
   },
   emptyText: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
     textAlign: 'center',
     lineHeight: 20,
-    marginBottom: 20,
+    marginBottom: spacing.md,
   },
   createButton: {
-    backgroundColor: '#44D62C',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    backgroundColor: colors.primary.main,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
     borderRadius: 8,
   },
   createButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    color: colors.white,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold,
   },
 }); 

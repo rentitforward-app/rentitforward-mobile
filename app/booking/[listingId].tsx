@@ -1,490 +1,936 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  StyleSheet,
-} from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { useAuthStore } from '../../src/stores/auth';
+import { View, Text, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, TextInput, Modal } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { colors, spacing, typography } from '../../src/lib/design-system';
+import { useAuth } from '../../src/components/AuthProvider';
 import { supabase } from '../../src/lib/supabase';
-import type { Listing } from '@shared/types/listing';
-import type { CreateBooking } from '@shared/types/booking';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
-interface BookingDraft {
-  listingId: string;
-  startDate: Date | null;
-  endDate: Date | null;
-  deliveryOption: 'pickup' | 'delivery';
-  deliveryAddress: string;
-  includeInsurance: boolean;
-  specialRequests: string;
-  totalDays: number;
-  subtotal: number;
-  insuranceFee: number;
-  deliveryFee: number;
-  totalAmount: number;
+interface ListingData {
+  id: string;
+  title: string;
+  description: string;
+  price_per_day: number;
+  location: string;
+  is_active: boolean;
+  created_at: string;
+  owner_id: string;
+  category: string;
+  condition: string;
+  delivery_available: boolean;
+  pickup_available: boolean;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  postal_code: string | null;
+  profiles: {
+    id: string;
+    full_name: string;
+    avatar_url: string | null;
+    rating: string | null;
+  } | null;
+  listing_photos: Array<{
+    id: string;
+    url: string;
+    order_index: number;
+  }>;
 }
 
 export default function BookingScreen() {
-  const { listingId } = useLocalSearchParams<{ listingId: string }>();
+  const { listingId } = useLocalSearchParams();
   const router = useRouter();
-  const { user } = useAuthStore();
-  const [bookingDraft, setBookingDraft] = useState<BookingDraft>({
-    listingId: listingId || '',
-    startDate: null,
-    endDate: null,
-    deliveryOption: 'pickup',
-    deliveryAddress: '',
-    includeInsurance: false,
-    specialRequests: '',
-    totalDays: 0,
-    subtotal: 0,
-    insuranceFee: 0,
-    deliveryFee: 0,
-    totalAmount: 0,
-  });
+  const { user } = useAuth();
+  
+  const [listing, setListing] = useState<ListingData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [bookingLoading, setBookingLoading] = useState(false);
+  
+  // Booking form state
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  const [deliveryMethod, setDeliveryMethod] = useState('');
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [specialInstructions, setSpecialInstructions] = useState('');
 
-  // Fetch listing details
-  const { data: listing, isLoading: listingLoading } = useQuery({
-    queryKey: ['listing', listingId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('listings')
-        .select(`
-          *,
-          owner:profiles!listings_owner_id_fkey(*)
-        `)
-        .eq('id', listingId)
-        .single();
-      
-      if (error) throw error;
-      return data as Listing;
-    },
-    enabled: !!listingId,
-  });
-
-  // Calculate pricing when dates change
   useEffect(() => {
-    if (bookingDraft.startDate && bookingDraft.endDate && listing) {
-      const days = Math.ceil(
-        (bookingDraft.endDate.getTime() - bookingDraft.startDate.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      const subtotal = days * listing.daily_rate;
-      const insuranceFee = bookingDraft.includeInsurance ? subtotal * 0.1 : 0; // 10% insurance
-      const deliveryFee = bookingDraft.deliveryOption === 'delivery' ? 25 : 0; // $25 delivery fee
-      const totalAmount = subtotal + insuranceFee + deliveryFee;
+    fetchListingDetails();
+  }, [listingId]);
 
-      setBookingDraft(prev => ({
-        ...prev,
-        totalDays: days,
-        subtotal,
-        insuranceFee,
-        deliveryFee,
-        totalAmount,
-      }));
-    }
-  }, [bookingDraft.startDate, bookingDraft.endDate, bookingDraft.includeInsurance, bookingDraft.deliveryOption, listing]);
-
-  // Create booking mutation
-  const createBookingMutation = useMutation({
-    mutationFn: async (bookingData: CreateBooking) => {
-      const { data, error } = await supabase
-        .from('bookings')
-        .insert(bookingData)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (booking) => {
-      router.push(`/booking/success?bookingId=${booking.id}`);
-    },
-    onError: (error) => {
-      Alert.alert('Booking Error', 'Failed to create booking. Please try again.');
-      console.error('Booking creation error:', error);
-    },
-  });
-
-  const handleDateSelection = () => {
-    router.push({
-      pathname: '/booking/calendar',
-      params: { 
-        listingId,
-        startDate: bookingDraft.startDate?.toISOString(),
-        endDate: bookingDraft.endDate?.toISOString(),
-      },
-    });
-  };
-
-  const handleProceedToSummary = () => {
-    if (!bookingDraft.startDate || !bookingDraft.endDate) {
-      Alert.alert('Missing Dates', 'Please select your rental dates.');
+  const fetchListingDetails = async () => {
+    if (!listingId || typeof listingId !== 'string') {
+      Alert.alert('Error', 'Invalid listing ID');
+      router.back();
       return;
     }
 
-    router.push({
-      pathname: '/booking/summary',
-      params: {
-        listingId,
-        startDate: bookingDraft.startDate.toISOString(),
-        endDate: bookingDraft.endDate.toISOString(),
-        deliveryOption: bookingDraft.deliveryOption,
-        deliveryAddress: bookingDraft.deliveryAddress,
-        includeInsurance: bookingDraft.includeInsurance.toString(),
-        specialRequests: bookingDraft.specialRequests,
-        totalAmount: bookingDraft.totalAmount.toString(),
-      },
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('listings')
+      .select(`
+        *,
+        profiles:owner_id (
+          id,
+          full_name,
+          avatar_url,
+          rating
+        ),
+        listing_photos (
+          id,
+          url,
+          order_index
+        ),
+        address,
+        city,
+        state,
+        postal_code
+      `)
+      .eq('id', listingId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching listing:', error);
+      Alert.alert('Error', 'Failed to load listing details');
+      router.back();
+    } else {
+      setListing(data);
+    }
+    setLoading(false);
+  };
+
+  // Set default delivery method to pickup when listing loads
+  useEffect(() => {
+    if (listing && !deliveryMethod) {
+      if (listing.pickup_available) {
+        setDeliveryMethod('pickup');
+      } else if (listing.delivery_available) {
+        setDeliveryMethod('delivery');
+      }
+    }
+  }, [listing, deliveryMethod]);
+
+  const calculateDuration = (): number => {
+    if (!startDate || !endDate) return 0;
+    const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  const calculatePricing = () => {
+    if (!listing) {
+      return {
+        duration: 0,
+        basePrice: 0,
+        platformFee: 0,
+        total: 0
+      };
+    }
+    
+    const duration = calculateDuration();
+    const basePrice = listing.price_per_day * duration;
+    const platformFee = basePrice * 0.03; // 3% platform fee
+    const total = basePrice + platformFee;
+
+    return {
+      duration,
+      basePrice,
+      platformFee,
+      total
+    };
+  };
+
+  const formatDate = (date: Date | null): string => {
+    if (!date) return 'dd/mm/yyyy';
+    return date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
     });
   };
 
-  if (listingLoading) {
+  const formatCurrency = (amount: number): string => {
+    return `$${amount.toFixed(2)}`;
+  };
+
+  const handleStartDateChange = (event: any, selectedDate?: Date) => {
+    setShowStartDatePicker(false);
+    if (selectedDate) {
+      setStartDate(selectedDate);
+      // If end date is before or same as new start date, clear it
+      if (endDate && endDate <= selectedDate) {
+        setEndDate(null);
+      }
+    }
+  };
+
+  const handleEndDateChange = (event: any, selectedDate?: Date) => {
+    setShowEndDatePicker(false);
+    if (selectedDate && startDate && selectedDate > startDate) {
+      setEndDate(selectedDate);
+    } else if (selectedDate && selectedDate <= (startDate || new Date())) {
+      Alert.alert('Invalid Date', 'End date must be after start date');
+    }
+  };
+
+  const getMinimumDate = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow;
+  };
+
+  const getMinimumEndDate = () => {
+    if (!startDate) return getMinimumDate();
+    const dayAfterStart = new Date(startDate);
+    dayAfterStart.setDate(dayAfterStart.getDate() + 1);
+    return dayAfterStart;
+  };
+
+  const getDeliveryOptions = () => {
+    const options = [];
+    
+    if (listing?.pickup_available) {
+      options.push({ label: 'Pickup', value: 'pickup' });
+    }
+    if (listing?.delivery_available) {
+      options.push({ label: 'Delivery', value: 'delivery' });
+    }
+    
+    return options;
+  };
+
+  const getDeliveryMethodDisplayName = (value: string) => {
+    const options = getDeliveryOptions();
+    const option = options.find(opt => opt.value === value);
+    return option ? option.label : value;
+  };
+
+  const getMaskedPickupLocation = (listing: ListingData | null): string => {
+    if (!listing) return 'Pickup location not specified';
+    
+    // Show only city and state, hide street address and postal code for security
+    const city = listing.city?.trim();
+    const state = listing.state?.trim();
+    
+    if (city && state) {
+      return `${city}, ${state}`;
+    } else if (city) {
+      return city;
+    } else if (state) {
+      return state;
+    }
+    
+    return 'Pickup location available';
+  };
+
+  const handleBooking = async () => {
+    if (!user) {
+      Alert.alert('Sign In Required', 'Please sign in to book this item');
+      return;
+    }
+
+    if (!startDate || !endDate) {
+      Alert.alert('Missing Dates', 'Please select both start and end dates');
+      return;
+    }
+
+    if (!deliveryMethod) {
+      Alert.alert('Missing Delivery Method', 'Please select a delivery method');
+      return;
+    }
+
+    if (deliveryMethod === 'delivery' && !deliveryAddress.trim()) {
+      Alert.alert('Missing Delivery Address', 'Please enter a delivery address');
+      return;
+    }
+
+    // Pickup validation no longer needed as location comes from listing
+
+    setBookingLoading(true);
+
+    try {
+      const pricing = calculatePricing();
+      
+      const { data, error } = await supabase
+        .from('bookings')
+        .insert({
+          listing_id: listing?.id,
+          renter_id: user.id,
+          start_date: startDate.toISOString().split('T')[0],
+          end_date: endDate.toISOString().split('T')[0],
+          total_price: pricing.total,
+          platform_fee: pricing.platformFee,
+          delivery_method: deliveryMethod,
+          delivery_address: deliveryMethod === 'delivery' ? deliveryAddress.trim() : null,
+          pickup_location: deliveryMethod === 'pickup' ? `${listing?.address || ''}, ${listing?.city || ''}, ${listing?.state || ''} ${listing?.postal_code || ''}`.trim() : null,
+          special_instructions: specialInstructions || null,
+          status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      Alert.alert(
+        'Booking Request Sent!',
+        `Your booking request has been sent to ${listing?.profiles?.full_name || 'the owner'}. You'll receive a notification when they respond.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              router.replace('/bookings');
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Booking error:', error);
+      Alert.alert('Booking Failed', 'Failed to create booking. Please try again.');
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
+  if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading listing details...</Text>
-      </View>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator size="large" color={colors.primary.main} />
+            <Text style={{ marginTop: spacing.md, color: colors.text.secondary }}>Loading booking details...</Text>
+          </View>
+        </SafeAreaView>
+      </>
     );
   }
 
   if (!listing) {
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Listing not found</Text>
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={() => router.back()}
-        >
-          <Text style={styles.backButtonText}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: typography.sizes.lg, color: colors.text.primary }}>Listing not found</Text>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={{
+                marginTop: spacing.md,
+                paddingHorizontal: spacing.lg,
+                paddingVertical: spacing.sm,
+                backgroundColor: colors.primary.main,
+                borderRadius: 8
+              }}
+            >
+              <Text style={{ color: colors.white, fontWeight: typography.weights.semibold }}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </>
     );
   }
 
+  const pricing = calculatePricing();
+  const deliveryOptions = getDeliveryOptions();
+
+  // Get main image
+  let mainImage = null;
+  if (listing.listing_photos && listing.listing_photos.length > 0) {
+    const sortedPhotos = listing.listing_photos.sort((a, b) => a.order_index - b.order_index);
+    mainImage = sortedPhotos[0].url;
+  }
+
   return (
-    <ScrollView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Book {listing.title}</Text>
-      </View>
-
-      {/* Listing Summary */}
-      <View style={styles.listingSummary}>
-        <Text style={styles.listingTitle}>{listing.title}</Text>
-        <Text style={styles.listingLocation}>{listing.location}</Text>
-        <Text style={styles.listingPrice}>${listing.daily_rate}/day</Text>
-      </View>
-
-      {/* Date Selection */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Select Dates</Text>
-        <TouchableOpacity style={styles.dateSelector} onPress={handleDateSelection}>
-          <Text style={styles.dateSelectorText}>
-            {bookingDraft.startDate && bookingDraft.endDate
-              ? `${bookingDraft.startDate.toLocaleDateString()} - ${bookingDraft.endDate.toLocaleDateString()}`
-              : 'Choose your dates'
-            }
-          </Text>
-        </TouchableOpacity>
-        {bookingDraft.totalDays > 0 && (
-          <Text style={styles.daysText}>{bookingDraft.totalDays} days</Text>
-        )}
-      </View>
-
-      {/* Delivery Options */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Delivery Options</Text>
-        <View style={styles.radioGroup}>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }} edges={['top', 'left', 'right']}>
+        {/* Header */}
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: spacing.md,
+          paddingVertical: spacing.sm,
+          backgroundColor: colors.white,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.gray[200]
+        }}>
           <TouchableOpacity
-            style={[
-              styles.radioOption,
-              bookingDraft.deliveryOption === 'pickup' && styles.radioOptionSelected
-            ]}
-            onPress={() => setBookingDraft(prev => ({ ...prev, deliveryOption: 'pickup' }))}
+            onPress={() => router.back()}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center'
+            }}
           >
-            <Text style={styles.radioText}>Pickup (Free)</Text>
-            <Text style={styles.radioSubtext}>Pick up from owner's location</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[
-              styles.radioOption,
-              bookingDraft.deliveryOption === 'delivery' && styles.radioOptionSelected
-            ]}
-            onPress={() => setBookingDraft(prev => ({ ...prev, deliveryOption: 'delivery' }))}
-          >
-            <Text style={styles.radioText}>Delivery (+$25)</Text>
-            <Text style={styles.radioSubtext}>Delivered to your location</Text>
+            <Ionicons name="arrow-back" size={24} color={colors.primary.main} />
+            <Text style={{
+              marginLeft: spacing.xs,
+              fontSize: typography.sizes.base,
+              color: colors.primary.main,
+              fontWeight: typography.weights.medium
+            }}>
+              Back to Browse
+            </Text>
           </TouchableOpacity>
         </View>
-      </View>
 
-      {/* Insurance Option */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Protection</Text>
-        <TouchableOpacity
-          style={[
-            styles.insuranceOption,
-            bookingDraft.includeInsurance && styles.insuranceOptionSelected
-          ]}
-          onPress={() => setBookingDraft(prev => ({ 
-            ...prev, 
-            includeInsurance: !prev.includeInsurance 
-          }))}
-        >
-          <Text style={styles.insuranceText}>
-            Include Damage Protection (+10%)
-          </Text>
-          <Text style={styles.insuranceSubtext}>
-            Covers accidental damage up to item value
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Price Breakdown */}
-      {bookingDraft.totalDays > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Price Breakdown</Text>
-          <View style={styles.priceBreakdown}>
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>
-                ${listing.daily_rate}/day × {bookingDraft.totalDays} days
+        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+          {/* Listing Summary */}
+          <View style={{
+            flexDirection: 'row',
+            padding: spacing.md,
+            backgroundColor: colors.white,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.gray[100]
+          }}>
+            {mainImage ? (
+              <Image
+                source={{ uri: mainImage }}
+                style={{
+                  width: 100,
+                  height: 100,
+                  borderRadius: 8,
+                  marginRight: spacing.md
+                }}
+              />
+            ) : (
+              <View style={{
+                width: 100,
+                height: 100,
+                backgroundColor: colors.gray[100],
+                borderRadius: 8,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: spacing.md
+              }}>
+                <Ionicons name="image" size={32} color={colors.gray[400]} />
+              </View>
+            )}
+            
+            <View style={{ flex: 1 }}>
+              <Text style={{
+                fontSize: typography.sizes.lg,
+                fontWeight: typography.weights.bold,
+                color: colors.text.primary,
+                marginBottom: spacing.xs
+              }}>
+                {listing.title}
               </Text>
-              <Text style={styles.priceValue}>${bookingDraft.subtotal.toFixed(2)}</Text>
-            </View>
-            
-            {bookingDraft.deliveryFee > 0 && (
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>Delivery fee</Text>
-                <Text style={styles.priceValue}>${bookingDraft.deliveryFee.toFixed(2)}</Text>
+              
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginBottom: spacing.xs
+              }}>
+                <Text style={{
+                  fontSize: typography.sizes['2xl'],
+                  fontWeight: typography.weights.bold,
+                  color: colors.primary.main
+                }}>
+                  ${listing.price_per_day}
+                </Text>
+                <Text style={{
+                  fontSize: typography.sizes.sm,
+                  color: colors.text.secondary,
+                  marginLeft: spacing.xs
+                }}>
+                  per day
+                </Text>
               </View>
-            )}
-            
-            {bookingDraft.insuranceFee > 0 && (
-              <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>Damage protection</Text>
-                <Text style={styles.priceValue}>${bookingDraft.insuranceFee.toFixed(2)}</Text>
-              </View>
-            )}
-            
-            <View style={[styles.priceRow, styles.totalRow]}>
-              <Text style={styles.totalLabel}>Total</Text>
-              <Text style={styles.totalValue}>${bookingDraft.totalAmount.toFixed(2)}</Text>
+              
+              <Text style={{
+                fontSize: typography.sizes.sm,
+                color: colors.text.secondary
+              }}>
+                by {listing.profiles?.full_name || 'Unknown Owner'}
+              </Text>
             </View>
           </View>
-        </View>
-      )}
 
-      {/* Continue Button */}
-      <TouchableOpacity
-        style={[
-          styles.continueButton,
-          (!bookingDraft.startDate || !bookingDraft.endDate) && styles.continueButtonDisabled
-        ]}
-        onPress={handleProceedToSummary}
-        disabled={!bookingDraft.startDate || !bookingDraft.endDate}
-      >
-        <Text style={styles.continueButtonText}>Continue to Summary</Text>
-      </TouchableOpacity>
-    </ScrollView>
+          {/* Booking Form */}
+          <View style={{ padding: spacing.md }}>
+            {/* Date Selection */}
+            <View style={{ marginBottom: spacing.lg }}>
+              <View style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                marginBottom: spacing.md
+              }}>
+                {/* Start Date */}
+                <View style={{ flex: 1, marginRight: spacing.sm }}>
+                  <Text style={{
+                    fontSize: typography.sizes.sm,
+                    fontWeight: typography.weights.medium,
+                    color: colors.text.primary,
+                    marginBottom: spacing.xs
+                  }}>
+                    Start Date
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setShowStartDatePicker(true)}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: colors.gray[300],
+                      borderRadius: 8,
+                      paddingHorizontal: spacing.sm,
+                      paddingVertical: spacing.md,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: typography.sizes.base,
+                      color: startDate ? colors.text.primary : colors.text.secondary
+                    }}>
+                      {formatDate(startDate)}
+                    </Text>
+                    <Ionicons name="calendar-outline" size={20} color={colors.gray[400]} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* End Date */}
+                <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                  <Text style={{
+                    fontSize: typography.sizes.sm,
+                    fontWeight: typography.weights.medium,
+                    color: colors.text.primary,
+                    marginBottom: spacing.xs
+                  }}>
+                    End Date
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setShowEndDatePicker(true)}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: colors.gray[300],
+                      borderRadius: 8,
+                      paddingHorizontal: spacing.sm,
+                      paddingVertical: spacing.md,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: typography.sizes.base,
+                      color: endDate ? colors.text.primary : colors.text.secondary
+                    }}>
+                      {formatDate(endDate)}
+                    </Text>
+                    <Ionicons name="calendar-outline" size={20} color={colors.gray[400]} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
+            {/* Delivery Method */}
+            <View style={{ marginBottom: spacing.lg }}>
+              <Text style={{
+                fontSize: typography.sizes.sm,
+                fontWeight: typography.weights.medium,
+                color: colors.text.primary,
+                marginBottom: spacing.xs
+              }}>
+                Delivery Method
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  const options = getDeliveryOptions();
+                  if (options.length === 0) {
+                    Alert.alert(
+                      'No Delivery Options',
+                      'This listing does not have pickup or delivery options available. Please contact the owner for more information.',
+                      [{ text: 'OK' }]
+                    );
+                  } else {
+                    setShowDeliveryModal(true);
+                  }
+                }}
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.gray[300],
+                  borderRadius: 8,
+                  paddingHorizontal: spacing.sm,
+                  paddingVertical: spacing.md,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}
+              >
+                <Text style={{
+                  fontSize: typography.sizes.base,
+                  color: deliveryMethod ? colors.text.primary : colors.text.secondary
+                }}>
+                  {deliveryMethod 
+                    ? (deliveryMethod === 'pickup' ? 'Pickup' : 'Delivery')
+                    : (getDeliveryOptions().length > 0 ? 'Select delivery method' : 'No delivery options available')
+                  }
+                </Text>
+                <Ionicons name="chevron-down" size={20} color={colors.gray[400]} />
+              </TouchableOpacity>
+              
+              {/* Delivery Address - only show when delivery is selected */}
+              {deliveryMethod === 'delivery' && (
+                <View style={{ marginTop: spacing.md }}>
+                  <Text style={{
+                    fontSize: typography.sizes.sm,
+                    fontWeight: typography.weights.medium,
+                    color: colors.text.primary,
+                    marginBottom: spacing.xs
+                  }}>
+                    Delivery Address
+                  </Text>
+                  <TextInput
+                    value={deliveryAddress}
+                    onChangeText={setDeliveryAddress}
+                    placeholder="Enter your delivery address..."
+                    multiline
+                    numberOfLines={3}
+                    textAlignVertical="top"
+                    style={{
+                      borderWidth: 1,
+                      borderColor: colors.gray[300],
+                      borderRadius: 8,
+                      paddingHorizontal: spacing.sm,
+                      paddingVertical: spacing.sm,
+                      fontSize: typography.sizes.base,
+                      color: colors.text.primary,
+                      backgroundColor: colors.white,
+                      minHeight: 80
+                    }}
+                  />
+                </View>
+              )}
+              
+              {/* Pickup Location - only show when pickup is selected */}
+              {deliveryMethod === 'pickup' && (
+                <View style={{ marginTop: spacing.md }}>
+                  <Text style={{
+                    fontSize: typography.sizes.sm,
+                    fontWeight: typography.weights.medium,
+                    color: colors.text.primary,
+                    marginBottom: spacing.xs
+                  }}>
+                    Pickup Location
+                  </Text>
+                  <View style={{
+                    borderWidth: 1,
+                    borderColor: colors.gray[300],
+                    borderRadius: 8,
+                    paddingHorizontal: spacing.sm,
+                    paddingVertical: spacing.md,
+                    backgroundColor: colors.gray[50]
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Ionicons name="location-outline" size={18} color={colors.primary.main} style={{ marginRight: spacing.xs }} />
+                      <Text style={{
+                        fontSize: typography.sizes.base,
+                        color: colors.text.primary,
+                        fontWeight: typography.weights.medium
+                      }}>
+                        {getMaskedPickupLocation(listing)}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={{
+                    backgroundColor: colors.gray[50],
+                    borderRadius: 8,
+                    padding: spacing.sm,
+                    marginTop: spacing.xs,
+                    flexDirection: 'row',
+                    alignItems: 'flex-start'
+                  }}>
+                    <Ionicons name="shield-checkmark-outline" size={16} color={colors.primary.main} style={{ marginRight: spacing.xs, marginTop: 2 }} />
+                    <Text style={{
+                      fontSize: typography.sizes.xs,
+                      color: colors.gray[600],
+                      flex: 1,
+                      lineHeight: 16
+                    }}>
+                      The exact pickup address will be provided by the owner once your booking is confirmed.
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* Special Instructions */}
+            <View style={{ marginBottom: spacing.lg }}>
+              <Text style={{
+                fontSize: typography.sizes.sm,
+                fontWeight: typography.weights.medium,
+                color: colors.text.primary,
+                marginBottom: spacing.xs
+              }}>
+                Special Instructions (Optional)
+              </Text>
+              <TextInput
+                value={specialInstructions}
+                onChangeText={setSpecialInstructions}
+                placeholder="Any special requests or instructions..."
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.gray[300],
+                  borderRadius: 8,
+                  paddingHorizontal: spacing.sm,
+                  paddingVertical: spacing.sm,
+                  fontSize: typography.sizes.base,
+                  color: colors.text.primary,
+                  backgroundColor: colors.white,
+                  minHeight: 80
+                }}
+              />
+            </View>
+
+            {/* Price Breakdown */}
+            {pricing.duration > 0 && (
+              <View style={{
+                backgroundColor: colors.gray[50],
+                borderRadius: 12,
+                padding: spacing.md,
+                marginBottom: spacing.lg
+              }}>
+                <Text style={{
+                  fontSize: typography.sizes.base,
+                  fontWeight: typography.weights.semibold,
+                  color: colors.text.primary,
+                  marginBottom: spacing.md
+                }}>
+                  Price Breakdown
+                </Text>
+                
+                <View style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  marginBottom: spacing.sm
+                }}>
+                  <Text style={{ color: colors.text.secondary }}>
+                    ${listing.price_per_day} × {pricing.duration} day{pricing.duration > 1 ? 's' : ''}
+                  </Text>
+                  <Text style={{ color: colors.text.primary }}>
+                    {formatCurrency(pricing.basePrice)}
+                  </Text>
+                </View>
+                
+                <View style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  marginBottom: spacing.sm
+                }}>
+                  <Text style={{ color: colors.text.secondary }}>Platform fee (3%)</Text>
+                  <Text style={{ color: colors.text.primary }}>
+                    {formatCurrency(pricing.platformFee)}
+                  </Text>
+                </View>
+                
+                <View style={{
+                  borderTopWidth: 1,
+                  borderTopColor: colors.gray[200],
+                  paddingTop: spacing.sm,
+                  flexDirection: 'row',
+                  justifyContent: 'space-between'
+                }}>
+                  <Text style={{
+                    fontSize: typography.sizes.base,
+                    fontWeight: typography.weights.semibold,
+                    color: colors.text.primary
+                  }}>
+                    Total
+                  </Text>
+                  <Text style={{
+                    fontSize: typography.sizes.base,
+                    fontWeight: typography.weights.semibold,
+                    color: colors.text.primary
+                  }}>
+                    {formatCurrency(pricing.total)}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Security Notice */}
+            <View style={{
+              backgroundColor: colors.gray[50],
+              borderRadius: 12,
+              padding: spacing.md,
+              marginBottom: spacing.lg
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                <Ionicons name="shield-checkmark" size={20} color={colors.primary.main} style={{ marginRight: spacing.sm, marginTop: 2 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{
+                    fontSize: typography.sizes.sm,
+                    color: colors.text.primary,
+                    lineHeight: 20
+                  }}>
+                    <Text style={{ fontWeight: typography.weights.semibold }}>Secure payments & deposit protection</Text>
+                    {'\n\n'}
+                    You won't be charged yet. This sends a booking request to the owner.
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+
+        {/* Bottom Action */}
+        <SafeAreaView edges={['bottom']} style={{ backgroundColor: colors.white }}>
+          <View style={{
+            padding: spacing.md,
+            backgroundColor: colors.white,
+            borderTopWidth: 1,
+            borderTopColor: colors.gray[200]
+          }}>
+            <TouchableOpacity
+              onPress={handleBooking}
+              disabled={bookingLoading || !startDate || !endDate || !deliveryMethod || (deliveryMethod === 'delivery' && !deliveryAddress.trim())}
+              style={{
+                backgroundColor: (!startDate || !endDate || !deliveryMethod || (deliveryMethod === 'delivery' && !deliveryAddress.trim())) ? colors.gray[400] : colors.primary.main,
+                borderRadius: 12,
+                paddingVertical: spacing.md,
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'row'
+              }}
+            >
+              {bookingLoading ? (
+                <ActivityIndicator size="small" color={colors.white} />
+              ) : (
+                <Text style={{
+                  fontSize: typography.sizes.base,
+                  fontWeight: typography.weights.semibold,
+                  color: colors.white
+                }}>
+                  Request to Book
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+
+        {/* Date Pickers */}
+        {/* Delivery Method Modal */}
+        <Modal
+          visible={showDeliveryModal}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowDeliveryModal(false)}
+        >
+          <View style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            justifyContent: 'flex-end'
+          }}>
+            <View style={{
+              backgroundColor: colors.white,
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              paddingHorizontal: spacing.md,
+              paddingTop: spacing.lg,
+              paddingBottom: spacing.xl
+            }}>
+              <View style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: spacing.lg
+              }}>
+                <Text style={{
+                  fontSize: typography.sizes.lg,
+                  fontWeight: typography.weights.semibold,
+                  color: colors.text.primary
+                }}>
+                  Select Delivery Method
+                </Text>
+                <TouchableOpacity onPress={() => setShowDeliveryModal(false)}>
+                  <Ionicons name="close" size={24} color={colors.gray[400]} />
+                </TouchableOpacity>
+              </View>
+              
+              {getDeliveryOptions().map((option, index) => (
+                <TouchableOpacity
+                  key={`${option.value}-${index}`}
+                  onPress={() => {
+                    setDeliveryMethod(option.value);
+                    setShowDeliveryModal(false);
+                    // Clear delivery address if switching away from delivery
+                    if (option.value !== 'delivery') {
+                      setDeliveryAddress('');
+                    }
+                  }}
+                  style={{
+                    paddingVertical: spacing.md,
+                    paddingHorizontal: spacing.sm,
+                    borderRadius: 8,
+                    backgroundColor: deliveryMethod === option.value ? colors.primary.main + '20' : 'transparent',
+                    marginBottom: spacing.sm,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}
+                >
+                  <Text style={{
+                    fontSize: typography.sizes.base,
+                    color: deliveryMethod === option.value ? colors.primary.main : colors.text.primary,
+                    fontWeight: deliveryMethod === option.value ? typography.weights.semibold : typography.weights.normal
+                  }}>
+                    {option.label}
+                  </Text>
+                  {deliveryMethod === option.value && (
+                    <Ionicons name="checkmark" size={20} color={colors.primary.main} />
+                  )}
+                </TouchableOpacity>
+              ))}
+              
+              {getDeliveryOptions().length === 0 && (
+                <View style={{
+                  paddingVertical: spacing.lg,
+                  alignItems: 'center'
+                }}>
+                  <Text style={{
+                    fontSize: typography.sizes.base,
+                    color: colors.text.secondary,
+                    textAlign: 'center'
+                  }}>
+                    No delivery options available for this listing.
+                    Please contact the owner for more information.
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </Modal>
+
+        {/* Date Pickers */}
+        {showStartDatePicker && (
+          <DateTimePicker
+            value={startDate || getMinimumDate()}
+            mode="date"
+            display="default"
+            minimumDate={getMinimumDate()}
+            onChange={handleStartDateChange}
+          />
+        )}
+
+        {showEndDatePicker && (
+          <DateTimePicker
+            value={endDate || getMinimumEndDate()}
+            mode="date"
+            display="default"
+            minimumDate={getMinimumEndDate()}
+            onChange={handleEndDateChange}
+          />
+        )}
+      </SafeAreaView>
+    </>
   );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f9fafb',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f9fafb',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#6b7280',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f9fafb',
-    padding: 20,
-  },
-  errorText: {
-    fontSize: 18,
-    color: '#ef4444',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  header: {
-    backgroundColor: '#ffffff',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#111827',
-    marginTop: 8,
-  },
-  backButton: {
-    padding: 8,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#44d62c',
-    fontWeight: '500',
-  },
-  listingSummary: {
-    backgroundColor: '#ffffff',
-    padding: 16,
-    marginTop: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  listingTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  listingLocation: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 8,
-  },
-  listingPrice: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#44d62c',
-  },
-  section: {
-    backgroundColor: '#ffffff',
-    marginTop: 8,
-    padding: 16,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 12,
-  },
-  dateSelector: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 16,
-    backgroundColor: '#f9fafb',
-  },
-  dateSelectorText: {
-    fontSize: 16,
-    color: '#374151',
-  },
-  daysText: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginTop: 8,
-  },
-  radioGroup: {
-    gap: 12,
-  },
-  radioOption: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 16,
-    backgroundColor: '#ffffff',
-  },
-  radioOptionSelected: {
-    borderColor: '#44d62c',
-    backgroundColor: '#f0fdf4',
-  },
-  radioText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  radioSubtext: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  insuranceOption: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 16,
-    backgroundColor: '#ffffff',
-  },
-  insuranceOptionSelected: {
-    borderColor: '#44d62c',
-    backgroundColor: '#f0fdf4',
-  },
-  insuranceText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  insuranceSubtext: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  priceBreakdown: {
-    gap: 12,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  priceLabel: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  priceValue: {
-    fontSize: 14,
-    color: '#111827',
-    fontWeight: '500',
-  },
-  totalRow: {
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    paddingTop: 12,
-    marginTop: 12,
-  },
-  totalLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  totalValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  continueButton: {
-    backgroundColor: '#44d62c',
-    margin: 16,
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  continueButtonDisabled: {
-    backgroundColor: '#d1d5db',
-  },
-  continueButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-}); 
+} 

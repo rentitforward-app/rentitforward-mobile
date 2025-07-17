@@ -23,7 +23,7 @@ export default function WelcomeScreen() {
         {/* PNG Logo in Top Right */}
         <View style={styles.logoContainer}>
           <Image 
-            source={require('../../assets/images/Rent it Forward Inverted Color Transparent bg.png')}
+            source={require('../../assets/images/RentitForwardInvertedColorTransparentbg.png')}
             style={styles.logoImage}
             resizeMode="contain"
           />
@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
   heroImage: {
     width: '100%',
     height: '100%',
-  },
+  } as const,
   logoContainer: {
     position: 'absolute',
     top: 50,
@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
   logoImage: {
     width: 100,
     height: 46,
-  },
+  } as const,
   overlay: {
     position: 'absolute',
     top: 0,
@@ -151,11 +151,11 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   primaryButton: {
-    backgroundColor: mobileTokens.colors.primary,
+    backgroundColor: mobileTokens.colors.primary.main,
     borderRadius: 12,
     paddingVertical: 18,
     marginBottom: 16,
-    shadowColor: mobileTokens.colors.primary,
+    shadowColor: mobileTokens.colors.primary.main,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   linkText: {
-    color: mobileTokens.colors.primary,
+    color: mobileTokens.colors.primary.main,
     fontWeight: '500',
   },
 }); 

@@ -15,6 +15,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../../src/stores/auth';
 import { supabase } from '../../src/lib/supabase';
 import type { Booking } from '@shared/types/booking';
+import { colors, spacing, typography, componentStyles } from '../../src/lib/design-system';
 
 type BookingStatus = 'active' | 'pending' | 'past' | 'cancelled';
 
@@ -330,7 +331,7 @@ export default function BookingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.neutral.lightGray,
   },
   loadingContainer: {
     flex: 1,
@@ -338,52 +339,52 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    fontSize: 16,
-    color: '#6b7280',
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
   },
   header: {
-    backgroundColor: '#ffffff',
-    padding: 16,
+    backgroundColor: colors.white,
+    padding: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: colors.neutral.mediumGray,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#111827',
+    fontSize: typography.sizes['2xl'],
+    fontWeight: typography.weights.semibold,
+    color: colors.text.primary,
   },
   tabContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: colors.neutral.mediumGray,
   },
   tabContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
   tab: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
     borderRadius: 20,
-    marginRight: 12,
-    backgroundColor: '#f3f4f6',
+    marginRight: spacing.sm,
+    backgroundColor: colors.neutral.lightGray,
   },
   activeTab: {
-    backgroundColor: '#44d62c',
+    backgroundColor: colors.primary.main,
   },
   tabText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6b7280',
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.medium,
+    color: colors.text.secondary,
   },
   activeTabText: {
-    color: '#ffffff',
+    color: colors.white,
   },
   tabBadge: {
-    marginLeft: 8,
-    backgroundColor: '#e5e7eb',
+    marginLeft: spacing.xs,
+    backgroundColor: colors.neutral.mediumGray,
     borderRadius: 10,
     minWidth: 20,
     height: 20,
@@ -392,52 +393,52 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   activeTabBadge: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.white,
   },
   tabBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6b7280',
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.secondary,
   },
   activeTabBadgeText: {
-    color: '#44d62c',
+    color: colors.primary.main,
   },
   listContainer: {
-    padding: 16,
+    padding: spacing.md,
   },
   emptyListContainer: {
     flex: 1,
     justifyContent: 'center',
   },
   bookingCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.white,
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.neutral.mediumGray,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: spacing.sm,
   },
   cardTitleContainer: {
     flex: 1,
-    marginRight: 12,
+    marginRight: spacing.sm,
   },
   cardTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.primary,
+    marginBottom: spacing.xs / 2,
   },
   cardRole: {
-    fontSize: 12,
-    color: '#6b7280',
+    fontSize: typography.sizes.xs,
+    color: colors.text.secondary,
     textTransform: 'uppercase',
-    fontWeight: '500',
+    fontWeight: typography.weights.medium,
   },
   statusBadge: {
     paddingHorizontal: 8,
@@ -546,14 +547,14 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   emptyAction: {
-    backgroundColor: '#44d62c',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    backgroundColor: colors.primary.main,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
     borderRadius: 8,
   },
   emptyActionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+    color: colors.white,
   },
 }); 

@@ -76,7 +76,7 @@ export default function SignInScreen() {
           <View style={styles.heroOverlay}>
             {/* Logo */}
             <Image
-              source={require('../../assets/images/Rent it Forward Inverted Color Transparent bg.png')}
+              source={require('../../assets/images/RentitForwardInvertedColorTransparentbg.png')}
               style={styles.logo}
               resizeMode="contain"
             />
@@ -273,29 +273,27 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   signInButton: {
-    backgroundColor: mobileTokens.colors.primary,
-    paddingVertical: 16,
+    backgroundColor: mobileTokens.colors.primary.main,
     borderRadius: 12,
+    paddingVertical: 16,
     alignItems: 'center',
-    marginBottom: 24,
-    shadowColor: mobileTokens.colors.primary,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
+    marginTop: 16,
+    marginBottom: 8,
+    shadowColor: mobileTokens.colors.primary.main,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
   },
   buttonDisabled: {
-    backgroundColor: '#9CA3AF',
-    shadowOpacity: 0,
-    elevation: 0,
+    backgroundColor: mobileTokens.colors.primary.light,
+    opacity: 0.7,
   },
   signInButtonText: {
     color: 'white',
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    textAlign: 'center',
   },
   footer: {
     alignItems: 'center',

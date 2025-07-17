@@ -16,7 +16,7 @@ export const DevTest: React.FC = () => {
   };
 
   return (
-    <View className="p-4 bg-white rounded-lg shadow-sm border border-gray-200">
+    <View className="p-4 bg-white rounded-lg border border-gray-200">
       <Text className="text-lg font-bold text-gray-900 mb-4">
         Development Environment Test
       </Text>

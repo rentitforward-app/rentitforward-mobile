@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../src/components/AuthProvider';
 import { supabase } from '../../src/lib/supabase';
+import { colors, spacing, typography, componentStyles } from '../../src/lib/design-system';
 
 // Step definitions
 const STEPS = [
@@ -425,10 +426,10 @@ export default function CreateScreen() {
           </View>
         ))}
         
-        <TouchableOpacity style={styles.addPhotoButton} onPress={pickImage}>
-          <Ionicons name="camera" size={32} color="#44D62C" />
-          <Text style={styles.addPhotoText}>Add Photo</Text>
-        </TouchableOpacity>
+                  <TouchableOpacity style={styles.addPhotoButton} onPress={pickImage}>
+            <Ionicons name="camera" size={32} color={colors.primary.main} />
+            <Text style={styles.addPhotoText}>Add Photo</Text>
+          </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -631,15 +632,15 @@ export default function CreateScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
   },
   progressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    backgroundColor: '#F8F9FA',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.neutral.lightGray,
   },
   progressStep: {
     flexDirection: 'row',
@@ -649,65 +650,65 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#E5E5E5',
+    backgroundColor: colors.neutral.mediumGray,
     justifyContent: 'center',
     alignItems: 'center',
   },
   progressCircleActive: {
-    backgroundColor: '#44D62C',
+    backgroundColor: colors.primary.main,
   },
   progressLine: {
     width: 24,
     height: 2,
-    backgroundColor: '#E5E5E5',
-    marginHorizontal: 4,
+    backgroundColor: colors.neutral.mediumGray,
+    marginHorizontal: spacing.xs / 2,
   },
   progressLineActive: {
-    backgroundColor: '#44D62C',
+    backgroundColor: colors.primary.main,
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.md,
   },
   stepContainer: {
-    paddingVertical: 20,
+    paddingVertical: spacing.md,
   },
   stepTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#343C3E',
-    marginBottom: 8,
+    fontSize: typography.sizes['2xl'],
+    fontWeight: typography.weights.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
   },
   stepSubtitle: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginBottom: 24,
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
+    marginBottom: spacing.lg,
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: spacing.md,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
   },
   label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#343C3E',
-    marginBottom: 8,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
   },
   helper: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 8,
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+    marginBottom: spacing.xs,
   },
   textInput: {
     borderWidth: 1,
-    borderColor: '#E5E5E5',
+    borderColor: colors.neutral.mediumGray,
     borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#FFFFFF',
+    padding: spacing.sm,
+    fontSize: typography.sizes.base,
+    backgroundColor: colors.white,
   },
   textArea: {
     height: 100,
@@ -715,20 +716,20 @@ const styles = StyleSheet.create({
   },
   selectButton: {
     borderWidth: 1,
-    borderColor: '#E5E5E5',
+    borderColor: colors.neutral.mediumGray,
     borderRadius: 8,
-    padding: 12,
+    padding: spacing.sm,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
   },
   selectText: {
-    fontSize: 16,
-    color: '#343C3E',
+    fontSize: typography.sizes.base,
+    color: colors.text.primary,
   },
   placeholderText: {
-    color: '#6B7280',
+    color: colors.text.secondary,
   },
   photosContainer: {
     flexDirection: 'row',
@@ -808,20 +809,20 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   nextButton: {
-    backgroundColor: '#44D62C',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    backgroundColor: colors.primary.main,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
     borderRadius: 8,
     minWidth: 120,
     alignItems: 'center',
   },
   nextButtonDisabled: {
-    backgroundColor: '#E5E5E5',
+    backgroundColor: colors.neutral.mediumGray,
   },
   nextButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    color: colors.white,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold,
   },
   modalOverlay: {
     flex: 1,

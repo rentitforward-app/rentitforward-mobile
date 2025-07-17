@@ -313,10 +313,17 @@ export default function BookingDetailScreen() {
                      booking.delivery?.method === 'delivery' ? 'Delivery to renter' : 'Meetup location'}
           </Text>
           
-          {booking.delivery?.pickupAddress && (
+          {booking.delivery?.deliveryAddress && booking.delivery.method === 'delivery' && (
             <View style={styles.addressItem}>
-              <Text style={styles.addressLabel}>Pickup Address:</Text>
-              <Text style={styles.addressValue}>{booking.delivery.pickupAddress}</Text>
+              <Text style={styles.addressLabel}>Delivery Address:</Text>
+              <Text style={styles.addressValue}>{booking.delivery.deliveryAddress}</Text>
+            </View>
+          )}
+          
+          {booking.delivery?.method === 'pickup' && (
+            <View style={styles.addressItem}>
+              <Text style={styles.addressLabel}>Pickup Location:</Text>
+              <Text style={styles.addressValue}>Address will be provided by owner</Text>
             </View>
           )}
           

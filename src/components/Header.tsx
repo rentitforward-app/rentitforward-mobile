@@ -1,124 +1,164 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import type { NavigationProp } from '@react-navigation/native';
-import type { RootStackParamList } from '../types/navigation';
+import { View, Text, TouchableOpacity, ViewStyle, TextStyle } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { colors, spacing, typography } from '../lib/design-system';
 
-// Brand colors from Rent It Forward design system
-const COLORS = {
-  primary: '#44D62C',     // Vibrant Green
-  secondary: '#343C3E',   // Charcoal Grey  
-  white: '#FFFFFF',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-};
-
-type NavigationProps = NavigationProp<RootStackParamList>;
-
-export default function Header() {
-  const navigation = useNavigation<NavigationProps>();
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.content}>
-        <View style={styles.headerRow}>
-          {/* Logo */}
-          <TouchableOpacity 
-            onPress={() => navigation.navigate('Home')}
-            style={styles.logoContainer}
-          >
-            <View style={[styles.logoIcon, { backgroundColor: COLORS.primary }]}>
-              <Text style={styles.logoText}>R</Text>
-            </View>
-            <Text style={[styles.logoTitle, { color: COLORS.secondary }]}>
-              RENT IT FORWARD
-            </Text>
-          </TouchableOpacity>
-          
-          {/* User Actions */}
-          <View style={styles.userActions}>
-            <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-              <Text style={[styles.linkText, { color: COLORS.secondary }]}>
-                Login
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              onPress={() => navigation.navigate('Register')}
-              style={[styles.signUpButton, { backgroundColor: COLORS.primary }]}
-            >
-              <Text style={[styles.signUpText, { color: COLORS.white }]}>
-                Sign Up
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </View>
-  );
+export interface HeaderProps {
+  title: string;
+  subtitle?: string;
+  showBackButton?: boolean;
+  onBackPress?: () => void;
+  rightAction?: {
+    icon: keyof typeof Ionicons.glyphMap;
+    onPress: () => void;
+    testID?: string;
+  };
+  backgroundColor?: string;
+  titleColor?: string;
+  style?: ViewStyle;
 }
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#ffffff',
+export function Header({
+  title,
+  subtitle,
+  showBackButton = false,
+  onBackPress,
+  rightAction,
+  backgroundColor = colors.white,
+  titleColor = colors.text.primary,
+  style,
+}: HeaderProps) {
+  const headerStyle: ViewStyle = {
+    backgroundColor,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  content: {
-    maxWidth: 1280,
-    marginHorizontal: 'auto',
-    paddingHorizontal: 16,
-  },
-  headerRow: {
+    borderBottomColor: colors.neutral.mediumGray,
+    ...style,
+  };
+
+  const containerStyle: ViewStyle = {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    height: 64,
-  },
-  logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  logoIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  logoText: {
-    color: '#ffffff',
-    fontWeight: 'bold',
-    fontSize: 18,
-  },
-  logoTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  userActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  linkText: {
-    fontWeight: '500',
-    fontSize: 16,
-  },
-  signUpButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 8,
-    borderRadius: 24,
-  },
-  signUpText: {
-    fontWeight: '500',
-    fontSize: 16,
-  },
-}); 
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    minHeight: 56,
+  };
+
+  const titleContainerStyle: ViewStyle = {
+    flex: 1,
+    alignItems: showBackButton ? 'flex-start' : 'center',
+    marginLeft: showBackButton ? spacing.sm : 0,
+    marginRight: rightAction ? spacing.sm : 0,
+  };
+
+  const titleTextStyle: TextStyle = {
+    fontSize: typography.sizes['2xl'],
+    fontWeight: typography.weights.bold,
+    color: titleColor,
+    textAlign: showBackButton ? 'left' : 'center',
+  };
+
+  const subtitleTextStyle: TextStyle = {
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+    marginTop: spacing.xs / 2,
+    textAlign: showBackButton ? 'left' : 'center',
+  };
+
+  const iconButtonStyle: ViewStyle = {
+    padding: spacing.xs,
+    borderRadius: 8,
+    backgroundColor: 'transparent',
+  };
+
+  return (
+    <SafeAreaView style={headerStyle} edges={['top']}>
+      <View style={containerStyle}>
+        {/* Back button */}
+        {showBackButton && (
+          <TouchableOpacity 
+            style={iconButtonStyle}
+            onPress={onBackPress}
+            testID="header-back-button"
+          >
+            <Ionicons
+              name="chevron-back"
+              size={24}
+              color={colors.text.primary}
+            />
+          </TouchableOpacity>
+        )}
+
+        {/* Title and subtitle */}
+        <View style={titleContainerStyle}>
+          <Text style={titleTextStyle} numberOfLines={1}>
+            {title}
+              </Text>
+          {subtitle && (
+            <Text style={subtitleTextStyle} numberOfLines={1}>
+              {subtitle}
+              </Text>
+          )}
+        </View>
+
+        {/* Right action */}
+        {rightAction ? (
+          <TouchableOpacity
+            style={iconButtonStyle}
+            onPress={rightAction.onPress}
+            testID={rightAction.testID || 'header-right-action'}
+          >
+            <Ionicons
+              name={rightAction.icon}
+              size={24}
+              color={colors.text.primary}
+            />
+          </TouchableOpacity>
+        ) : (
+          // Placeholder to maintain spacing when no right action
+          showBackButton && <View style={{ width: 40 }} />
+        )}
+      </View>
+    </SafeAreaView>
+  );
+}
+
+// Preset header configurations for common use cases
+export const HeaderPresets = {
+  // Main screen header with title only
+  main: (title: string) => ({
+    title,
+    showBackButton: false,
+  }),
+
+  // Detail screen header with back button
+  detail: (title: string, onBackPress: () => void) => ({
+    title,
+    showBackButton: true,
+    onBackPress,
+  }),
+
+  // Screen with action button
+  withAction: (
+    title: string,
+    icon: keyof typeof Ionicons.glyphMap,
+    onActionPress: () => void
+  ) => ({
+    title,
+    rightAction: {
+      icon,
+      onPress: onActionPress,
+    },
+  }),
+
+  // Settings style header
+  settings: (title: string, onBackPress?: () => void) => ({
+    title,
+    showBackButton: !!onBackPress,
+    onBackPress,
+    backgroundColor: colors.neutral.lightGray,
+  }),
+};
+
+export default Header; 

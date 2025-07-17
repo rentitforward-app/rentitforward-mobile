@@ -1,28 +1,63 @@
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useEffect } from 'react';
+import { colors, spacing, typography } from '../../src/lib/design-system';
+import { useAuth } from '../../src/components/AuthProvider';
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { user, loading } = useAuth();
+  
+  // Protect tabs - redirect unauthenticated users
+  useEffect(() => {
+    if (!loading && !user) {
+      console.log('Unauthenticated user accessing tabs - redirecting to index');
+      router.replace('/');
+    }
+  }, [user, loading, router]);
+  
+  // Don't render tabs if user is not authenticated
+  if (!user && !loading) {
+    return null;
+  }
+  
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#44D62C',
-        tabBarInactiveTintColor: '#343C3E',
+        tabBarActiveTintColor: colors.primary.main,
+        tabBarInactiveTintColor: colors.text.secondary,
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopColor: '#E5E7EB',
+          backgroundColor: colors.white,
+          borderTopColor: colors.gray[200],
           borderTopWidth: 1,
-          paddingTop: 8,
-          paddingBottom: 8,
-          height: 60,
+          paddingTop: spacing.sm,
+          paddingBottom: Math.max(insets.bottom, spacing.sm), // Ensure safe area padding
+          height: 70 + Math.max(insets.bottom, spacing.sm), // Increased height for better proportions
+          paddingHorizontal: spacing.md,
+          // Enhanced shadow for depth (React Native style)
+          shadowColor: colors.black,
+          shadowOffset: {
+            width: 0,
+            height: -2,
+          },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+          elevation: 8, // Android shadow
         },
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '500',
-          marginTop: 4,
+          fontSize: typography.sizes.xs,
+          fontWeight: typography.weights.semibold, // Slightly bolder for better readability
+          marginTop: spacing.xs / 2,
+          marginBottom: spacing.xs / 4,
         },
         tabBarIconStyle: {
-          marginBottom: 4,
+          marginBottom: spacing.xs / 2,
+        },
+        tabBarItemStyle: {
+          paddingVertical: spacing.xs,
         },
       }}
     >
@@ -30,8 +65,12 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons 
+              name={focused ? "home" : "home-outline"} 
+              size={size} 
+              color={color} 
+            />
           ),
         }}
       />
@@ -39,8 +78,12 @@ export default function TabLayout() {
         name="browse"
         options={{
           title: 'Browse',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="search-outline" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons 
+              name={focused ? "search" : "search-outline"} 
+              size={size} 
+              color={color} 
+            />
           ),
         }}
       />
@@ -48,8 +91,12 @@ export default function TabLayout() {
         name="create"
         options={{
           title: 'Create',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="add-circle-outline" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons 
+              name={focused ? "add-circle" : "add-circle-outline"} 
+              size={size} 
+              color={color} 
+            />
           ),
         }}
       />
@@ -57,8 +104,12 @@ export default function TabLayout() {
         name="bookings"
         options={{
           title: 'Bookings',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="calendar-outline" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons 
+              name={focused ? "calendar" : "calendar-outline"} 
+              size={size} 
+              color={color} 
+            />
           ),
         }}
       />
@@ -66,8 +117,12 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons 
+              name={focused ? "person" : "person-outline"} 
+              size={size} 
+              color={color} 
+            />
           ),
         }}
       />
