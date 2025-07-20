@@ -7,9 +7,9 @@
     "userInterfaceStyle": "light",
     "icon": "./assets/images/RentItForwardFavicon2.png",
     "splash": {
-      "image": "./assets/images/RIF_Onboarding_Image.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#44D62C"
+      "image": "./assets/images/RentitForwardMainLogo.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#ffffff"
     },
     "assetBundlePatterns": [
       "**/*"
