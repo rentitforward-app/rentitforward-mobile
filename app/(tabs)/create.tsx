@@ -18,6 +18,76 @@ import { useAuth } from '../../src/components/AuthProvider';
 import { supabase } from '../../src/lib/supabase';
 import { colors, spacing, typography, componentStyles } from '../../src/lib/design-system';
 
+// Real geocoding utility function using the web API
+const geocodeAddress = async (address: string, city: string, state: string): Promise<{ latitude: number; longitude: number } | null> => {
+  try {
+    console.log('📍 Geocoding address:', `${address}, ${city}, ${state}`);
+    
+    // Call the web API for geocoding - use environment-based URL
+    const apiUrl = __DEV__ 
+      ? 'http://localhost:3000/api/geocoding'  // Development
+      : 'https://your-production-domain.com/api/geocoding';  // Production
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        address,
+        city,
+        state,
+        country: 'Australia',
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn('🚫 Geocoding API error, falling back to city coordinates');
+      return getFallbackCoordinates(city);
+    }
+
+    const data = await response.json();
+    
+    if (data.success && data.coordinates) {
+      console.log('✅ Geocoding successful:', data.coordinates);
+      return {
+        latitude: data.coordinates.latitude,
+        longitude: data.coordinates.longitude,
+      };
+    } else {
+      console.warn('🚫 Geocoding failed, falling back to city coordinates:', data.error);
+      return getFallbackCoordinates(city);
+    }
+  } catch (error) {
+    console.error('🚨 Geocoding error:', error);
+    return getFallbackCoordinates(city);
+  }
+};
+
+// Fallback coordinates for major Australian cities
+const getFallbackCoordinates = (city: string): { latitude: number; longitude: number } => {
+  const cityCoordinates: Record<string, { latitude: number; longitude: number }> = {
+    'sydney': { latitude: -33.8688, longitude: 151.2093 },
+    'melbourne': { latitude: -37.8136, longitude: 144.9631 },
+    'brisbane': { latitude: -27.4698, longitude: 153.0251 },
+    'perth': { latitude: -31.9505, longitude: 115.8605 },
+    'adelaide': { latitude: -34.9285, longitude: 138.6007 },
+    'canberra': { latitude: -35.2809, longitude: 149.1300 },
+    'hobart': { latitude: -42.8821, longitude: 147.3272 },
+    'darwin': { latitude: -12.4634, longitude: 130.8456 },
+  };
+  
+  const cityKey = city.toLowerCase();
+  if (cityCoordinates[cityKey]) {
+    console.log(`📍 Using fallback coordinates for ${city}:`, cityCoordinates[cityKey]);
+    return cityCoordinates[cityKey];
+  }
+  
+  // Default to Sydney coordinates
+  console.log('📍 Using default Sydney coordinates');
+  return { latitude: -33.8688, longitude: 151.2093 };
+};
+
 // Step definitions
 const STEPS = [
   { id: 1, title: 'Basic Info', icon: 'information-circle' },
@@ -179,6 +249,12 @@ export default function CreateScreen() {
     setIsLoading(true);
     
     try {
+      // Geocode the address to get coordinates
+      const coordinates = await geocodeAddress(formData.address, formData.city, formData.state);
+      const locationPoint = coordinates 
+        ? `POINT(${coordinates.longitude} ${coordinates.latitude})`
+        : 'POINT(151.2093 -33.8688)'; // Default to Sydney coordinates
+
       // Create listing
       const { data: listing, error: listingError } = await supabase
         .from('listings')
@@ -201,7 +277,7 @@ export default function CreateScreen() {
           currency: 'AUD',
           owner_id: user.id,
           is_active: true,
-          location: `POINT(0 0)`, // TODO: Geocode address
+          location: locationPoint,
         })
         .select()
         .single();
