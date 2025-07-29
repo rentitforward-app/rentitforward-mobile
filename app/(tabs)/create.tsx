@@ -99,16 +99,17 @@ const STEPS = [
 
 // Categories (matches your database)
 const CATEGORIES = [
-  { id: 'tools_diy', name: 'Tools & DIY', icon: '🔧' },
-  { id: 'electronics', name: 'Electronics', icon: '📱' },
-  { id: 'cameras', name: 'Cameras', icon: '📷' },
-  { id: 'sports_outdoors', name: 'Sports & Outdoors', icon: '🏃' },
-  { id: 'event_party', name: 'Event & Party', icon: '🎉' },
-  { id: 'instruments', name: 'Instruments', icon: '🎸' },
-  { id: 'automotive', name: 'Automotive', icon: '🚗' },
-  { id: 'home_garden', name: 'Home & Garden', icon: '🏡' },
-  { id: 'appliances', name: 'Appliances', icon: '🏠' },
-  { id: 'other', name: 'Other', icon: '📦' },
+  { id: 'tools_diy_equipment', name: 'Tools & DIY Equipment', icon: '🔧' },
+  { id: 'cameras_photography_gear', name: 'Cameras & Photography Gear', icon: '📷' },
+  { id: 'event_party_equipment', name: 'Event & Party Equipment', icon: '🎉' },
+  { id: 'camping_outdoor_gear', name: 'Camping & Outdoor Gear', icon: '🏕️' },
+  { id: 'tech_electronics', name: 'Tech & Electronics', icon: '📱' },
+  { id: 'vehicles_transport', name: 'Vehicles & Transport', icon: '🚗' },
+  { id: 'home_garden_appliances', name: 'Home & Garden Appliances', icon: '🏡' },
+  { id: 'sports_fitness_equipment', name: 'Sports & Fitness Equipment', icon: '🏃' },
+  { id: 'musical_instruments_gear', name: 'Musical Instruments & Gear', icon: '🎸' },
+  { id: 'costumes_props', name: 'Costumes & Props', icon: '🎭' },
+  { id: 'maker_craft_supplies', name: 'Maker & Craft Supplies', icon: '✂️' },
 ];
 
 const CONDITIONS = [

@@ -30,18 +30,18 @@ interface SearchFilters {
 }
 
 const CATEGORIES = [
-  { id: 'all', name: 'All Categories', icon: '🔍' },
-  { id: 'tools', name: 'Tools & Equipment', icon: '🔧' },
-  { id: 'electronics', name: 'Electronics', icon: '📱' },
-  { id: 'sports', name: 'Sports & Recreation', icon: '⚽' },
-  { id: 'automotive', name: 'Automotive', icon: '🚗' },
-  { id: 'outdoor', name: 'Outdoor & Camping', icon: '🏕️' },
-  { id: 'home', name: 'Home & Garden', icon: '🏠' },
-  { id: 'party', name: 'Party & Events', icon: '🎉' },
-  { id: 'photography', name: 'Photography', icon: '📸' },
-  { id: 'fitness', name: 'Fitness & Health', icon: '💪' },
-  { id: 'music', name: 'Music & Audio', icon: '🎵' },
-  { id: 'other', name: 'Other', icon: '📦' },
+  { id: 'all', name: 'All Categories', icon: '��' },
+  { id: 'tools_diy_equipment', name: 'Tools & DIY Equipment', icon: '🔧' },
+  { id: 'cameras_photography_gear', name: 'Cameras & Photography Gear', icon: '📷' },
+  { id: 'event_party_equipment', name: 'Event & Party Equipment', icon: '🎉' },
+  { id: 'camping_outdoor_gear', name: 'Camping & Outdoor Gear', icon: '🏕️' },
+  { id: 'tech_electronics', name: 'Tech & Electronics', icon: '📱' },
+  { id: 'vehicles_transport', name: 'Vehicles & Transport', icon: '🚗' },
+  { id: 'home_garden_appliances', name: 'Home & Garden Appliances', icon: '🏡' },
+  { id: 'sports_fitness_equipment', name: 'Sports & Fitness Equipment', icon: '🏃' },
+  { id: 'musical_instruments_gear', name: 'Musical Instruments & Gear', icon: '🎸' },
+  { id: 'costumes_props', name: 'Costumes & Props', icon: '🎭' },
+  { id: 'maker_craft_supplies', name: 'Maker & Craft Supplies', icon: '✂️' },
 ];
 
 const SORT_OPTIONS = [

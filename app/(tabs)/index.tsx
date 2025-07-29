@@ -10,19 +10,19 @@ import { supabase } from '../../src/lib/supabase';
 
 const logo = require('../../assets/images/RentitForwardMainLogo.png');
 
-// Categories (from browse.tsx)
+// Categories (updated to match new category structure)
 const CATEGORIES = [
-  { id: 'all', name: 'All', icon: '🔍' },
-  { id: 'tools_diy', name: 'Tools & DIY', icon: '🔧' },
-  { id: 'electronics', name: 'Electronics', icon: '📱' },
-  { id: 'cameras', name: 'Cameras', icon: '📷' },
-  { id: 'sports_outdoors', name: 'Sports & Outdoors', icon: '🏃' },
-  { id: 'event_party', name: 'Event & Party', icon: '🎉' },
-  { id: 'instruments', name: 'Instruments', icon: '🎸' },
-  { id: 'automotive', name: 'Automotive', icon: '🚗' },
-  { id: 'home_garden', name: 'Home & Garden', icon: '🏡' },
-  { id: 'appliances', name: 'Appliances', icon: '🏠' },
-  { id: 'other', name: 'Other', icon: '📦' },
+  { id: 'tools_diy_equipment', name: 'Tools & DIY Equipment', icon: '🔧' },
+  { id: 'cameras_photography_gear', name: 'Cameras & Photography Gear', icon: '📷' },
+  { id: 'event_party_equipment', name: 'Event & Party Equipment', icon: '🎉' },
+  { id: 'camping_outdoor_gear', name: 'Camping & Outdoor Gear', icon: '🏕️' },
+  { id: 'tech_electronics', name: 'Tech & Electronics', icon: '📱' },
+  { id: 'vehicles_transport', name: 'Vehicles & Transport', icon: '🚗' },
+  { id: 'home_garden_appliances', name: 'Home & Garden Appliances', icon: '🏡' },
+  { id: 'sports_fitness_equipment', name: 'Sports & Fitness Equipment', icon: '🏃' },
+  { id: 'musical_instruments_gear', name: 'Musical Instruments & Gear', icon: '🎸' },
+  { id: 'costumes_props', name: 'Costumes & Props', icon: '🎭' },
+  { id: 'maker_craft_supplies', name: 'Maker & Craft Supplies', icon: '✂️' },
 ];
 
 export default function HomeScreen() {
@@ -251,13 +251,13 @@ export default function HomeScreen() {
         {/* Categories Section */}
         <View style={{ marginTop: spacing.xl, marginBottom: spacing.md, paddingHorizontal: spacing.md }}>
           <Text style={{ fontSize: typography.sizes.lg, fontWeight: typography.weights.semibold, color: colors.text.primary, marginBottom: spacing.md }}>
-            Categories
+            Browse Categories
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-            {CATEGORIES.map(category => (
+            {CATEGORIES.slice(0, 8).map(category => (
               <TouchableOpacity key={category.id} onPress={() => handleCategoryPress(category.id)} style={{ width: '48%', backgroundColor: colors.white, borderRadius: 12, alignItems: 'center', paddingVertical: spacing.lg, marginBottom: spacing.md, shadowColor: colors.black, shadowOpacity: 0.03, shadowRadius: 2, elevation: 1 }}>
                 <Text style={{ fontSize: 32, marginBottom: spacing.sm }}>{category.icon}</Text>
-                <Text style={{ fontSize: typography.sizes.base, fontWeight: typography.weights.medium, color: colors.text.primary }}>{category.name}</Text>
+                <Text style={{ fontSize: typography.sizes.sm, fontWeight: typography.weights.medium, color: colors.text.primary, textAlign: 'center' }}>{category.name}</Text>
               </TouchableOpacity>
             ))}
           </View>
