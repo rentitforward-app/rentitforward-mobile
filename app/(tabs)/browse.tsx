@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../src/lib/supabase';
 import Sentry from '../../src/lib/sentry';
 import { colors, spacing, typography, componentStyles } from '../../src/lib/design-system';
+import { RealAPIPredictiveSearchInput } from '../../src/components/search/RealAPIPredictiveSearchInput';
 
 // Categories
 const CATEGORIES = [
@@ -117,7 +118,15 @@ export default function BrowseScreen() {
   };
 
   const renderListingCard = ({ item }: { item: any }) => {
+    if (!item) return null;
+    
     const mainImage = getMainImage(item);
+    const category = CATEGORIES.find(c => c.id === item.category);
+    const categoryIcon = category?.icon || '📦';
+    const categoryName = category?.name || item.category || 'Other';
+    const price = Math.floor(parseFloat(item.price_per_day || 0));
+    const ownerName = item.profiles?.full_name || 'Unknown';
+    const rating = item.profiles?.rating ? parseFloat(item.profiles.rating) : null;
     
     return (
       <TouchableOpacity style={styles.listingCard} activeOpacity={0.8}>
@@ -132,7 +141,7 @@ export default function BrowseScreen() {
           
           <View style={styles.priceBadge}>
             <Text style={styles.priceText}>
-              ${Math.floor(parseFloat(item.price_per_day || 0))}/day
+              ${price}/day
             </Text>
           </View>
         </View>
@@ -144,15 +153,14 @@ export default function BrowseScreen() {
           
           <View style={styles.categoryContainer}>
             <Text style={styles.categoryText}>
-              {CATEGORIES.find(c => c.id === item.category)?.icon || '📦'} {' '}
-              {CATEGORIES.find(c => c.id === item.category)?.name || item.category}
+              {categoryIcon} {categoryName}
             </Text>
           </View>
 
           <View style={styles.locationContainer}>
             <Ionicons name="location" size={14} color="#6B7280" />
             <Text style={styles.locationText}>
-              {item.city}, {item.state}
+              {item.city || 'Unknown'}, {item.state || 'Unknown'}
             </Text>
           </View>
 
@@ -166,15 +174,15 @@ export default function BrowseScreen() {
                 </View>
               )}
               <Text style={styles.ownerName}>
-                {item.profiles?.full_name || 'Unknown'}
+                {ownerName}
               </Text>
             </View>
             
-            {item.profiles?.rating && item.profiles.rating > 0 && (
+            {rating && rating > 0 && (
               <View style={styles.ratingContainer}>
                 <Ionicons name="star" size={14} color="#FFD700" />
                 <Text style={styles.ratingText}>
-                  {parseFloat(item.profiles.rating).toFixed(1)}
+                  {rating.toFixed(1)}
                 </Text>
               </View>
             )}
@@ -185,25 +193,45 @@ export default function BrowseScreen() {
   };
 
   const renderCategoryFilter = () => (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
-      {CATEGORIES.map((category) => (
-        <TouchableOpacity
-          key={category.id}
-          style={[
-            styles.categoryChip,
-            selectedCategory === category.id && styles.categoryChipActive
-          ]}
-          onPress={() => setSelectedCategory(category.id)}
-        >
-          <Text style={styles.categoryChipIcon}>{category.icon}</Text>
-          <Text style={[
-            styles.categoryChipText,
-            selectedCategory === category.id && styles.categoryChipTextActive
-          ]}>
-            {category.name}
-          </Text>
-        </TouchableOpacity>
-      ))}
+    <ScrollView 
+      horizontal 
+      showsHorizontalScrollIndicator={false} 
+      style={styles.categoryScroll}
+      contentContainerStyle={styles.categoryScrollContent}
+    >
+      {CATEGORIES.map((category) => {
+        const isActive = selectedCategory === category.id;
+        return (
+          <TouchableOpacity
+            key={category.id}
+            style={[
+              styles.categoryChip,
+              isActive && styles.categoryChipActive
+            ]}
+            onPress={() => {
+              console.log('Category selected:', category.id, category.name);
+              setSelectedCategory(category.id);
+            }}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={`Filter by ${category.name}`}
+            accessibilityState={{ selected: isActive }}
+          >
+            <Text style={[
+              styles.categoryChipIcon,
+              isActive && styles.categoryChipIconActive
+            ]}>
+              {category.icon}
+            </Text>
+            <Text style={[
+              styles.categoryChipText,
+              isActive && styles.categoryChipTextActive
+            ]}>
+              {category.name}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
     </ScrollView>
   );
 
@@ -244,23 +272,18 @@ export default function BrowseScreen() {
         </View>
       </View>
 
-      {/* Search Bar */}
+      {/* Enhanced Search Bar - Real Database */}
       <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={20} color="#6B7280" />
-          <TextInput
-            style={styles.searchInput}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search for items..."
-            placeholderTextColor="#6B7280"
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={20} color="#6B7280" />
-            </TouchableOpacity>
-          )}
-        </View>
+        <RealAPIPredictiveSearchInput
+          placeholder="Search for items, categories, brands..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          onSearch={(query) => {
+            setSearchQuery(query);
+            // The search will be triggered by the useEffect that watches searchQuery
+          }}
+          useRealAPI={true}
+        />
       </View>
 
       {/* Category Filter */}
@@ -289,13 +312,17 @@ export default function BrowseScreen() {
         <FlatList
           data={filteredListings}
           renderItem={renderListingCard}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => item?.id || `item-${index}`}
           numColumns={2}
           columnWrapperStyle={styles.row}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
           onRefresh={loadListings}
           refreshing={isLoading}
+          removeClippedSubviews={false}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          initialNumToRender={8}
         />
       )}
     </SafeAreaView>
@@ -338,50 +365,59 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
   },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.neutral.lightGray,
-    borderRadius: 12,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: typography.sizes.base,
-    marginLeft: spacing.sm,
-    color: colors.text.primary,
-  },
   categoryScroll: {
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  categoryScrollContent: {
+    paddingRight: spacing.md,
+    alignItems: 'center',
   },
   categoryChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.neutral.lightGray,
-    borderRadius: 20,
+    backgroundColor: colors.white,
+    borderRadius: 22,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.sm + 2,
     marginRight: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.neutral.mediumGray,
+    marginVertical: spacing.xs,
+    borderWidth: 1.5,
+    borderColor: colors.gray[200],
+    elevation: 2,
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    minHeight: 40,
+    maxWidth: 200,
   },
   categoryChipActive: {
     backgroundColor: colors.primary.main,
     borderColor: colors.primary.main,
+    elevation: 4,
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
   },
   categoryChipIcon: {
     fontSize: typography.sizes.base,
-    marginRight: 6,
+    marginRight: spacing.xs,
+    lineHeight: typography.sizes.base * 1.2,
+  },
+  categoryChipIconActive: {
+    opacity: 1,
   },
   categoryChipText: {
     fontSize: typography.sizes.sm,
-    color: colors.text.secondary,
+    color: colors.text.primary,
     fontWeight: typography.weights.medium,
+    lineHeight: typography.sizes.sm * 1.3,
+    flexShrink: 1,
   },
   categoryChipTextActive: {
     color: colors.white,
+    fontWeight: typography.weights.semibold,
   },
   resultsContainer: {
     paddingHorizontal: spacing.md,

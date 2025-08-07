@@ -64,9 +64,7 @@ export default function WelcomeScreen() {
         </TouchableOpacity>
         
         <Text style={styles.termsText}>
-          By continuing, you agree to our{' '}
-          <Text style={styles.linkText}>Terms of Service</Text> and{' '}
-          <Text style={styles.linkText}>Privacy Policy</Text>
+          By continuing, you agree to our <Text style={styles.linkText}>Terms of Service</Text> and <Text style={styles.linkText}>Privacy Policy</Text>
         </Text>
       </View>
     </View>

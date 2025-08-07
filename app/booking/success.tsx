@@ -58,19 +58,19 @@ export default function BookingSuccessScreen() {
         return;
       }
 
-      const startDate = new Date(booking.start_date);
-      const endDate = new Date(booking.end_date);
+          const startDate = new Date(booking.startDate);
+    const endDate = new Date(booking.endDate);
       
       // Add one day to end date since it's typically the return date
       endDate.setDate(endDate.getDate() + 1);
 
       await Calendar.createEventAsync(defaultCalendar.id, {
-        title: `Rental: ${booking.listing?.title}`,
+        title: `Rental: ${booking.listingId}`,
         startDate,
         endDate,
         allDay: true,
-        notes: `Rental from ${booking.owner?.first_name || 'Owner'}\n\nPickup/Delivery: ${booking.delivery_option}\n\nContact: ${booking.contact_phone}\n\nBooking ID: ${booking.id}`,
-        location: booking.delivery_option === 'pickup' ? booking.listing?.location : booking.delivery_address,
+        notes: `Rental booking\n\nPickup/Delivery: ${booking.delivery?.method || 'pickup'}\n\nBooking ID: ${booking.id}`,
+        location: booking.delivery?.method === 'pickup' ? 'Pickup location' : booking.delivery?.deliveryAddress,
       });
 
       Alert.alert('Success', 'Rental dates added to your calendar!');
@@ -85,7 +85,7 @@ export default function BookingSuccessScreen() {
     if (!booking) return;
 
     try {
-      const message = `I just booked "${booking.listing?.title}" for ${formatDateRange(booking.start_date, booking.end_date)}!\n\nTotal: $${booking.total_amount}\n\nBooking ID: ${booking.id}`;
+      const message = `I just booked item ${booking.listingId} for ${formatDateRange(booking.startDate, booking.endDate)}!\n\nBooking ID: ${booking.id}`;
 
       await Share.share({
         message,
@@ -118,8 +118,8 @@ export default function BookingSuccessScreen() {
   // Calculate days
   const getTotalDays = () => {
     if (!booking) return 0;
-    const start = new Date(booking.start_date);
-    const end = new Date(booking.end_date);
+    const start = new Date(booking.startDate);
+    const end = new Date(booking.endDate);
     return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
   };
 
@@ -162,8 +162,8 @@ export default function BookingSuccessScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Booking Details</Text>
         <View style={styles.bookingCard}>
-          <Text style={styles.itemTitle}>{booking.listing?.title}</Text>
-          <Text style={styles.itemLocation}>{booking.listing?.location}</Text>
+          <Text style={styles.itemTitle}>{booking.listingId}</Text>
+          <Text style={styles.itemLocation}>{'Location TBD'}</Text>
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Booking ID:</Text>
@@ -173,7 +173,7 @@ export default function BookingSuccessScreen() {
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Dates:</Text>
             <Text style={styles.detailValue}>
-              {formatDateRange(booking.start_date, booking.end_date)}
+              {formatDateRange(booking.startDate, booking.endDate)}
             </Text>
           </View>
           
@@ -184,13 +184,13 @@ export default function BookingSuccessScreen() {
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Total Amount:</Text>
-            <Text style={styles.totalAmount}>${booking.total_amount}</Text>
+            <Text style={styles.totalAmount}>${booking.pricing?.total || 0}</Text>
           </View>
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Pickup/Delivery:</Text>
             <Text style={styles.detailValue}>
-              {booking.delivery_option === 'pickup' ? 'Pickup from owner' : 'Delivery to you'}
+              {booking.delivery?.method === 'pickup' ? 'Pickup from owner' : 'Delivery to you'}
             </Text>
           </View>
         </View>
@@ -201,15 +201,9 @@ export default function BookingSuccessScreen() {
         <Text style={styles.sectionTitle}>Owner Contact</Text>
         <View style={styles.ownerCard}>
           <Text style={styles.ownerName}>
-            {booking.owner?.first_name} {booking.owner?.last_name}
+            {booking.ownerId} {''}
           </Text>
-          {booking.owner?.phone && (
-            <Text style={styles.ownerContact}>Phone: {booking.owner.phone}</Text>
-          )}
-          <Text style={styles.ownerContact}>Email: {booking.owner?.email}</Text>
-          {booking.owner?.verification_status === 'verified' && (
-            <Text style={styles.verifiedBadge}>✓ Verified Owner</Text>
-          )}
+          <Text style={styles.ownerContact}>Owner ID: {booking.ownerId}</Text>
         </View>
       </View>
 
@@ -263,7 +257,7 @@ export default function BookingSuccessScreen() {
           <Text style={styles.note}>• You can cancel free of charge before confirmation</Text>
           <Text style={styles.note}>• Please inspect the item carefully before accepting it</Text>
           <Text style={styles.note}>• Report any issues immediately through the app</Text>
-          {booking.include_insurance && (
+          {false && (
             <Text style={styles.note}>• Your booking includes damage protection coverage</Text>
           )}
         </View>

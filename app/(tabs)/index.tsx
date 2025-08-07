@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, TextInput, Image, ScrollView, FlatList, A
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography } from '../../src/lib/design-system';
+import { RealAPIPredictiveSearchInput } from '../../src/components/search/RealAPIPredictiveSearchInput';
 import { useUIStore } from '../../src/stores/ui';
 import { useAuth } from '../../src/components/AuthProvider';
 import { useRouter } from 'expo-router';
@@ -172,35 +173,22 @@ export default function HomeScreen() {
           >
             Share More, Buy Less
           </Text>
-          <View
+          <RealAPIPredictiveSearchInput
+            placeholder="Search for items, e.g. camera, drill..."
+            value={search}
+            onChangeText={setSearch}
+            onSearch={(query) => {
+              setSearch(query);
+              router.push(`/(tabs)/browse?search=${encodeURIComponent(query)}`);
+            }}
+            useRealAPI={true}
             style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              backgroundColor: colors.white,
-              borderRadius: 999,
-              paddingHorizontal: spacing.md,
-              paddingVertical: spacing.sm,
               shadowColor: colors.black,
               shadowOpacity: 0.06,
               shadowRadius: 4,
               elevation: 2,
             }}
-          >
-            <Ionicons name="search" size={22} color={colors.gray[400]} style={{ marginRight: spacing.sm }} />
-            <TextInput
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Search for items, e.g. camera, drill..."
-              placeholderTextColor={colors.gray[400]}
-              style={{
-                flex: 1,
-                fontSize: typography.sizes.base,
-                color: colors.text.primary,
-                paddingVertical: 0,
-              }}
-              returnKeyType="search"
-            />
-          </View>
+          />
         </View>
 
         {/* Top Rental Items Section */}

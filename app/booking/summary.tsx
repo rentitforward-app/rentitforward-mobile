@@ -14,7 +14,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../../src/stores/auth';
 import { supabase } from '../../src/lib/supabase';
 import type { Listing } from '@shared/types/listing';
-import type { CreateBooking } from '@shared/types/booking';
+import type { CreateBooking, DeliveryMethod } from '@shared/types/booking';
 
 interface BookingSummaryData {
   listingId: string;
@@ -37,7 +37,7 @@ export default function BookingSummaryScreen() {
     includeInsurance,
     specialRequests,
     totalAmount,
-  } = useLocalSearchParams<BookingSummaryData>();
+  } = useLocalSearchParams();
 
   const router = useRouter();
   const { user } = useAuthStore();
@@ -52,13 +52,13 @@ export default function BookingSummaryScreen() {
   // Parse booking data
   const bookingData = {
     listingId,
-    startDate: startDate ? new Date(startDate) : null,
-    endDate: endDate ? new Date(endDate) : null,
+    startDate: startDate ? new Date(Array.isArray(startDate) ? startDate[0] : startDate) : null,
+    endDate: endDate ? new Date(Array.isArray(endDate) ? endDate[0] : endDate) : null,
     deliveryOption: (deliveryOption as 'pickup' | 'delivery') || 'pickup',
     deliveryAddress: deliveryAddress || '',
     includeInsurance: includeInsurance === 'true',
     specialRequests: additionalRequests,
-    totalAmount: totalAmount ? parseFloat(totalAmount) : 0,
+    totalAmount: totalAmount ? parseFloat(Array.isArray(totalAmount) ? totalAmount[0] : totalAmount) : 0,
   };
 
   // Calculate derived values
@@ -87,11 +87,11 @@ export default function BookingSummaryScreen() {
 
   // Recalculate pricing
   const pricingBreakdown = listing ? {
-    dailyRate: listing.daily_rate,
-    subtotal: totalDays * listing.daily_rate,
-    insuranceFee: bookingData.includeInsurance ? (totalDays * listing.daily_rate) * 0.1 : 0,
+    dailyRate: listing.pricing?.basePrice || 0,
+    subtotal: totalDays * (listing.pricing?.basePrice || 0),
+    insuranceFee: bookingData.includeInsurance ? (totalDays * (listing.pricing?.basePrice || 0)) * 0.1 : 0,
     deliveryFee: bookingData.deliveryOption === 'delivery' ? 25 : 0,
-    serviceFee: (totalDays * listing.daily_rate) * 0.05, // 5% service fee
+    serviceFee: (totalDays * (listing.pricing?.basePrice || 0)) * 0.05, // 5% service fee
     total: 0,
   } : null;
 
@@ -110,13 +110,13 @@ export default function BookingSummaryScreen() {
         .insert({
           listing_id: bookingData.listingId,
           renter_id: user?.id,
-          owner_id: listing?.owner_id,
+          owner_id: listing?.ownerId,
           start_date: bookingData.startDate,
           end_date: bookingData.endDate,
           total_amount: pricingBreakdown?.total || 0,
-          delivery_option: bookingData.deliveryOption,
-          delivery_address: bookingData.deliveryAddress,
-          include_insurance: bookingData.includeInsurance,
+          delivery_option: bookingData.delivery?.method || 'pickup',
+          delivery_address: bookingData.delivery?.deliveryAddress,
+          include_insurance: includeInsurance === 'true',
           special_requests: bookingData.specialRequests,
           status: 'pending',
           contact_phone: contactInfo.phone,
@@ -163,13 +163,15 @@ export default function BookingSummaryScreen() {
           text: 'Confirm',
           onPress: () => {
             createBookingMutation.mutate({
-              listingId,
+              listingId: Array.isArray(listingId) ? listingId[0] : listingId,
               startDate: bookingData.startDate?.toISOString() || '',
               endDate: bookingData.endDate?.toISOString() || '',
-              deliveryOption: bookingData.deliveryOption,
-              deliveryAddress: bookingData.deliveryAddress,
-              includeInsurance: bookingData.includeInsurance,
-              specialRequests: additionalRequests,
+              delivery: {
+                method: (bookingData.deliveryOption || 'pickup') as DeliveryMethod,
+                deliveryAddress: Array.isArray(deliveryAddress) ? deliveryAddress[0] : deliveryAddress,
+              },
+
+              specialRequests: Array.isArray(additionalRequests) ? additionalRequests[0] : additionalRequests,
             });
           },
         },
@@ -211,8 +213,10 @@ export default function BookingSummaryScreen() {
         <Text style={styles.sectionTitle}>Item Details</Text>
         <View style={styles.listingSummary}>
           <Text style={styles.listingTitle}>{listing.title}</Text>
-          <Text style={styles.listingLocation}>{listing.location}</Text>
-          <Text style={styles.listingOwner}>Owner: {listing.owner?.first_name || 'Unknown'}</Text>
+          <Text style={styles.listingLocation}>
+            {listing.location?.address ? `${listing.location.address}, ${listing.location.city}` : 'Location not specified'}
+          </Text>
+          <Text style={styles.listingOwner}>Owner ID: {listing.ownerId}</Text>
         </View>
       </View>
 
@@ -349,9 +353,9 @@ export default function BookingSummaryScreen() {
               thumbColor={acceptedTerms ? '#ffffff' : '#f3f4f6'}
             />
             <Text style={styles.termsText}>
-              I agree to the{' '}
+              I agree to the 
               <Text style={styles.termsLink}>Terms of Service</Text>
-              {' '}and{' '}
+ and 
               <Text style={styles.termsLink}>Rental Agreement</Text>
             </Text>
           </View>

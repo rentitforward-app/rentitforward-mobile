@@ -155,7 +155,7 @@ export default function SignInScreen() {
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>
-              Don't have an account?{' '}
+              Don't have an account? 
               <Text
                 style={styles.linkText}
                 onPress={() => router.push('/(auth)/sign-up')}
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   forgotPasswordText: {
-    color: mobileTokens.colors.primary,
+    color: mobileTokens.colors.primary.main,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   linkText: {
-    color: mobileTokens.colors.primary,
+    color: mobileTokens.colors.primary.main,
     fontWeight: '600',
   },
 }); 

@@ -1,3 +1,3 @@
-export { ReviewForm } from './ReviewForm';
-export { ReviewCard } from './ReviewCard';
-export { ReviewList } from './ReviewList'; 
+export { default as ReviewForm } from './ReviewForm';
+export { default as ReviewCard } from './ReviewCard';
+export { default as ReviewList } from './ReviewList'; 

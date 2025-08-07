@@ -19,8 +19,7 @@ module.exports = function (api) {
           },
         },
       ],
-      // Temporarily disable NativeWind to troubleshoot CSS parsing issues
-      // 'nativewind/babel',
+      // 'nativewind/babel', // Temporarily disabled
       'react-native-reanimated/plugin',
     ],
   };

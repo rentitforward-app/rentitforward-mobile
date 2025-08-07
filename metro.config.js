@@ -3,28 +3,18 @@ const path = require('path');
 
 const config = getDefaultConfig(__dirname);
 
-// Support for monorepo with shared package
+// Add monorepo support for shared package
 config.watchFolders = [
-  __dirname, // Mobile app
-  path.resolve(__dirname, '../rentitforward-shared'), // Shared package
+  path.resolve(__dirname, '../rentitforward-shared'),
 ];
 
-// Resolve modules from shared package
-config.resolver.nodeModulesPaths = [
-  path.resolve(__dirname, 'node_modules'),
-  path.resolve(__dirname, '../rentitforward-shared/node_modules'),
-];
-
-// Add SVG transformer support
-config.transformer = {
-  ...config.transformer,
-  babelTransformerPath: require.resolve('react-native-svg-transformer'),
+config.resolver.alias = {
+  '@rentitforward/shared': path.resolve(__dirname, '../rentitforward-shared/src'),
+  '@shared': path.resolve(__dirname, '../rentitforward-shared/src'),
+  crypto: 'react-native-crypto',
 };
 
-config.resolver = {
-  ...config.resolver,
-  assetExts: config.resolver.assetExts.filter((ext) => ext !== 'svg'),
-  sourceExts: [...config.resolver.sourceExts, 'svg'],
-};
+// Add Node.js polyfills for React Native
+config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
 
-module.exports = config; 
+module.exports = config;

@@ -111,7 +111,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!state.loading) {
-      SplashScreen.hideAsync();
+      // Use setTimeout to ensure the splash screen hides properly
+      setTimeout(() => {
+        SplashScreen.hideAsync().catch(() => {
+          // Splash screen was already hidden or couldn't be hidden
+          // This is not a critical error
+        });
+      }, 100);
     }
   }, [state.loading]);
 

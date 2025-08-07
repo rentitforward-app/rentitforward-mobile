@@ -329,8 +329,7 @@ export default function ConversationScreen() {
           </Text>
         </View>
         <Text style={styles.contextDates}>
-          {new Date(conversation.booking.startDate).toLocaleDateString('en-AU')} - {' '}
-          {new Date(conversation.booking.endDate).toLocaleDateString('en-AU')}
+          {new Date(conversation.booking.startDate).toLocaleDateString('en-AU')} - {new Date(conversation.booking.endDate).toLocaleDateString('en-AU')}
         </Text>
       </View>
 

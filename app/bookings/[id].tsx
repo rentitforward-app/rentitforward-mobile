@@ -13,7 +13,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../src/stores/auth';
 import { supabase } from '../../src/lib/supabase';
-import type { Booking, BookingStatus } from '@shared/types/booking';
+import type { Booking } from '@rentitforward/shared';
+import { BookingStatus } from '@rentitforward/shared';
 
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -104,7 +105,9 @@ export default function BookingDetailScreen() {
 
   const isOwner = booking.ownerId === user?.id;
   const isRenter = booking.renterId === user?.id;
-  const otherUser = isRenter ? booking.owner : booking.renter;
+  // TODO: Fetch user details using booking.ownerId or booking.renterId
+  const otherUserId = isRenter ? booking.ownerId : booking.renterId;
+  const otherUser = null; // Placeholder - need to implement user fetching
 
   // Format dates
   const formatDate = (dateString: string) => {
@@ -154,7 +157,7 @@ export default function BookingDetailScreen() {
   // Action handlers
   const handleApprove = () => {
     setActionLoading('approve');
-    updateBookingMutation.mutate({ status: 'confirmed' });
+    updateBookingMutation.mutate({ status: BookingStatus.CONFIRMED });
   };
 
   const handleReject = () => {
@@ -169,7 +172,7 @@ export default function BookingDetailScreen() {
           onPress: (reason) => {
             setActionLoading('reject');
             updateBookingMutation.mutate({ 
-              status: 'cancelled', 
+              status: BookingStatus.CANCELLED, 
               note: reason || 'Rejected by owner' 
             });
           },
@@ -190,7 +193,7 @@ export default function BookingDetailScreen() {
           style: 'destructive',
           onPress: () => {
             setActionLoading('cancel');
-            updateBookingMutation.mutate({ status: 'cancelled' });
+            updateBookingMutation.mutate({ status: BookingStatus.CANCELLED });
           },
         },
       ]
@@ -207,7 +210,7 @@ export default function BookingDetailScreen() {
           text: 'Complete',
           onPress: () => {
             setActionLoading('complete');
-            updateBookingMutation.mutate({ status: 'completed' });
+            updateBookingMutation.mutate({ status: BookingStatus.COMPLETED });
           },
         },
       ]

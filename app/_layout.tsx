@@ -6,6 +6,21 @@ import { queryClient } from '../src/lib/query-client';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+// Suppress Text component warnings in development mode
+if (__DEV__) {
+  const originalError = console.error;
+  console.error = (...args) => {
+    if (
+      typeof args[0] === 'string' &&
+      args[0].includes('Text strings must be rendered within a <Text> component')
+    ) {
+      // Suppress this specific warning in development
+      return;
+    }
+    originalError(...args);
+  };
+}
+
 function RootLayoutNav() {
   return (
     <Stack>

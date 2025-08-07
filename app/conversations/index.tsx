@@ -75,15 +75,16 @@ export default function ConversationsScreen() {
       if (error) throw error;
 
       // Transform bookings into conversations
-      const conversations: Conversation[] = bookings.map(booking => {
+      const conversations = bookings.map(booking => {
         const isOwner = booking.owner_id === user.id;
         const otherUser = isOwner ? booking.renter : booking.owner;
+        const otherUserData = Array.isArray(otherUser) ? otherUser[0] : otherUser;
         
         return {
           id: `booking-${booking.id}`,
           bookingId: booking.id,
-          otherUserId: otherUser.id,
-          otherUser,
+          otherUserId: otherUserData?.id || '',
+          otherUser: otherUserData,
           lastMessage: {
             id: '1',
             content: getLastMessageForBooking(booking.status),

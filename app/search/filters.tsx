@@ -254,8 +254,7 @@ export default function SearchFiltersScreen() {
             onPress={() => setShowCategoryPicker(true)}
           >
             <Text style={styles.pickerText}>
-              {CATEGORIES.find(c => c.id === filters.category)?.icon}{' '}
-              {CATEGORIES.find(c => c.id === filters.category)?.name}
+              {CATEGORIES.find(c => c.id === filters.category)?.icon} {CATEGORIES.find(c => c.id === filters.category)?.name}
             </Text>
             <Text style={styles.pickerArrow}>▼</Text>
           </TouchableOpacity>
@@ -456,8 +455,7 @@ export default function SearchFiltersScreen() {
             onPress={() => setShowSortPicker(true)}
           >
             <Text style={styles.pickerText}>
-              {SORT_OPTIONS.find(s => s.id === filters.sortBy)?.icon}{' '}
-              {SORT_OPTIONS.find(s => s.id === filters.sortBy)?.name}
+              {SORT_OPTIONS.find(s => s.id === filters.sortBy)?.icon} {SORT_OPTIONS.find(s => s.id === filters.sortBy)?.name}
             </Text>
             <Text style={styles.pickerArrow}>▼</Text>
           </TouchableOpacity>

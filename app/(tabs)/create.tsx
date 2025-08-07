@@ -211,7 +211,7 @@ export default function CreateScreen() {
           uri: image.uri,
           type: `image/${fileExt}`,
           name: fileName,
-        });
+        } as any);
 
         const { data, error } = await supabase.storage
           .from('listing-images')
@@ -362,7 +362,7 @@ export default function CreateScreen() {
             currentStep >= step.id && styles.progressCircleActive
           ]}>
             <Ionicons 
-              name={step.icon} 
+              name={step.icon as any} 
               size={16} 
               color={currentStep >= step.id ? '#FFFFFF' : '#6B7280'} 
             />

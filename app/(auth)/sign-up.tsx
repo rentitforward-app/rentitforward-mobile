@@ -210,14 +210,14 @@ export default function SignUpScreen() {
 
             <Text style={styles.termsText}>
               By creating an account, you agree to our{'\n'}
-              <Text style={styles.linkText}>Terms of Service</Text> and{' '}
+              <Text style={styles.linkText}>Terms of Service</Text> and 
               <Text style={styles.linkText}>Privacy Policy</Text>
             </Text>
           </View>
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>
-              Already have an account?{' '}
+              Already have an account? 
               <Text
                 style={styles.linkText}
                 onPress={() => router.push('/(auth)/sign-in')}
@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   linkText: {
-    color: mobileTokens.colors.primary,
+    color: mobileTokens.colors.primary.main,
     fontWeight: '600',
   },
 }); 

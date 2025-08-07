@@ -24,8 +24,8 @@ Sentry.init({
     }),
   ],
   
-  // Configure sessions
-  sessionTrackingEnabled: true,
+  // Configure sessions (updated property name)
+  autoSessionTracking: true,
   
   // Configure user context
   beforeSend(event) {

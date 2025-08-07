@@ -172,7 +172,7 @@ export default function ForgotPasswordScreen() {
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>
-              Remember your password?{' '}
+              Remember your password? 
               <Text
                 style={styles.linkText}
                 onPress={() => router.push('/(auth)/sign-in')}

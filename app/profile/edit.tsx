@@ -43,7 +43,7 @@ interface ProfileSettings {
 
 export default function EditProfileScreen() {
   const router = useRouter();
-  const { user, setUser } = useAuthStore();
+  const { user, updateProfile } = useAuthStore();
   const queryClient = useQueryClient();
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -141,14 +141,7 @@ export default function EditProfileScreen() {
     onSuccess: (updatedData) => {
       // Update local auth store
       if (user) {
-        setUser({
-          ...user,
-          user_metadata: {
-            ...user.user_metadata,
-            first_name: updatedData.first_name,
-            last_name: updatedData.last_name,
-          }
-        });
+        // Note: User data will be updated automatically via onAuthStateChange
       }
 
       // Invalidate queries

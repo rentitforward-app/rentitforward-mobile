@@ -1,7 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Switch, StyleSheet, Alert, ScrollView } from 'react-native';
 import { useOneSignal, useNotificationPermission } from './OneSignalProvider';
-import { colors, spacing, typography } from 'rentitforward-shared/src/design-system';
+// Temporarily using local colors until design system is fixed
+const colors = {
+  primary: { green: '#44D62C' },
+  gray: { 200: '#e5e7eb', 300: '#d1d5db', 600: '#4b5563', 900: '#111827' }
+};
+const typography = {
+  sizes: { base: 16, lg: 18, sm: 14 },
+  weights: { medium: '500', semibold: '600' },
+  lineHeights: { normal: 1.5, relaxed: 1.75 }
+};
+const spacing = { md: 16 };
 
 interface NotificationCategory {
   key: string;

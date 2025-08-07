@@ -10,7 +10,7 @@ import {
   createPushNotification, 
   shouldSendNotification,
   NotificationPreferences 
-} from 'rentitforward-shared';
+} from '@rentitforward/shared';
 
 export interface MobileOneSignalConfig {
   appId: string;
