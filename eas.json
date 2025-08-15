@@ -14,15 +14,42 @@
         "simulator": true
       }
     },
+    "debug": {
+      "env": {
+        "EXPO_SKIP_TYPE_CHECK": "1",
+        "NODE_ENV": "production"
+      },
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "production": {
       "env": {
-        "EXPO_SKIP_TYPE_CHECK": "1"
+        "EXPO_SKIP_TYPE_CHECK": "1",
+        "NODE_OPTIONS": "--max_old_space_size=4096",
+        "EXPO_NO_TELEMETRY": "1",
+        "JAVA_HOME": "/usr/lib/jvm/java-17-openjdk-amd64",
+        "ORG_GRADLE_JAVA_HOME": "/usr/lib/jvm/java-17-openjdk-amd64",
+        "JAVA_TOOLCHAIN_VERSION": "17"
       },
       "ios": {
         "distribution": "store"
       },
       "android": {
-        "distribution": "store"
+        "distribution": "store",
+        "image": "ubuntu-22.04-jdk-17-ndk-r26b"
+      }
+    }
+    ,
+    "simple": {
+      "env": {
+        "EXPO_SKIP_TYPE_CHECK": "1",
+        "EXPO_NO_TELEMETRY": "1"
+      },
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
       }
     }
   },

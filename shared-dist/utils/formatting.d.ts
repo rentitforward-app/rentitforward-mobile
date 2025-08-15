@@ -1,0 +1,16 @@
+export declare const slugify: (text: string) => string;
+export declare const truncateText: (text: string, maxLength: number) => string;
+export declare const capitalizeFirst: (text: string) => string;
+export declare const titleCase: (text: string) => string;
+export declare const formatPrice: (amount: number, currency?: string, locale?: string) => string;
+export declare const formatPriceRange: (minPrice: number, maxPrice: number, currency?: string, locale?: string) => string;
+export declare const formatDate: (date: string | Date, format?: "short" | "medium" | "long" | "full", locale?: string) => string;
+export declare const formatRelativeTime: (date: string | Date, locale?: string) => string;
+export declare const formatDaysBetween: (startDate: string | Date, endDate: string | Date) => number;
+export declare const formatRating: (rating: number, precision?: number) => string;
+export declare const getRatingStars: (rating: number) => string;
+export declare const formatFileSize: (bytes: number) => string;
+export declare const getImageUrl: (path: string, bucket?: string, baseUrl?: string) => string;
+export declare const isValidEmail: (email: string) => boolean;
+export declare const isValidPhone: (phone: string) => boolean;
+export declare const isValidPostcode: (postcode: string) => boolean;

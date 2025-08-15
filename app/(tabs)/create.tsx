@@ -110,6 +110,7 @@ const CATEGORIES = [
   { id: 'musical_instruments_gear', name: 'Musical Instruments & Gear', icon: '🎸' },
   { id: 'costumes_props', name: 'Costumes & Props', icon: '🎭' },
   { id: 'maker_craft_supplies', name: 'Maker & Craft Supplies', icon: '✂️' },
+  { id: 'clothing_shoes_accessories', name: 'Clothing, Shoes and Accessories', icon: '👕' },
 ];
 
 const CONDITIONS = [

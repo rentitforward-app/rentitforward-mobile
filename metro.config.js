@@ -3,18 +3,16 @@ const path = require('path');
 
 const config = getDefaultConfig(__dirname);
 
-// Add monorepo support for shared package
-config.watchFolders = [
-  path.resolve(__dirname, '../rentitforward-shared'),
-];
-
+// Resolve shared package from a vendored dist inside mobile repo to ensure EAS packs it
 config.resolver.alias = {
-  '@rentitforward/shared': path.resolve(__dirname, '../rentitforward-shared/src'),
-  '@shared': path.resolve(__dirname, '../rentitforward-shared/src'),
+  '@rentitforward/shared': path.resolve(__dirname, './shared-dist'),
+  '@shared': path.resolve(__dirname, './shared-dist'),
+  // Shim server-only stripe SDK to avoid bundling errors in RN
+  stripe: path.resolve(__dirname, './src/shims/stripe-empty.js'),
   crypto: 'react-native-crypto',
 };
 
-// Add Node.js polyfills for React Native
+// Prefer react-native entry points
 config.resolver.resolverMainFields = ['react-native', 'browser', 'main'];
 
 module.exports = config;
