@@ -13,8 +13,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../src/stores/auth';
 import { supabase } from '../../src/lib/supabase';
-import type { Booking } from '@rentitforward/shared';
-import { BookingStatus } from '@rentitforward/shared';
+import type { Booking } from '../../shared-dist/types/booking';
+import { BookingStatus } from '../../shared-dist/types/booking';
 
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

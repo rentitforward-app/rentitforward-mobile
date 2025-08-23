@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,10 @@ export default function SignInScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  
+  // Refs for keyboard navigation
+  const emailInputRef = useRef<TextInput>(null);
+  const passwordInputRef = useRef<TextInput>(null);
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -54,6 +58,16 @@ export default function SignInScreen() {
       // Error is already handled in AuthProvider
       console.error('Sign in error:', error);
     }
+  };
+
+  const handleEmailSubmit = () => {
+    passwordInputRef.current?.focus();
+  };
+
+  const handlePasswordSubmit = () => {
+    // Dismiss keyboard and attempt sign in
+    passwordInputRef.current?.blur();
+    handleSignIn();
   };
 
   return (
@@ -96,6 +110,7 @@ export default function SignInScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email</Text>
               <TextInput
+                ref={emailInputRef}
                 style={[styles.input, errors.email && styles.inputError]}
                 value={email}
                 onChangeText={(text) => {
@@ -108,6 +123,9 @@ export default function SignInScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={handleEmailSubmit}
                 editable={!loading}
               />
               {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
@@ -116,6 +134,7 @@ export default function SignInScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Password</Text>
               <TextInput
+                ref={passwordInputRef}
                 style={[styles.input, errors.password && styles.inputError]}
                 value={password}
                 onChangeText={(text) => {
@@ -128,6 +147,9 @@ export default function SignInScreen() {
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
+                returnKeyType="done"
+                blurOnSubmit={true}
+                onSubmitEditing={handlePasswordSubmit}
                 editable={!loading}
               />
               {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}

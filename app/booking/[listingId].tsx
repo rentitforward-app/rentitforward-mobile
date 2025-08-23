@@ -1,41 +1,40 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, TextInput, Modal } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, TextInput, Modal, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { colors, spacing, typography } from '../../src/lib/design-system';
 import { useAuth } from '../../src/components/AuthProvider';
 import { supabase } from '../../src/lib/supabase';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { Calendar, DateData } from 'react-native-calendars';
+import { useQuery } from '@tanstack/react-query';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 interface ListingData {
   id: string;
   title: string;
   description: string;
   price_per_day: number;
-  location: string;
-  is_active: boolean;
-  created_at: string;
-  owner_id: string;
+  price_weekly: number | null;
+  price_hourly: number | null;
+  deposit_amount: number | null;
   category: string;
-  condition: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  address: string;
   delivery_available: boolean;
   pickup_available: boolean;
-  address: string | null;
-  city: string | null;
-  state: string | null;
-  postal_code: string | null;
+  images: string[];
+  features: string[];
+  created_at: string;
   profiles: {
     id: string;
     full_name: string;
-    avatar_url: string | null;
-    rating: string | null;
-  } | null;
-  listing_photos: Array<{
-    id: string;
-    url: string;
-    order_index: number;
-  }>;
+    avatar_url: string;
+    rating: number;
+  };
 }
 
 export default function BookingScreen() {
@@ -47,19 +46,136 @@ export default function BookingScreen() {
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
   
+  // Calendar state
+  const [selectedDates, setSelectedDates] = useState<{
+    startDate: string | null;
+    endDate: string | null;
+  }>({
+    startDate: null,
+    endDate: null,
+  });
+  const [showCalendar, setShowCalendar] = useState(false);
+  
   // Booking form state
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
-  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
-  const [deliveryMethod, setDeliveryMethod] = useState('');
-  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [deliveryMethod, setDeliveryMethod] = useState('pickup');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
 
   useEffect(() => {
     fetchListingDetails();
   }, [listingId]);
+
+  // Fetch booking availability for the listing
+  const { data: unavailableDates = [] } = useQuery({
+    queryKey: ['listing-availability', listingId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('start_date, end_date')
+        .eq('listing_id', listingId)
+        .in('status', ['confirmed', 'active', 'pending'])
+        .gte('end_date', new Date().toISOString().split('T')[0]);
+
+      if (error) throw error;
+      
+      // Generate array of unavailable dates
+      const unavailable: string[] = [];
+      data.forEach(booking => {
+        const start = new Date(booking.start_date);
+        const end = new Date(booking.end_date);
+        
+        for (let d = start; d <= end; d.setDate(d.getDate() + 1)) {
+          unavailable.push(d.toISOString().split('T')[0]);
+        }
+      });
+      
+      return unavailable;
+    },
+    enabled: !!listingId,
+  });
+
+  // Calculate marked dates for calendar
+  const markedDates = useMemo(() => {
+    const marked: any = {}; // Changed from MarkedDates to any
+
+    // Mark unavailable dates
+    unavailableDates.forEach(date => {
+      marked[date] = {
+        disabled: true,
+        disableTouchEvent: true,
+        color: colors.gray[200],
+        textColor: colors.text.secondary,
+      };
+    });
+
+    // Mark today and past dates as disabled
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    for (let i = 0; i < 365; i++) {
+      const date = new Date(yesterday);
+      date.setDate(date.getDate() - i);
+      const dateString = date.toISOString().split('T')[0];
+      
+      if (!marked[dateString]) {
+        marked[dateString] = {
+          disabled: true,
+          disableTouchEvent: true,
+          color: colors.gray[100],
+          textColor: colors.text.secondary,
+        };
+      }
+    }
+
+    // Mark selected date range
+    if (selectedDates.startDate && selectedDates.endDate) {
+      const start = new Date(selectedDates.startDate);
+      const end = new Date(selectedDates.endDate);
+
+      // Mark start date
+      marked[selectedDates.startDate] = {
+        ...marked[selectedDates.startDate],
+        selected: true,
+        startingDay: true,
+        color: colors.primary.main,
+        textColor: colors.white,
+        disabled: false,
+        disableTouchEvent: false,
+      };
+
+      // Mark end date
+      marked[selectedDates.endDate] = {
+        ...marked[selectedDates.endDate],
+        selected: true,
+        endingDay: true,
+        color: colors.primary.main,
+        textColor: colors.white,
+        disabled: false,
+        disableTouchEvent: false,
+      };
+
+      // Mark days in between
+      const current = new Date(start);
+      current.setDate(current.getDate() + 1);
+      
+      while (current < end) {
+        const dateString = current.toISOString().split('T')[0];
+        if (!unavailableDates.includes(dateString)) {
+          marked[dateString] = {
+            selected: true,
+            color: colors.primary.main + '40', // Semi-transparent
+            textColor: colors.primary.main,
+            disabled: false,
+            disableTouchEvent: false,
+          };
+        }
+        current.setDate(current.getDate() + 1);
+      }
+    }
+
+    return marked;
+  }, [unavailableDates, selectedDates.startDate, selectedDates.endDate]);
 
   const fetchListingDetails = async () => {
     if (!listingId || typeof listingId !== 'string') {
@@ -79,11 +195,7 @@ export default function BookingScreen() {
           avatar_url,
           rating
         ),
-        listing_photos (
-          id,
-          url,
-          order_index
-        ),
+        images,
         address,
         city,
         state,
@@ -102,167 +214,140 @@ export default function BookingScreen() {
     setLoading(false);
   };
 
-  // Set default delivery method to pickup when listing loads
-  useEffect(() => {
-    if (listing && !deliveryMethod) {
-      if (listing.pickup_available) {
-        setDeliveryMethod('pickup');
-      } else if (listing.delivery_available) {
-        setDeliveryMethod('delivery');
+  const handleDayPress = (day: DateData) => {
+    const dateString = day.dateString;
+    
+    // Check if date is unavailable
+    if (unavailableDates.includes(dateString)) {
+      Alert.alert('Date Unavailable', 'This date is already booked.');
+      return;
+    }
+
+    // Check if date is in the past
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDate = new Date(dateString);
+    
+    if (selectedDate < today) {
+      Alert.alert('Invalid Date', 'Cannot select dates in the past.');
+      return;
+    }
+
+    if (!selectedDates.startDate || (selectedDates.startDate && selectedDates.endDate)) {
+      // Start new selection
+      setSelectedDates({
+        startDate: dateString,
+        endDate: null,
+      });
+    } else if (selectedDates.startDate && !selectedDates.endDate) {
+      const startDate = new Date(selectedDates.startDate);
+      const endDate = new Date(dateString);
+
+      if (endDate < startDate) {
+        // Selected end date is before start date, swap them
+        setSelectedDates({
+          startDate: dateString,
+          endDate: selectedDates.startDate,
+        });
+      } else if (endDate.getTime() === startDate.getTime()) {
+        // Same date selected, clear selection
+        setSelectedDates({
+          startDate: null,
+          endDate: null,
+        });
+      } else {
+        // Check if any dates in between are unavailable
+        const datesInBetween: string[] = [];
+        const current = new Date(startDate);
+        current.setDate(current.getDate() + 1);
+        
+        while (current < endDate) {
+          datesInBetween.push(current.toISOString().split('T')[0]);
+          current.setDate(current.getDate() + 1);
+        }
+
+        const hasUnavailableDates = datesInBetween.some(date => 
+          unavailableDates.includes(date)
+        );
+
+        if (hasUnavailableDates) {
+          Alert.alert(
+            'Date Range Unavailable', 
+            'Some dates in this range are already booked. Please select a different range.'
+          );
+          return;
+        }
+
+        // Valid range
+        setSelectedDates({
+          startDate: selectedDates.startDate,
+          endDate: dateString,
+        });
       }
     }
-  }, [listing, deliveryMethod]);
+  };
 
-  const calculateDuration = (): number => {
-    if (!startDate || !endDate) return 0;
-    const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+  const handleClearDates = () => {
+    setSelectedDates({ startDate: null, endDate: null });
+  };
+
+  const calculateDuration = () => {
+    if (!selectedDates.startDate || !selectedDates.endDate) return 0;
+    const start = new Date(selectedDates.startDate);
+    const end = new Date(selectedDates.endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
   };
 
   const calculatePricing = () => {
-    if (!listing) {
+    if (!listing || !selectedDates.startDate || !selectedDates.endDate) {
       return {
-        duration: 0,
-        basePrice: 0,
-        platformFee: 0,
-        total: 0
+        rentalFee: 0,
+        serviceFee: 0,
+        damageProtection: 0,
+        deliveryFee: deliveryMethod === 'delivery' ? 20 : 0,
+        total: 0,
       };
     }
-    
+
     const duration = calculateDuration();
-    const basePrice = listing.price_per_day * duration;
-    const platformFee = basePrice * 0.03; // 3% platform fee
-    const total = basePrice + platformFee;
+    const rentalFee = listing.price_per_day * duration;
+    const serviceFee = rentalFee * 0.15; // 15% service fee
+    const damageProtection = rentalFee * 0.10; // 10% damage protection
+    const deliveryFee = deliveryMethod === 'delivery' ? 20 : 0;
+    const total = rentalFee + serviceFee + damageProtection + deliveryFee;
 
     return {
-      duration,
-      basePrice,
-      platformFee,
-      total
+      rentalFee,
+      serviceFee,
+      damageProtection,
+      deliveryFee,
+      total,
     };
   };
 
-  const formatDate = (date: Date | null): string => {
-    if (!date) return 'dd/mm/yyyy';
-    return date.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  };
-
-  const formatCurrency = (amount: number): string => {
-    return `$${amount.toFixed(2)}`;
-  };
-
-  const handleStartDateChange = (event: any, selectedDate?: Date) => {
-    setShowStartDatePicker(false);
-    if (selectedDate) {
-      setStartDate(selectedDate);
-      // If end date is before or same as new start date, clear it
-      if (endDate && endDate <= selectedDate) {
-        setEndDate(null);
-      }
-    }
-  };
-
-  const handleEndDateChange = (event: any, selectedDate?: Date) => {
-    setShowEndDatePicker(false);
-    if (selectedDate && startDate && selectedDate > startDate) {
-      setEndDate(selectedDate);
-    } else if (selectedDate && selectedDate <= (startDate || new Date())) {
-      Alert.alert('Invalid Date', 'End date must be after start date');
-    }
-  };
-
-  const getMinimumDate = () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow;
-  };
-
-  const getMinimumEndDate = () => {
-    if (!startDate) return getMinimumDate();
-    const dayAfterStart = new Date(startDate);
-    dayAfterStart.setDate(dayAfterStart.getDate() + 1);
-    return dayAfterStart;
-  };
-
-  const getDeliveryOptions = () => {
-    const options = [];
-    
-    if (listing?.pickup_available) {
-      options.push({ label: 'Pickup', value: 'pickup' });
-    }
-    if (listing?.delivery_available) {
-      options.push({ label: 'Delivery', value: 'delivery' });
-    }
-    
-    return options;
-  };
-
-  const getDeliveryMethodDisplayName = (value: string) => {
-    const options = getDeliveryOptions();
-    const option = options.find(opt => opt.value === value);
-    return option ? option.label : value;
-  };
-
-  const getMaskedPickupLocation = (listing: ListingData | null): string => {
-    if (!listing) return 'Pickup location not specified';
-    
-    // Show only city and state, hide street address and postal code for security
-    const city = listing.city?.trim();
-    const state = listing.state?.trim();
-    
-    if (city && state) {
-      return `${city}, ${state}`;
-    } else if (city) {
-      return city;
-    } else if (state) {
-      return state;
-    }
-    
-    return 'Pickup location available';
-  };
-
-  const handleBooking = async () => {
-    if (!user) {
-      Alert.alert('Sign In Required', 'Please sign in to book this item');
+  const handleCreateBooking = async () => {
+    if (!user || !listing || !selectedDates.startDate || !selectedDates.endDate) {
+      Alert.alert('Error', 'Please select dates and ensure you are logged in.');
       return;
     }
-
-    if (!startDate || !endDate) {
-      Alert.alert('Missing Dates', 'Please select both start and end dates');
-      return;
-    }
-
-    if (!deliveryMethod) {
-      Alert.alert('Missing Delivery Method', 'Please select a delivery method');
-      return;
-    }
-
-    if (deliveryMethod === 'delivery' && !deliveryAddress.trim()) {
-      Alert.alert('Missing Delivery Address', 'Please enter a delivery address');
-      return;
-    }
-
-    // Pickup validation no longer needed as location comes from listing
 
     setBookingLoading(true);
-
     try {
       const pricing = calculatePricing();
       
-      const { data, error } = await supabase
+      const { data: booking, error } = await supabase
         .from('bookings')
         .insert({
-          listing_id: listing?.id,
+          listing_id: listing.id,
           renter_id: user.id,
-          start_date: startDate.toISOString().split('T')[0],
-          end_date: endDate.toISOString().split('T')[0],
-          total_price: pricing.total,
-          platform_fee: pricing.platformFee,
+          owner_id: listing.profiles.id,
+          start_date: selectedDates.startDate,
+          end_date: selectedDates.endDate,
+          total_amount: pricing.total,
+          rental_fee: pricing.rentalFee,
+          platform_fee: pricing.serviceFee,
           delivery_method: deliveryMethod,
           delivery_address: deliveryMethod === 'delivery' ? deliveryAddress.trim() : null,
           pickup_location: deliveryMethod === 'pickup' ? `${listing?.address || ''}, ${listing?.city || ''}, ${listing?.state || ''} ${listing?.postal_code || ''}`.trim() : null,
@@ -336,13 +421,11 @@ export default function BookingScreen() {
   }
 
   const pricing = calculatePricing();
-  const deliveryOptions = getDeliveryOptions();
 
   // Get main image
   let mainImage = null;
-  if (listing.listing_photos && listing.listing_photos.length > 0) {
-    const sortedPhotos = listing.listing_photos.sort((a, b) => a.order_index - b.order_index);
-    mainImage = sortedPhotos[0].url;
+  if (listing.images && listing.images.length > 0) {
+    mainImage = listing.images[0];
   }
 
   return (
@@ -364,572 +447,574 @@ export default function BookingScreen() {
             onPress={() => router.back()}
             style={{
               flexDirection: 'row',
-              alignItems: 'center'
+              alignItems: 'center',
+              gap: spacing.xs
             }}
           >
-            <Ionicons name="arrow-back" size={24} color={colors.primary.main} />
+            <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
             <Text style={{
-              marginLeft: spacing.xs,
               fontSize: typography.sizes.base,
-              color: colors.primary.main,
-              fontWeight: typography.weights.medium
+              fontWeight: typography.weights.medium,
+              color: colors.text.primary
             }}>
-              Back to Browse
+              Back
             </Text>
           </TouchableOpacity>
+          
+          <Text style={{
+            fontSize: typography.sizes.lg,
+            fontWeight: typography.weights.semibold,
+            color: colors.text.primary
+          }}>
+            Book {listing.title}
+          </Text>
+          
+          <View style={{ width: 80 }} />
         </View>
 
+        {/* Main Content */}
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-          {/* Listing Summary */}
-          <View style={{
-            flexDirection: 'row',
-            padding: spacing.md,
-            backgroundColor: colors.white,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.gray[100]
-          }}>
-            {mainImage ? (
-              <Image
-                source={{ uri: mainImage }}
-                style={{
-                  width: 100,
-                  height: 100,
-                  borderRadius: 8,
-                  marginRight: spacing.md
-                }}
-              />
-            ) : (
-              <View style={{
-                width: 100,
-                height: 100,
-                backgroundColor: colors.gray[100],
-                borderRadius: 8,
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: spacing.md
-              }}>
-                <Ionicons name="image" size={32} color={colors.gray[400]} />
-              </View>
-            )}
-            
-            <View style={{ flex: 1 }}>
+          {/* Single Column Layout for Mobile */}
+          <View style={{ padding: spacing.md }}>
+            {/* Calendar Section */}
+            <View style={{
+              backgroundColor: colors.white,
+              borderRadius: 12,
+              padding: spacing.md,
+              marginBottom: spacing.lg,
+              shadowColor: colors.black,
+              shadowOpacity: 0.05,
+              shadowRadius: 8,
+              elevation: 2
+            }}>
               <Text style={{
                 fontSize: typography.sizes.lg,
-                fontWeight: typography.weights.bold,
+                fontWeight: typography.weights.semibold,
                 color: colors.text.primary,
-                marginBottom: spacing.xs
-              }}>
-                {listing.title}
-              </Text>
-              
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginBottom: spacing.xs
-              }}>
-                <Text style={{
-                  fontSize: typography.sizes['2xl'],
-                  fontWeight: typography.weights.bold,
-                  color: colors.primary.main
-                }}>
-                  ${listing.price_per_day}
-                </Text>
-                <Text style={{
-                  fontSize: typography.sizes.sm,
-                  color: colors.text.secondary,
-                  marginLeft: spacing.xs
-                }}>
-                  per day
-                </Text>
-              </View>
-              
-              <Text style={{
-                fontSize: typography.sizes.sm,
-                color: colors.text.secondary
-              }}>
-                by {listing.profiles?.full_name || 'Unknown Owner'}
-              </Text>
-            </View>
-          </View>
-
-          {/* Booking Form */}
-          <View style={{ padding: spacing.md }}>
-            {/* Date Selection */}
-            <View style={{ marginBottom: spacing.lg }}>
-              <View style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
                 marginBottom: spacing.md
               }}>
-                {/* Start Date */}
-                <View style={{ flex: 1, marginRight: spacing.sm }}>
-                  <Text style={{
-                    fontSize: typography.sizes.sm,
-                    fontWeight: typography.weights.medium,
-                    color: colors.text.primary,
-                    marginBottom: spacing.xs
-                  }}>
-                    Start Date
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => setShowStartDatePicker(true)}
-                    style={{
-                      borderWidth: 1,
-                      borderColor: colors.gray[300],
-                      borderRadius: 8,
-                      paddingHorizontal: spacing.sm,
-                      paddingVertical: spacing.md,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between'
-                    }}
-                  >
-                    <Text style={{
-                      fontSize: typography.sizes.base,
-                      color: startDate ? colors.text.primary : colors.text.secondary
-                    }}>
-                      {formatDate(startDate)}
-                    </Text>
-                    <Ionicons name="calendar-outline" size={20} color={colors.gray[400]} />
-                  </TouchableOpacity>
-                </View>
-
-                {/* End Date */}
-                <View style={{ flex: 1, marginLeft: spacing.sm }}>
-                  <Text style={{
-                    fontSize: typography.sizes.sm,
-                    fontWeight: typography.weights.medium,
-                    color: colors.text.primary,
-                    marginBottom: spacing.xs
-                  }}>
-                    End Date
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => setShowEndDatePicker(true)}
-                    style={{
-                      borderWidth: 1,
-                      borderColor: colors.gray[300],
-                      borderRadius: 8,
-                      paddingHorizontal: spacing.sm,
-                      paddingVertical: spacing.md,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between'
-                    }}
-                  >
-                    <Text style={{
-                      fontSize: typography.sizes.base,
-                      color: endDate ? colors.text.primary : colors.text.secondary
-                    }}>
-                      {formatDate(endDate)}
-                    </Text>
-                    <Ionicons name="calendar-outline" size={20} color={colors.gray[400]} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-
-            {/* Delivery Method */}
-            <View style={{ marginBottom: spacing.lg }}>
-              <Text style={{
-                fontSize: typography.sizes.sm,
-                fontWeight: typography.weights.medium,
-                color: colors.text.primary,
-                marginBottom: spacing.xs
-              }}>
-                Delivery Method
+                Select Dates
               </Text>
-              <TouchableOpacity
-                onPress={() => {
-                  const options = getDeliveryOptions();
-                  if (options.length === 0) {
-                    Alert.alert(
-                      'No Delivery Options',
-                      'This listing does not have pickup or delivery options available. Please contact the owner for more information.',
-                      [{ text: 'OK' }]
-                    );
-                  } else {
-                    setShowDeliveryModal(true);
-                  }
-                }}
-                style={{
-                  borderWidth: 1,
-                  borderColor: colors.gray[300],
+
+              {/* Current Selection */}
+              {(selectedDates.startDate || selectedDates.endDate) && (
+                <View style={{
+                  backgroundColor: colors.gray[50],
                   borderRadius: 8,
-                  paddingHorizontal: spacing.sm,
-                  paddingVertical: spacing.md,
+                  padding: spacing.sm,
+                  marginBottom: spacing.md,
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'space-between'
-                }}
-              >
-                <Text style={{
-                  fontSize: typography.sizes.base,
-                  color: deliveryMethod ? colors.text.primary : colors.text.secondary
                 }}>
-                  {deliveryMethod 
-                    ? (deliveryMethod === 'pickup' ? 'Pickup' : 'Delivery')
-                    : (getDeliveryOptions().length > 0 ? 'Select delivery method' : 'No delivery options available')
-                  }
-                </Text>
-                <Ionicons name="chevron-down" size={20} color={colors.gray[400]} />
-              </TouchableOpacity>
-              
-              {/* Delivery Address - only show when delivery is selected */}
-              {deliveryMethod === 'delivery' && (
-                <View style={{ marginTop: spacing.md }}>
                   <Text style={{
-                    fontSize: typography.sizes.sm,
-                    fontWeight: typography.weights.medium,
-                    color: colors.text.primary,
-                    marginBottom: spacing.xs
+                    fontSize: typography.sizes.base,
+                    color: colors.text.primary
                   }}>
-                    Delivery Address
-                  </Text>
-                  <TextInput
-                    value={deliveryAddress}
-                    onChangeText={setDeliveryAddress}
-                    placeholder="Enter your delivery address..."
-                    multiline
-                    numberOfLines={3}
-                    textAlignVertical="top"
-                    style={{
-                      borderWidth: 1,
-                      borderColor: colors.gray[300],
-                      borderRadius: 8,
-                      paddingHorizontal: spacing.sm,
-                      paddingVertical: spacing.sm,
-                      fontSize: typography.sizes.base,
-                      color: colors.text.primary,
-                      backgroundColor: colors.white,
-                      minHeight: 80
-                    }}
-                  />
-                </View>
-              )}
-              
-              {/* Pickup Location - only show when pickup is selected */}
-              {deliveryMethod === 'pickup' && (
-                <View style={{ marginTop: spacing.md }}>
-                  <Text style={{
-                    fontSize: typography.sizes.sm,
-                    fontWeight: typography.weights.medium,
-                    color: colors.text.primary,
-                    marginBottom: spacing.xs
-                  }}>
-                    Pickup Location
+                    {selectedDates.startDate ? new Date(selectedDates.startDate).toLocaleDateString() : 'Not selected'} 
+                    {selectedDates.endDate ? ` - ${new Date(selectedDates.endDate).toLocaleDateString()}` : ''}
                   </Text>
                   <View style={{
-                    borderWidth: 1,
-                    borderColor: colors.gray[300],
-                    borderRadius: 8,
+                    backgroundColor: colors.primary.main,
                     paddingHorizontal: spacing.sm,
-                    paddingVertical: spacing.md,
-                    backgroundColor: colors.gray[50]
+                    paddingVertical: spacing.xs,
+                    borderRadius: 12
                   }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Ionicons name="location-outline" size={18} color={colors.primary.main} style={{ marginRight: spacing.xs }} />
-                      <Text style={{
-                        fontSize: typography.sizes.base,
-                        color: colors.text.primary,
-                        fontWeight: typography.weights.medium
-                      }}>
-                        {getMaskedPickupLocation(listing)}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={{
-                    backgroundColor: colors.gray[50],
-                    borderRadius: 8,
-                    padding: spacing.sm,
-                    marginTop: spacing.xs,
-                    flexDirection: 'row',
-                    alignItems: 'flex-start'
-                  }}>
-                    <Ionicons name="shield-checkmark-outline" size={16} color={colors.primary.main} style={{ marginRight: spacing.xs, marginTop: 2 }} />
                     <Text style={{
-                      fontSize: typography.sizes.xs,
-                      color: colors.gray[600],
-                      flex: 1,
-                      lineHeight: 16
+                      fontSize: typography.sizes.sm,
+                      color: colors.white,
+                      fontWeight: typography.weights.medium
                     }}>
-                      The exact pickup address will be provided by the owner once your booking is confirmed.
+                      {calculateDuration()} day{calculateDuration() === 1 ? '' : 's'}
                     </Text>
                   </View>
                 </View>
               )}
-            </View>
 
-            {/* Special Instructions */}
-            <View style={{ marginBottom: spacing.lg }}>
-              <Text style={{
-                fontSize: typography.sizes.sm,
-                fontWeight: typography.weights.medium,
-                color: colors.text.primary,
-                marginBottom: spacing.xs
-              }}>
-                Special Instructions (Optional)
-              </Text>
-              <TextInput
-                value={specialInstructions}
-                onChangeText={setSpecialInstructions}
-                placeholder="Any special requests or instructions..."
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-                style={{
-                  borderWidth: 1,
-                  borderColor: colors.gray[300],
-                  borderRadius: 8,
-                  paddingHorizontal: spacing.sm,
-                  paddingVertical: spacing.sm,
-                  fontSize: typography.sizes.base,
-                  color: colors.text.primary,
+              {/* Calendar */}
+              <Calendar
+                onDayPress={handleDayPress}
+                markedDates={markedDates}
+                markingType="period"
+                theme={{
                   backgroundColor: colors.white,
-                  minHeight: 80
+                  calendarBackground: colors.white,
+                  textSectionTitleColor: colors.text.primary,
+                  selectedDayBackgroundColor: colors.primary.main,
+                  selectedDayTextColor: colors.white,
+                  todayTextColor: colors.primary.main,
+                  dayTextColor: colors.text.primary,
+                  textDisabledColor: colors.text.secondary,
+                  dotColor: colors.primary.main,
+                  selectedDotColor: colors.white,
+                  arrowColor: colors.primary.main,
+                  disabledArrowColor: colors.gray[300],
+                  monthTextColor: colors.text.primary,
+                  indicatorColor: colors.primary.main,
+                  textDayFontFamily: 'System',
+                  textMonthFontFamily: 'System',
+                  textDayHeaderFontFamily: 'System',
+                  textDayFontSize: 14,
+                  textMonthFontSize: 16,
+                  textDayHeaderFontSize: 12,
                 }}
+                minDate={new Date().toISOString().split('T')[0]}
+                maxDate={new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
               />
-            </View>
 
-            {/* Price Breakdown */}
-            {pricing.duration > 0 && (
+              {/* Legend */}
               <View style={{
                 backgroundColor: colors.gray[50],
-                borderRadius: 12,
-                padding: spacing.md,
-                marginBottom: spacing.lg
+                borderRadius: 8,
+                padding: spacing.sm,
+                marginTop: spacing.md
               }}>
                 <Text style={{
-                  fontSize: typography.sizes.base,
-                  fontWeight: typography.weights.semibold,
+                  fontSize: typography.sizes.sm,
+                  fontWeight: typography.weights.medium,
                   color: colors.text.primary,
-                  marginBottom: spacing.md
+                  marginBottom: spacing.xs
                 }}>
-                  Price Breakdown
+                  Legend
                 </Text>
+                <View style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-around',
+                  flexWrap: 'wrap',
+                  gap: spacing.xs
+                }}>
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: spacing.xs
+                  }}>
+                    <View style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: 6,
+                      backgroundColor: colors.primary.main
+                    }} />
+                    <Text style={{
+                      fontSize: typography.sizes.xs,
+                      color: colors.text.secondary
+                    }}>
+                      Selected
+                    </Text>
+                  </View>
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: spacing.xs
+                  }}>
+                    <View style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: 6,
+                      backgroundColor: colors.primary.main + '40'
+                    }} />
+                    <Text style={{
+                      fontSize: typography.sizes.xs,
+                      color: colors.text.secondary
+                    }}>
+                      Range
+                    </Text>
+                  </View>
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: spacing.xs
+                  }}>
+                    <View style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: 6,
+                      backgroundColor: colors.gray[300]
+                    }} />
+                    <Text style={{
+                      fontSize: typography.sizes.xs,
+                      color: colors.text.secondary
+                    }}>
+                      Booked
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Action Buttons */}
+              <View style={{
+                flexDirection: 'row',
+                gap: spacing.sm,
+                marginTop: spacing.md
+              }}>
+                {(selectedDates.startDate || selectedDates.endDate) && (
+                  <TouchableOpacity
+                    onPress={handleClearDates}
+                    style={{
+                      flex: 1,
+                      backgroundColor: colors.white,
+                      borderWidth: 1,
+                      borderColor: colors.gray[300],
+                      padding: spacing.sm,
+                      borderRadius: 8,
+                      alignItems: 'center'
+                    }}
+                  >
+                    <Text style={{
+                      fontSize: typography.sizes.sm,
+                      fontWeight: typography.weights.medium,
+                      color: colors.text.secondary
+                    }}>
+                      Clear Selection
+                    </Text>
+                  </TouchableOpacity>
+                )}
                 
+                <TouchableOpacity
+                  style={{
+                    flex: 1,
+                    backgroundColor: colors.gray[100],
+                    padding: spacing.sm,
+                    borderRadius: 8,
+                    alignItems: 'center'
+                  }}
+                >
+                  <Text style={{
+                    fontSize: typography.sizes.sm,
+                    fontWeight: typography.weights.medium,
+                    color: colors.text.secondary
+                  }}>
+                    Refresh
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Price Breakdown Section */}
+            <View style={{
+              backgroundColor: colors.white,
+              borderRadius: 12,
+              padding: spacing.md,
+              marginBottom: spacing.lg,
+              shadowColor: colors.black,
+              shadowOpacity: 0.05,
+              shadowRadius: 8,
+              elevation: 2
+            }}>
+              <Text style={{
+                fontSize: typography.sizes.lg,
+                fontWeight: typography.weights.semibold,
+                color: colors.text.primary,
+                marginBottom: spacing.md
+              }}>
+                Price Breakdown
+              </Text>
+
+              <View style={{ gap: spacing.sm }}>
                 <View style={{
                   flexDirection: 'row',
                   justifyContent: 'space-between',
-                  marginBottom: spacing.sm
+                  alignItems: 'center'
                 }}>
-                  <Text style={{ color: colors.text.secondary }}>
-                    ${listing.price_per_day} × {pricing.duration} day{pricing.duration > 1 ? 's' : ''}
-                  </Text>
-                  <Text style={{ color: colors.text.primary }}>
-                    {formatCurrency(pricing.basePrice)}
+                  <View>
+                    <Text style={{
+                      fontSize: typography.sizes.base,
+                      color: colors.text.primary
+                    }}>
+                      Rental fee
+                    </Text>
+                    <Text style={{
+                      fontSize: typography.sizes.sm,
+                      color: colors.text.secondary
+                    }}>
+                      {calculateDuration()} day{calculateDuration() === 1 ? '' : 's'} × ${listing.price_per_day}
+                    </Text>
+                  </View>
+                  <Text style={{
+                    fontSize: typography.sizes.base,
+                    fontWeight: typography.weights.medium,
+                    color: colors.text.primary
+                  }}>
+                    ${pricing.rentalFee.toFixed(2)}
                   </Text>
                 </View>
-                
+
                 <View style={{
                   flexDirection: 'row',
                   justifyContent: 'space-between',
-                  marginBottom: spacing.sm
+                  alignItems: 'center'
                 }}>
-                  <Text style={{ color: colors.text.secondary }}>Platform fee (3%)</Text>
-                  <Text style={{ color: colors.text.primary }}>
-                    {formatCurrency(pricing.platformFee)}
+                  <View>
+                    <Text style={{
+                      fontSize: typography.sizes.base,
+                      color: colors.text.primary
+                    }}>
+                      Service fee
+                    </Text>
+                    <Text style={{
+                      fontSize: typography.sizes.sm,
+                      color: colors.text.secondary
+                    }}>
+                      15% of rental fee
+                    </Text>
+                  </View>
+                  <Text style={{
+                    fontSize: typography.sizes.base,
+                    fontWeight: typography.weights.medium,
+                    color: colors.text.primary
+                  }}>
+                    ${pricing.serviceFee.toFixed(2)}
                   </Text>
                 </View>
-                
+
+                <View style={{
+                  backgroundColor: colors.gray[50],
+                  borderRadius: 8,
+                  padding: spacing.sm
+                }}>
+                  <View style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <View>
+                      <Text style={{
+                        fontSize: typography.sizes.base,
+                        color: colors.text.primary
+                      }}>
+                        Protection fee
+                      </Text>
+                      <Text style={{
+                        fontSize: typography.sizes.sm,
+                        color: colors.text.secondary
+                      }}>
+                        10% of rental fee
+                      </Text>
+                    </View>
+                    <Text style={{
+                      fontSize: typography.sizes.base,
+                      fontWeight: typography.weights.medium,
+                      color: colors.text.primary
+                    }}>
+                      ${pricing.damageProtection.toFixed(2)}
+                    </Text>
+                  </View>
+                </View>
+
                 <View style={{
                   borderTopWidth: 1,
                   borderTopColor: colors.gray[200],
                   paddingTop: spacing.sm,
                   flexDirection: 'row',
-                  justifyContent: 'space-between'
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
                 }}>
                   <Text style={{
-                    fontSize: typography.sizes.base,
+                    fontSize: typography.sizes.lg,
                     fontWeight: typography.weights.semibold,
                     color: colors.text.primary
                   }}>
                     Total
                   </Text>
                   <Text style={{
-                    fontSize: typography.sizes.base,
+                    fontSize: typography.sizes.lg,
                     fontWeight: typography.weights.semibold,
                     color: colors.text.primary
                   }}>
-                    {formatCurrency(pricing.total)}
+                    ${pricing.total.toFixed(2)}
                   </Text>
                 </View>
               </View>
-            )}
 
-            {/* Security Notice */}
-            <View style={{
-              backgroundColor: colors.gray[50],
-              borderRadius: 12,
-              padding: spacing.md,
-              marginBottom: spacing.lg
-            }}>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                <Ionicons name="shield-checkmark" size={20} color={colors.primary.main} style={{ marginRight: spacing.sm, marginTop: 2 }} />
-                <View style={{ flex: 1 }}>
-                  <Text style={{
-                    fontSize: typography.sizes.sm,
-                    color: colors.text.primary,
-                    lineHeight: 20
-                  }}>
-                    <Text style={{ fontWeight: typography.weights.semibold }}>Secure payments & deposit protection</Text>
-                    {'\n\n'}
-                    You won't be charged yet. This sends a booking request to the owner.
-                  </Text>
-                </View>
+              <View style={{
+                backgroundColor: colors.gray[50],
+                borderRadius: 8,
+                padding: spacing.sm,
+                marginTop: spacing.md
+              }}>
+                <Text style={{
+                  fontSize: typography.sizes.xs,
+                  color: colors.text.secondary,
+                  lineHeight: 16
+                }}>
+                  • Service fee helps us run a safe and reliable platform{'\n'}
+                  • All prices are in AUD and include GST where applicable
+                </Text>
               </View>
             </View>
-          </View>
-        </ScrollView>
 
-        {/* Bottom Action */}
-        <SafeAreaView edges={['bottom']} style={{ backgroundColor: colors.white }}>
-          <View style={{
-            padding: spacing.md,
-            backgroundColor: colors.white,
-            borderTopWidth: 1,
-            borderTopColor: colors.gray[200]
-          }}>
+            {/* Booking Details Section */}
+            <View style={{
+              backgroundColor: colors.white,
+              borderRadius: 12,
+              padding: spacing.md,
+              marginBottom: spacing.lg,
+              shadowColor: colors.black,
+              shadowOpacity: 0.05,
+              shadowRadius: 8,
+              elevation: 2
+            }}>
+              <Text style={{
+                fontSize: typography.sizes.lg,
+                fontWeight: typography.weights.semibold,
+                color: colors.text.primary,
+                marginBottom: spacing.md
+              }}>
+                Booking Details
+              </Text>
+
+              {/* Delivery Method */}
+              <View style={{ marginBottom: spacing.md }}>
+                <Text style={{
+                  fontSize: typography.sizes.base,
+                  fontWeight: typography.weights.medium,
+                  color: colors.text.primary,
+                  marginBottom: spacing.sm
+                }}>
+                  Delivery Method
+                </Text>
+                
+                <View style={{ gap: spacing.sm }}>
+                  <TouchableOpacity
+                    onPress={() => setDeliveryMethod('pickup')}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: spacing.sm,
+                      padding: spacing.sm,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: deliveryMethod === 'pickup' ? colors.primary.main : colors.gray[300],
+                      backgroundColor: deliveryMethod === 'pickup' ? colors.primary.main + '10' : colors.white
+                    }}
+                  >
+                    <View style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      borderWidth: 2,
+                      borderColor: deliveryMethod === 'pickup' ? colors.primary.main : colors.gray[400],
+                      backgroundColor: deliveryMethod === 'pickup' ? colors.primary.main : colors.white,
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      {deliveryMethod === 'pickup' && (
+                        <View style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 4,
+                          backgroundColor: colors.white
+                        }} />
+                      )}
+                    </View>
+                    <Text style={{
+                      fontSize: typography.sizes.base,
+                      color: colors.text.primary
+                    }}>
+                      Pickup
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setDeliveryMethod('delivery')}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: spacing.sm,
+                      padding: spacing.sm,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: deliveryMethod === 'delivery' ? colors.primary.main : colors.gray[300],
+                      backgroundColor: deliveryMethod === 'delivery' ? colors.primary.main + '10' : colors.white
+                    }}
+                  >
+                    <View style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      borderWidth: 2,
+                      borderColor: deliveryMethod === 'delivery' ? colors.primary.main : colors.gray[400],
+                      backgroundColor: deliveryMethod === 'delivery' ? colors.primary.main : colors.white,
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      {deliveryMethod === 'delivery' && (
+                        <View style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 4,
+                          backgroundColor: colors.white
+                        }} />
+                      )}
+                    </View>
+                    <Text style={{
+                      fontSize: typography.sizes.base,
+                      color: colors.text.primary
+                    }}>
+                      Delivery (+$20)
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Notes */}
+              <View>
+                <Text style={{
+                  fontSize: typography.sizes.base,
+                  fontWeight: typography.weights.medium,
+                  color: colors.text.primary,
+                  marginBottom: spacing.sm
+                }}>
+                  Notes for Host (Optional)
+                </Text>
+                <TextInput
+                  value={specialInstructions}
+                  onChangeText={setSpecialInstructions}
+                  placeholder="Any special requests or information..."
+                  multiline
+                  numberOfLines={3}
+                  style={{
+                    borderWidth: 1,
+                    borderColor: colors.gray[300],
+                    borderRadius: 8,
+                    padding: spacing.sm,
+                    fontSize: typography.sizes.base,
+                    color: colors.text.primary,
+                    textAlignVertical: 'top'
+                  }}
+                />
+              </View>
+            </View>
+
+            {/* Book Now Button */}
             <TouchableOpacity
-              onPress={handleBooking}
-              disabled={bookingLoading || !startDate || !endDate || !deliveryMethod || (deliveryMethod === 'delivery' && !deliveryAddress.trim())}
+              onPress={handleCreateBooking}
+              disabled={!selectedDates.startDate || !selectedDates.endDate || bookingLoading}
               style={{
-                backgroundColor: (!startDate || !endDate || !deliveryMethod || (deliveryMethod === 'delivery' && !deliveryAddress.trim())) ? colors.gray[400] : colors.primary.main,
+                backgroundColor: (!selectedDates.startDate || !selectedDates.endDate) ? colors.gray[300] : colors.primary.main,
+                padding: spacing.lg,
                 borderRadius: 12,
-                paddingVertical: spacing.md,
                 alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'row'
+                marginBottom: spacing.xl,
+                shadowColor: colors.black,
+                shadowOpacity: 0.1,
+                shadowRadius: 8,
+                elevation: 4
               }}
             >
               {bookingLoading ? (
-                <ActivityIndicator size="small" color={colors.white} />
+                <ActivityIndicator color={colors.white} />
               ) : (
                 <Text style={{
-                  fontSize: typography.sizes.base,
+                  fontSize: typography.sizes.xl,
                   fontWeight: typography.weights.semibold,
                   color: colors.white
                 }}>
-                  Request to Book
+                  Book Now
                 </Text>
               )}
             </TouchableOpacity>
           </View>
-        </SafeAreaView>
-
-        {/* Date Pickers */}
-        {/* Delivery Method Modal */}
-        <Modal
-          visible={showDeliveryModal}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setShowDeliveryModal(false)}
-        >
-          <View style={{
-            flex: 1,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            justifyContent: 'flex-end'
-          }}>
-            <View style={{
-              backgroundColor: colors.white,
-              borderTopLeftRadius: 20,
-              borderTopRightRadius: 20,
-              paddingHorizontal: spacing.md,
-              paddingTop: spacing.lg,
-              paddingBottom: spacing.xl
-            }}>
-              <View style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: spacing.lg
-              }}>
-                <Text style={{
-                  fontSize: typography.sizes.lg,
-                  fontWeight: typography.weights.semibold,
-                  color: colors.text.primary
-                }}>
-                  Select Delivery Method
-                </Text>
-                <TouchableOpacity onPress={() => setShowDeliveryModal(false)}>
-                  <Ionicons name="close" size={24} color={colors.gray[400]} />
-                </TouchableOpacity>
-              </View>
-              
-              {getDeliveryOptions().map((option, index) => (
-                <TouchableOpacity
-                  key={`${option.value}-${index}`}
-                  onPress={() => {
-                    setDeliveryMethod(option.value);
-                    setShowDeliveryModal(false);
-                    // Clear delivery address if switching away from delivery
-                    if (option.value !== 'delivery') {
-                      setDeliveryAddress('');
-                    }
-                  }}
-                  style={{
-                    paddingVertical: spacing.md,
-                    paddingHorizontal: spacing.sm,
-                    borderRadius: 8,
-                    backgroundColor: deliveryMethod === option.value ? colors.primary.main + '20' : 'transparent',
-                    marginBottom: spacing.sm,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between'
-                  }}
-                >
-                  <Text style={{
-                    fontSize: typography.sizes.base,
-                    color: deliveryMethod === option.value ? colors.primary.main : colors.text.primary,
-                    fontWeight: deliveryMethod === option.value ? typography.weights.semibold : typography.weights.normal
-                  }}>
-                    {option.label}
-                  </Text>
-                  {deliveryMethod === option.value && (
-                    <Ionicons name="checkmark" size={20} color={colors.primary.main} />
-                  )}
-                </TouchableOpacity>
-              ))}
-              
-              {getDeliveryOptions().length === 0 && (
-                <View style={{
-                  paddingVertical: spacing.lg,
-                  alignItems: 'center'
-                }}>
-                  <Text style={{
-                    fontSize: typography.sizes.base,
-                    color: colors.text.secondary,
-                    textAlign: 'center'
-                  }}>
-                    No delivery options available for this listing.
-                    Please contact the owner for more information.
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
-        </Modal>
-
-        {/* Date Pickers */}
-        {showStartDatePicker && (
-          <DateTimePicker
-            value={startDate || getMinimumDate()}
-            mode="date"
-            display="default"
-            minimumDate={getMinimumDate()}
-            onChange={handleStartDateChange}
-          />
-        )}
-
-        {showEndDatePicker && (
-          <DateTimePicker
-            value={endDate || getMinimumEndDate()}
-            mode="date"
-            display="default"
-            minimumDate={getMinimumEndDate()}
-            onChange={handleEndDateChange}
-          />
-        )}
+        </ScrollView>
       </SafeAreaView>
     </>
   );

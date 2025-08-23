@@ -14,25 +14,40 @@ interface ListingData {
   title: string;
   description: string;
   price_per_day: number;
-  location: string;
-  is_active: boolean;
-  created_at: string;
-  owner_id: string;
-  category: string;
+  price_weekly: number | null;
+  price_hourly: number | null;
+  deposit: number;
+  images: string[];
+  address: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  country: string;
   condition: string;
+  brand: string | null;
+  model: string | null;
+  year: number | null;
+  features: string[];
+  rules: string[];
+  view_count: number;
+  favorite_count: number;
+  rating: number | null;
+  review_count: number | null;
   delivery_available: boolean;
   pickup_available: boolean;
+  is_active: boolean;
+  approval_status: string;
+  created_at: string;
   profiles: {
     id: string;
     full_name: string;
     avatar_url: string | null;
-    rating: string | null;
+    address: string | null;
+    city: string | null;
+    state: string | null;
+    postal_code: string | null;
+    created_at: string;
   };
-  listing_photos: Array<{
-    id: string;
-    url: string;
-    order_index: number;
-  }>;
 }
 
 export default function ListingDetailScreen() {
@@ -44,10 +59,18 @@ export default function ListingDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [showAllFeatures, setShowAllFeatures] = useState(false);
 
   useEffect(() => {
     fetchListingDetails();
   }, [id]);
+
+  useEffect(() => {
+    if (user && listing) {
+      checkFavoriteStatus();
+    }
+  }, [user, listing]);
 
   const fetchListingDetails = async () => {
     if (!id || typeof id !== 'string') {
@@ -57,33 +80,90 @@ export default function ListingDetailScreen() {
     }
 
     setLoading(true);
-    const { data, error } = await supabase
-      .from('listings')
-      .select(`
-        *,
-        profiles:owner_id (
-          id,
-          full_name,
-          avatar_url,
-          rating
-        ),
-        listing_photos (
-          id,
-          url,
-          order_index
-        )
-      `)
-      .eq('id', id)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('listings')
+        .select(`
+          *,
+          profiles:owner_id (
+            id,
+            full_name,
+            avatar_url,
+            address,
+            city,
+            state,
+            postal_code,
+            created_at
+          )
+        `)
+        .eq('id', id)
+        .single();
 
-    if (error) {
+      if (error) {
+        console.error('Error fetching listing:', error);
+        Alert.alert('Error', 'Failed to load listing details');
+        router.back();
+        return;
+      }
+
+      setListing(data);
+    } catch (error) {
       console.error('Error fetching listing:', error);
       Alert.alert('Error', 'Failed to load listing details');
       router.back();
-    } else {
-      setListing(data);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  const checkFavoriteStatus = async () => {
+    if (!user || !listing) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('favorites')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('listing_id', listing.id)
+        .single();
+
+      setIsFavorite(!!data);
+    } catch (error) {
+      // No favorite found, which is fine
+    }
+  };
+
+  const toggleFavorite = async () => {
+    if (!user) {
+      Alert.alert('Sign In Required', 'Please sign in to save favorites');
+      return;
+    }
+
+    try {
+      if (isFavorite) {
+        await supabase
+          .from('favorites')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('listing_id', listing!.id);
+
+        setIsFavorite(false);
+        Alert.alert('Success', 'Removed from favorites');
+      } else {
+        await supabase
+          .from('favorites')
+          .insert({
+            user_id: user.id,
+            listing_id: listing!.id
+          });
+
+        setIsFavorite(true);
+        Alert.alert('Success', 'Added to favorites');
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      Alert.alert('Error', 'Failed to update favorites');
+    }
   };
 
   const handleBookNow = () => {
@@ -95,7 +175,7 @@ export default function ListingDetailScreen() {
       return;
     }
 
-    if (listing?.owner_id === user.id) {
+    if (listing?.profiles.id === user.id) {
       Alert.alert('Cannot Book', 'You cannot book your own listing');
       return;
     }
@@ -108,19 +188,39 @@ export default function ListingDetailScreen() {
       Alert.alert('Sign In Required', 'Please sign in to contact the owner');
       return;
     }
-    router.push(`/conversations/new?ownerId=${listing?.owner_id}&listingId=${listing?.id}`);
+    router.push(`/conversations/new?ownerId=${listing?.profiles.id}&listingId=${listing?.id}`);
   };
 
   const handleViewProfile = () => {
-    router.push(`/profile/${listing?.owner_id}`);
+    router.push(`/profile/${listing?.profiles.id}`);
   };
 
   const handleShare = async () => {
     Alert.alert('Share', 'Sharing functionality would be implemented here');
   };
 
+  const formatPrice = (price: number | null | undefined) => {
+    if (!price || price === 0) {
+      return 'Contact for price';
+    }
+    return new Intl.NumberFormat('en-AU', {
+      style: 'currency',
+      currency: 'AUD',
+      minimumFractionDigits: 0,
+    }).format(price);
+  };
+
+  const getDisplayImage = (images: string[], index: number = 0) => {
+    if (!images || images.length === 0) {
+      return null; // Will show placeholder
+    }
+    return images[index] || null;
+  };
+
   const renderImageCarousel = () => {
-    if (!listing?.listing_photos || listing.listing_photos.length === 0) {
+    const displayImages = listing?.images && listing.images.length > 0 ? listing.images : [];
+    
+    if (displayImages.length === 0) {
       return (
         <View style={{
           width: screenWidth,
@@ -135,8 +235,6 @@ export default function ListingDetailScreen() {
       );
     }
 
-    const sortedPhotos = listing.listing_photos.sort((a, b) => a.order_index - b.order_index);
-
     return (
       <View>
         <ScrollView
@@ -148,9 +246,10 @@ export default function ListingDetailScreen() {
             setCurrentImageIndex(newIndex);
           }}
         >
-          {sortedPhotos.map((photo, photoIndex) => (
+          {displayImages.map((image, photoIndex) => (
             <Image
-              source={{ uri: photo.url }}
+              key={photoIndex}
+              source={{ uri: image }}
               style={{
                 width: screenWidth,
                 height: 300,
@@ -160,7 +259,7 @@ export default function ListingDetailScreen() {
           ))}
         </ScrollView>
         
-        {sortedPhotos.length > 1 && (
+        {displayImages.length > 1 && (
           <View style={{
             flexDirection: 'row',
             justifyContent: 'center',
@@ -169,8 +268,9 @@ export default function ListingDetailScreen() {
             left: 0,
             right: 0
           }}>
-            {sortedPhotos.map((_, index) => (
+            {displayImages.map((_, index) => (
               <View
+                key={index}
                 style={{
                   width: 8,
                   height: 8,
@@ -269,6 +369,7 @@ export default function ListingDetailScreen() {
             </TouchableOpacity>
             
             <TouchableOpacity
+              onPress={toggleFavorite}
               style={{
                 width: 40,
                 height: 40,
@@ -278,7 +379,11 @@ export default function ListingDetailScreen() {
                 justifyContent: 'center'
               }}
             >
-              <Ionicons name="heart-outline" size={24} color={colors.text.primary} />
+              <Ionicons 
+                name={isFavorite ? "heart" : "heart-outline"} 
+                size={24} 
+                color={isFavorite ? colors.semantic.error : colors.text.primary} 
+              />
             </TouchableOpacity>
           </View>
         </View>
@@ -287,6 +392,7 @@ export default function ListingDetailScreen() {
           {renderImageCarousel()}
 
           <View style={{ padding: spacing.md }}>
+            {/* Title and Price */}
             <View style={{ marginBottom: spacing.lg }}>
               <Text style={{
                 fontSize: typography.sizes['2xl'],
@@ -297,13 +403,13 @@ export default function ListingDetailScreen() {
                 {listing.title}
               </Text>
               
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
                 <Text style={{
                   fontSize: typography.sizes.xl,
                   fontWeight: typography.weights.bold,
                   color: colors.primary.main
                 }}>
-                  ${listing.price_per_day}/day
+                  {formatPrice(listing.price_per_day)}/day
                 </Text>
                 
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -313,12 +419,27 @@ export default function ListingDetailScreen() {
                     color: colors.text.secondary,
                     marginLeft: 4
                   }}>
-                    {listing.location}
+                    {listing.city}, {listing.state}
                   </Text>
                 </View>
               </View>
+
+              {/* Additional Pricing */}
+              <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                {listing.price_weekly && listing.price_weekly > 0 && (
+                  <Text style={{ fontSize: typography.sizes.sm, color: colors.text.secondary }}>
+                    {formatPrice(listing.price_weekly)}/week
+                  </Text>
+                )}
+                {listing.price_hourly && listing.price_hourly > 0 && (
+                  <Text style={{ fontSize: typography.sizes.sm, color: colors.text.secondary }}>
+                    {formatPrice(listing.price_hourly)}/hour
+                  </Text>
+                )}
+              </View>
             </View>
 
+            {/* Owner Profile */}
             <TouchableOpacity
               onPress={handleViewProfile}
               style={{
@@ -363,21 +484,22 @@ export default function ListingDetailScreen() {
                   {listing.profiles.full_name}
                 </Text>
                 
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                  <Ionicons name="star" size={14} color={colors.semantic.warning} />
-                  <Text style={{
-                    fontSize: typography.sizes.sm,
-                    color: colors.text.secondary,
-                    marginLeft: 4
-                  }}>
-                    {listing.profiles.rating ? parseFloat(listing.profiles.rating).toFixed(1) : 'New'}
-                  </Text>
-                </View>
+                <Text style={{
+                  fontSize: typography.sizes.sm,
+                  color: colors.text.secondary,
+                  marginTop: 2
+                }}>
+                  {listing.profiles.city && listing.profiles.state 
+                    ? `${listing.profiles.city}, ${listing.profiles.state}`
+                    : 'Location not specified'
+                  }
+                </Text>
               </View>
               
               <Ionicons name="chevron-forward" size={20} color={colors.gray[400]} />
             </TouchableOpacity>
 
+            {/* Description */}
             <View style={{ marginBottom: spacing.lg }}>
               <Text style={{
                 fontSize: typography.sizes.lg,
@@ -396,6 +518,103 @@ export default function ListingDetailScreen() {
               </Text>
             </View>
 
+            {/* Features */}
+            {listing.features && listing.features.length > 0 && (
+              <View style={{ marginBottom: spacing.lg }}>
+                <Text style={{
+                  fontSize: typography.sizes.lg,
+                  fontWeight: typography.weights.semibold,
+                  color: colors.text.primary,
+                  marginBottom: spacing.md
+                }}>
+                  Features
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+                  {(showAllFeatures ? listing.features : listing.features.slice(0, 6)).map((feature, index) => (
+                    <View key={index} style={{ flexDirection: 'row', alignItems: 'center', width: '48%' }}>
+                      <View style={{ width: 6, height: 6, backgroundColor: colors.primary.main, borderRadius: 3, marginRight: spacing.sm }} />
+                      <Text style={{ fontSize: typography.sizes.sm, color: colors.text.secondary, flex: 1 }}>
+                        {feature}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+                {listing.features.length > 6 && (
+                  <TouchableOpacity
+                    onPress={() => setShowAllFeatures(!showAllFeatures)}
+                    style={{ marginTop: spacing.sm }}
+                  >
+                    <Text style={{ color: colors.primary.main, fontWeight: typography.weights.medium }}>
+                      {showAllFeatures ? 'Show less' : `Show ${listing.features.length - 6} more features`}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {/* Delivery Methods */}
+            <View style={{ marginBottom: spacing.lg }}>
+              <Text style={{
+                fontSize: typography.sizes.lg,
+                fontWeight: typography.weights.semibold,
+                color: colors.text.primary,
+                marginBottom: spacing.md
+              }}>
+                Delivery Options
+              </Text>
+              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                {listing.pickup_available && (
+                  <View style={{
+                    backgroundColor: colors.primary.main + '20',
+                    paddingHorizontal: spacing.sm,
+                    paddingVertical: spacing.xs,
+                    borderRadius: 8
+                  }}>
+                    <Text style={{ fontSize: typography.sizes.sm, color: colors.primary.main, fontWeight: typography.weights.medium }}>
+                      Pickup
+                    </Text>
+                  </View>
+                )}
+                {listing.delivery_available && (
+                  <View style={{
+                    backgroundColor: colors.semantic.success + '20',
+                    paddingHorizontal: spacing.sm,
+                    paddingVertical: spacing.xs,
+                    borderRadius: 8
+                  }}>
+                    <Text style={{ fontSize: typography.sizes.sm, color: colors.semantic.success, fontWeight: typography.weights.medium }}>
+                      Delivery
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* Rules */}
+            {listing.rules && listing.rules.length > 0 && (
+              <View style={{ marginBottom: spacing.lg }}>
+                <Text style={{
+                  fontSize: typography.sizes.lg,
+                  fontWeight: typography.weights.semibold,
+                  color: colors.text.primary,
+                  marginBottom: spacing.md
+                }}>
+                  Rental Rules
+                </Text>
+                <View style={{ gap: spacing.sm }}>
+                  {listing.rules.map((rule, index) => (
+                    <View key={index} style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                      <Ionicons name="information-circle" size={16} color={colors.primary.main} style={{ marginRight: spacing.sm, marginTop: 2 }} />
+                      <Text style={{ fontSize: typography.sizes.sm, color: colors.text.secondary, flex: 1 }}>
+                        {rule}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Details */}
             <View style={{ marginBottom: spacing.lg }}>
               <Text style={{
                 fontSize: typography.sizes.lg,
@@ -421,19 +640,41 @@ export default function ListingDetailScreen() {
                   </Text>
                 </View>
                 
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm }}>
-                  <Text style={{ color: colors.text.secondary }}>Delivery Available</Text>
-                  <Text style={{ color: colors.text.primary, fontWeight: typography.weights.medium }}>
-                    {listing.delivery_available ? 'Yes' : 'No'}
-                  </Text>
-                </View>
+                {listing.brand && (
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm }}>
+                    <Text style={{ color: colors.text.secondary }}>Brand</Text>
+                    <Text style={{ color: colors.text.primary, fontWeight: typography.weights.medium }}>
+                      {listing.brand}
+                    </Text>
+                  </View>
+                )}
                 
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={{ color: colors.text.secondary }}>Pickup Available</Text>
-                  <Text style={{ color: colors.text.primary, fontWeight: typography.weights.medium }}>
-                    {listing.pickup_available ? 'Yes' : 'No'}
-                  </Text>
-                </View>
+                {listing.model && (
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm }}>
+                    <Text style={{ color: colors.text.secondary }}>Model</Text>
+                    <Text style={{ color: colors.text.primary, fontWeight: typography.weights.medium }}>
+                      {listing.model}
+                    </Text>
+                  </View>
+                )}
+                
+                {listing.year && (
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm }}>
+                    <Text style={{ color: colors.text.secondary }}>Year</Text>
+                    <Text style={{ color: colors.text.primary, fontWeight: typography.weights.medium }}>
+                      {listing.year}
+                    </Text>
+                  </View>
+                )}
+                
+                {listing.deposit > 0 && (
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ color: colors.text.secondary }}>Deposit</Text>
+                    <Text style={{ color: colors.text.primary, fontWeight: typography.weights.medium }}>
+                      {formatPrice(listing.deposit)}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
           </View>

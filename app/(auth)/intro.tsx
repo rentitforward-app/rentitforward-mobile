@@ -7,11 +7,12 @@ import {
   ScrollView,
   StatusBar,
   StyleSheet,
+  SafeAreaView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const INTRO_SEEN_KEY = '@intro_seen';
 
 interface IntroSlide {
@@ -91,7 +92,7 @@ export default function IntroScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="white" />
       
       {/* Header */}
@@ -101,34 +102,38 @@ export default function IntroScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Slides */}
-      <ScrollView
-        ref={scrollViewRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-        style={styles.scrollView}
-      >
-        {slides.map((slide) => (
-          <View key={slide.id} style={styles.slide}>
-            <View style={styles.slideContent}>
-              {/* Emoji Illustration */}
-              <View style={[styles.emojiContainer, { backgroundColor: slide.backgroundColor }]}>
-                <Text style={styles.emoji}>{slide.emoji}</Text>
-              </View>
+      {/* Main Content Area */}
+      <View style={styles.mainContent}>
+        {/* Slides */}
+        <ScrollView
+          ref={scrollViewRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollViewContent}
+        >
+          {slides.map((slide) => (
+            <View key={slide.id} style={styles.slide}>
+              <View style={styles.slideContent}>
+                {/* Emoji Illustration */}
+                <View style={[styles.emojiContainer, { backgroundColor: slide.backgroundColor }]}>
+                  <Text style={styles.emoji}>{slide.emoji}</Text>
+                </View>
 
-              {/* Content */}
-              <View style={styles.textContent}>
-                <Text style={styles.title}>{slide.title}</Text>
-                <Text style={styles.subtitle}>{slide.subtitle}</Text>
-                <Text style={styles.description}>{slide.description}</Text>
+                {/* Content */}
+                <View style={styles.textContent}>
+                  <Text style={styles.title}>{slide.title}</Text>
+                  <Text style={styles.subtitle}>{slide.subtitle}</Text>
+                  <Text style={styles.description}>{slide.description}</Text>
+                </View>
               </View>
             </View>
-          </View>
-        ))}
-      </ScrollView>
+          ))}
+        </ScrollView>
+      </View>
 
       {/* Bottom Section */}
       <View style={styles.bottomSection}>
@@ -158,7 +163,7 @@ export default function IntroScreen() {
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -171,8 +176,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     paddingHorizontal: 24,
-    paddingTop: 60,
+    paddingTop: 16,
     paddingBottom: 16,
+    minHeight: 60,
   },
   skipButton: {
     paddingVertical: 8,
@@ -183,8 +189,15 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     fontWeight: '500',
   },
+  mainContent: {
+    flex: 1,
+    minHeight: 0, // Important for flex to work properly
+  },
   scrollView: {
     flex: 1,
+  },
+  scrollViewContent: {
+    flexGrow: 1,
   },
   slide: {
     width: screenWidth,
@@ -192,57 +205,67 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
+    paddingVertical: 20,
   },
   slideContent: {
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
+    maxWidth: '100%',
+    minHeight: 0,
   },
   emojiContainer: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+    width: Math.min(200, screenWidth * 0.4),
+    height: Math.min(200, screenWidth * 0.4),
+    borderRadius: Math.min(100, screenWidth * 0.2),
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 48,
+    marginBottom: 32,
   },
   emoji: {
-    fontSize: 80,
+    fontSize: Math.min(80, screenWidth * 0.15),
   },
   textContent: {
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
+    flex: 1,
+    justifyContent: 'center',
+    maxWidth: '100%',
   },
   title: {
-    fontSize: 32,
+    fontSize: Math.min(32, screenWidth * 0.08),
     fontWeight: 'bold',
     color: '#111827',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
+    lineHeight: Math.min(40, screenWidth * 0.1),
   },
   subtitle: {
-    fontSize: 18,
+    fontSize: Math.min(18, screenWidth * 0.045),
     fontWeight: '600',
     color: '#16A34A',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
+    lineHeight: Math.min(24, screenWidth * 0.06),
   },
   description: {
-    fontSize: 16,
+    fontSize: Math.min(16, screenWidth * 0.04),
     color: '#6B7280',
     textAlign: 'center',
-    lineHeight: 24,
-    paddingHorizontal: 16,
+    lineHeight: Math.min(24, screenWidth * 0.06),
+    paddingHorizontal: 8,
   },
   bottomSection: {
     paddingHorizontal: 24,
-    paddingBottom: 48,
+    paddingBottom: 32,
+    paddingTop: 16,
+    backgroundColor: 'white',
   },
   indicators: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 24,
   },
   indicator: {
     width: 8,
@@ -256,13 +279,15 @@ const styles = StyleSheet.create({
     width: 24,
   },
   buttonContainer: {
-    marginTop: 16,
+    marginTop: 8,
   },
   nextButton: {
     backgroundColor: '#16A34A',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
+    minHeight: 56,
+    justifyContent: 'center',
   },
   nextButtonText: {
     color: 'white',

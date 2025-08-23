@@ -43,7 +43,9 @@ export default function BookingSummaryScreen() {
   const { user } = useAuthStore();
 
   const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [additionalRequests, setAdditionalRequests] = useState(specialRequests || '');
+  const [additionalRequests, setAdditionalRequests] = useState(
+    Array.isArray(specialRequests) ? specialRequests[0] || '' : specialRequests || ''
+  );
   const [contactInfo, setContactInfo] = useState({
     phone: user?.phone || '',
     email: user?.email || '',

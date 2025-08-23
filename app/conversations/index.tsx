@@ -129,7 +129,7 @@ export default function ConversationsScreen() {
   const filteredConversations = conversations.filter(conv =>
     conv.otherUser.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     conv.otherUser.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    conv.booking?.listing?.title?.toLowerCase().includes(searchQuery.toLowerCase())
+    (Array.isArray(conv.booking?.listing) ? conv.booking?.listing[0]?.title : conv.booking?.listing?.title)?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Handle refresh
@@ -214,7 +214,7 @@ export default function ConversationsScreen() {
             <View style={styles.bookingInfo}>
               <View style={[styles.statusDot, { backgroundColor: getStatusColor(item.booking.status) }]} />
               <Text style={styles.bookingText} numberOfLines={1}>
-                {item.booking.listing?.title || `Booking #${item.booking.id.substring(0, 8)}`}
+                {(Array.isArray(item.booking.listing) ? item.booking.listing[0]?.title : item.booking.listing?.title) || `Booking #${item.booking.id.substring(0, 8)}`}
               </Text>
             </View>
           )}

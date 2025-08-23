@@ -1,7 +1,8 @@
 import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Keyboard } from 'react-native';
 import { colors, spacing, typography } from '../../src/lib/design-system';
 import { useAuth } from '../../src/components/AuthProvider';
 
@@ -9,6 +10,7 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, loading } = useAuth();
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   
   // Protect tabs - redirect unauthenticated users
   useEffect(() => {
@@ -17,6 +19,21 @@ export default function TabLayout() {
       router.replace('/');
     }
   }, [user, loading, router]);
+
+  // Keyboard event listeners
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
+      setIsKeyboardVisible(true);
+    });
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      setIsKeyboardVisible(false);
+    });
+
+    return () => {
+      keyboardDidShowListener?.remove();
+      keyboardDidHideListener?.remove();
+    };
+  }, []);
   
   // Don't render tabs if user is not authenticated
   if (!user && !loading) {
@@ -46,6 +63,8 @@ export default function TabLayout() {
           shadowOpacity: 0.1,
           shadowRadius: 4,
           elevation: 8, // Android shadow
+          // Hide tab bar when keyboard is visible
+          display: isKeyboardVisible ? 'none' : 'flex',
         },
         tabBarLabelStyle: {
           fontSize: typography.sizes.xs,
@@ -90,7 +109,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="create"
         options={{
-          title: 'Create',
+          title: 'Post Item',
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons 
               name={focused ? "add-circle" : "add-circle-outline"} 

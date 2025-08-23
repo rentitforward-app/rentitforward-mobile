@@ -40,17 +40,70 @@ export default function HomeScreen() {
   useEffect(() => {
     const fetchTopRentals = async () => {
       setLoadingRentals(true);
-      const { data, error } = await supabase
-        .from('listings')
-        .select(`*, profiles:owner_id (full_name, avatar_url, rating), listing_photos (url, order_index)`)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(5);
-      if (!error && data) {
-        setTopRentals(data);
+      try {
+        const { data, error } = await supabase
+          .from('listings')
+          .select(`
+            id,
+            title,
+            price_per_day,
+            price_weekly,
+            price_hourly,
+            category,
+            city,
+            state,
+            delivery_available,
+            pickup_available,
+            is_active,
+            approval_status,
+            created_at,
+            images,
+            profiles:owner_id (
+              id,
+              full_name,
+              avatar_url,
+              rating
+            )
+          `)
+          .eq('is_active', true)
+          .eq('approval_status', 'approved')
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (error) {
+          console.error('Error fetching top rentals:', error);
+          return;
+        }
+
+        // Transform the data to match our component structure
+        const transformedData = data?.map((listing: any) => ({
+          id: listing.id,
+          title: listing.title,
+          price_per_day: listing.price_per_day,
+          price_weekly: listing.price_weekly,
+          price_hourly: listing.price_hourly,
+          category: listing.category,
+          city: listing.city,
+          state: listing.state,
+          delivery_available: listing.delivery_available || false,
+          pickup_available: listing.pickup_available || false,
+          created_at: listing.created_at,
+          images: listing.images || [],
+          owner: {
+            name: listing.profiles?.full_name || 'Unknown Owner',
+            avatar: listing.profiles?.avatar_url,
+            rating: listing.profiles?.rating
+          },
+        })) || [];
+
+        setTopRentals(transformedData);
+      } catch (error) {
+        console.error('Error fetching top rentals:', error);
+      } finally {
+        setLoadingRentals(false);
       }
-      setLoadingRentals(false);
     };
+
     fetchTopRentals();
   }, []);
 
@@ -70,6 +123,152 @@ export default function HomeScreen() {
   };
   const handleRentalPress = (listingId: string) => {
     router.push(`/listing/${listingId}`);
+  };
+
+  // Mobile Listing Card Component
+  const ListingCard = ({ item }: { item: any }) => {
+    const mainImage = item.images && item.images.length > 0 ? item.images[0] : null;
+    const rating = item.owner?.rating ? parseFloat(item.owner.rating) : 0;
+    
+    return (
+      <TouchableOpacity 
+        onPress={() => handleRentalPress(item.id)} 
+        style={{ 
+          width: 200, 
+          marginRight: spacing.md, 
+          backgroundColor: colors.white, 
+          borderRadius: 12, 
+          overflow: 'hidden', 
+          shadowColor: colors.black, 
+          shadowOpacity: 0.08, 
+          shadowRadius: 8, 
+          elevation: 3 
+        }}
+      >
+        {/* Image Container */}
+        <View style={{ position: 'relative', width: '100%', height: 150 }}>
+          {mainImage ? (
+            <Image 
+              source={{ uri: mainImage }} 
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={{ 
+              width: '100%', 
+              height: '100%', 
+              backgroundColor: colors.gray[200], 
+              justifyContent: 'center', 
+              alignItems: 'center' 
+            }}>
+              <Ionicons name="image-outline" size={32} color={colors.gray[400]} />
+            </View>
+          )}
+          
+          {/* Price Badge */}
+          <View style={{ 
+            position: 'absolute', 
+            top: 8, 
+            right: 8, 
+            backgroundColor: colors.primary.main, 
+            paddingHorizontal: 8, 
+            paddingVertical: 4, 
+            borderRadius: 12 
+          }}>
+            <Text style={{ color: colors.white, fontSize: 12, fontWeight: '600' }}>
+              ${item.price_per_day}/day
+            </Text>
+          </View>
+        </View>
+
+        {/* Content */}
+        <View style={{ padding: spacing.sm }}>
+          {/* Title */}
+          <Text style={{ 
+            fontSize: 14, 
+            fontWeight: '600', 
+            color: colors.text.primary, 
+            marginBottom: 4,
+            lineHeight: 18
+          }} numberOfLines={2}>
+            {item.title}
+          </Text>
+
+          {/* Rating and Location */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+            {/* Rating Stars */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 8 }}>
+              <Ionicons name="star" size={12} color={colors.semantic.warning} />
+              <Text style={{ fontSize: 12, color: colors.text.secondary, marginLeft: 2 }}>
+                {rating > 0 ? rating.toFixed(1) : 'New'}
+              </Text>
+            </View>
+            
+            {/* Location */}
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="location-outline" size={12} color={colors.text.secondary} />
+              <Text style={{ fontSize: 12, color: colors.text.secondary, marginLeft: 2 }}>
+                {item.city}, {item.state}
+              </Text>
+            </View>
+          </View>
+
+          {/* Delivery Methods */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+            {item.delivery_available && (
+              <View style={{ 
+                backgroundColor: colors.semantic.success + '20', 
+                paddingHorizontal: 6, 
+                paddingVertical: 2, 
+                borderRadius: 8, 
+                marginRight: 4 
+              }}>
+                <Text style={{ fontSize: 10, color: colors.semantic.success, fontWeight: '500' }}>
+                  Delivery
+                </Text>
+              </View>
+            )}
+            {item.pickup_available && (
+              <View style={{ 
+                backgroundColor: colors.primary.main + '20', 
+                paddingHorizontal: 6, 
+                paddingVertical: 2, 
+                borderRadius: 8 
+              }}>
+                <Text style={{ fontSize: 10, color: colors.primary.main, fontWeight: '500' }}>
+                  Pickup
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Owner Info */}
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {item.owner?.avatar ? (
+              <Image 
+                source={{ uri: item.owner.avatar }} 
+                style={{ width: 16, height: 16, borderRadius: 8, marginRight: 6 }}
+              />
+            ) : (
+              <View style={{ 
+                width: 16, 
+                height: 16, 
+                borderRadius: 8, 
+                backgroundColor: colors.gray[300], 
+                marginRight: 6,
+                justifyContent: 'center',
+                alignItems: 'center'
+              }}>
+                <Ionicons name="person" size={10} color={colors.gray[500]} />
+              </View>
+            )}
+            <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+              {item.owner?.name || 'Unknown Owner'}
+            </Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
   };
 
   return (
@@ -205,33 +404,9 @@ export default function HomeScreen() {
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ paddingHorizontal: spacing.md }}
-              renderItem={({ item }) => {
-                // Get main image
-                let mainImage = null;
-                if (item.listing_photos && item.listing_photos.length > 0) {
-                  const sortedPhotos = item.listing_photos.sort((a: any, b: any) => a.order_index - b.order_index);
-                  mainImage = sortedPhotos[0].url;
-                }
-                return (
-                  <TouchableOpacity onPress={() => handleRentalPress(item.id)} style={{ width: 180, marginRight: spacing.md, backgroundColor: colors.white, borderRadius: 12, overflow: 'hidden', shadowColor: colors.black, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 }}>
-                    {mainImage ? (
-                      <Image source={{ uri: mainImage }} style={{ width: '100%', height: 110, resizeMode: 'cover' }} />
-                    ) : (
-                      <View style={{ width: '100%', height: 110, backgroundColor: colors.gray[100], alignItems: 'center', justifyContent: 'center' }}>
-                        <Ionicons name="image" size={32} color={colors.gray[400]} />
-                      </View>
-                    )}
-                    <View style={{ padding: spacing.sm }}>
-                      <Text style={{ fontSize: typography.sizes.base, fontWeight: typography.weights.semibold, color: colors.text.primary }} numberOfLines={1}>{item.title || 'Untitled'}</Text>
-                      <Text style={{ fontSize: typography.sizes.sm, color: colors.text.secondary, marginTop: 2 }}>${item.price_per_day}/day</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                        <Ionicons name="star" size={14} color={colors.semantic.warning} />
-                        <Text style={{ fontSize: typography.sizes.sm, color: colors.text.secondary, marginLeft: 4 }}>{item.profiles?.rating ? parseFloat(item.profiles.rating).toFixed(1) : '—'}</Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              }}
+              renderItem={({ item }) => (
+                <ListingCard item={item} />
+              )}
             />
           )}
         </View>

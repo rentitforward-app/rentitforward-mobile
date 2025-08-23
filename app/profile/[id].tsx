@@ -16,8 +16,7 @@ import { supabase } from '../../src/lib/supabase';
 
 interface UserProfile {
   id: string;
-  first_name: string;
-  last_name: string;
+  full_name: string;
   email: string;
   phone?: string;
   bio?: string;
@@ -52,8 +51,7 @@ interface UserReview {
   created_at: string;
   booking_id: string;
   reviewer: {
-    first_name: string;
-    last_name: string;
+    full_name: string;
   };
 }
 
@@ -98,14 +96,24 @@ export default function UserProfileScreen() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('listings')
-        .select('id, title, daily_rate, location, status, created_at')
+        .select('id, title, price_per_day, city, state, is_active, approval_status, created_at')
         .eq('owner_id', userId)
-        .eq('status', 'active')
+        .eq('is_active', true)
+        .eq('approval_status', 'approved')
         .order('created_at', { ascending: false })
         .limit(10);
       
       if (error) throw error;
-      return data as UserListing[];
+      
+      // Transform data to match interface
+      return data?.map(listing => ({
+        id: listing.id,
+        title: listing.title,
+        daily_rate: listing.price_per_day,
+        location: `${listing.city}, ${listing.state}`,
+        status: listing.is_active ? 'active' : 'inactive',
+        created_at: listing.created_at,
+      })) || [];
     },
     enabled: !!userId,
   });
@@ -125,7 +133,7 @@ export default function UserProfileScreen() {
           review_type: 'owner',
           created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
           booking_id: 'booking-1',
-          reviewer: { first_name: 'Sarah', last_name: 'Johnson' },
+          reviewer: { full_name: 'Sarah Johnson' },
         },
         {
           id: '2',
@@ -135,7 +143,7 @@ export default function UserProfileScreen() {
           review_type: 'renter',
           created_at: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
           booking_id: 'booking-2',
-          reviewer: { first_name: 'Michael', last_name: 'Chen' },
+          reviewer: { full_name: 'Michael Chen' },
         },
         {
           id: '3',
@@ -145,7 +153,7 @@ export default function UserProfileScreen() {
           review_type: 'owner',
           created_at: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString(),
           booking_id: 'booking-3',
-          reviewer: { first_name: 'Emma', last_name: 'Wilson' },
+          reviewer: { full_name: 'Emma Wilson' },
         },
       ];
 
@@ -177,10 +185,14 @@ export default function UserProfileScreen() {
 
   // Format member since date
   const formatMemberSince = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-AU', {
-      month: 'long',
-      year: 'numeric',
-    });
+    try {
+      return new Date(dateString).toLocaleDateString('en-AU', {
+        month: 'long',
+        year: 'numeric',
+      });
+    } catch (error) {
+      return 'Recently';
+    }
   };
 
   // Get verification badge
@@ -215,7 +227,7 @@ export default function UserProfileScreen() {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Check out ${profile.first_name} ${profile.last_name}'s profile on Rent It Forward!`,
+        message: `Check out ${profile.full_name}'s profile on Rent It Forward!`,
         title: 'User Profile',
       });
     } catch (error) {
@@ -277,7 +289,7 @@ export default function UserProfileScreen() {
     <View key={review.id} style={styles.reviewCard}>
       <View style={styles.reviewHeader}>
         <Text style={styles.reviewerName}>
-          {review.reviewer.first_name} {review.reviewer.last_name}
+          {review.reviewer.full_name}
         </Text>
         <View style={styles.reviewMeta}>
           {renderStars(review.rating)}
@@ -320,7 +332,15 @@ export default function UserProfileScreen() {
         <View style={styles.avatarContainer}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
-              {profile.first_name.charAt(0).toUpperCase()}{profile.last_name.charAt(0).toUpperCase()}
+              {(() => {
+                const name = profile.full_name || '';
+                const spaceIndex = name.indexOf(' ');
+                if (spaceIndex > 0) {
+                  return name.charAt(0).toUpperCase() + name.charAt(spaceIndex + 1).toUpperCase();
+                } else {
+                  return name.charAt(0).toUpperCase();
+                }
+              })()}
             </Text>
           </View>
         </View>
@@ -328,7 +348,7 @@ export default function UserProfileScreen() {
         {/* Basic Info */}
         <View style={styles.basicInfo}>
           <Text style={styles.userName}>
-            {profile.first_name} {profile.last_name}
+            {profile.full_name}
           </Text>
           
           <View style={[styles.verificationBadge, { backgroundColor: verificationBadge.backgroundColor }]}>
@@ -342,7 +362,7 @@ export default function UserProfileScreen() {
           )}
 
           <Text style={styles.memberSince}>
-            Member since {formatMemberSince(profile.member_since)}
+            Member since {profile.member_since ? formatMemberSince(profile.member_since) : 'Recently'}
           </Text>
         </View>
 

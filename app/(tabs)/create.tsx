@@ -90,11 +90,9 @@ const getFallbackCoordinates = (city: string): { latitude: number; longitude: nu
 
 // Step definitions
 const STEPS = [
-  { id: 1, title: 'Basic Info', icon: 'information-circle' },
-  { id: 2, title: 'Category', icon: 'grid' },
-  { id: 3, title: 'Photos', icon: 'camera' },
-  { id: 4, title: 'Pricing', icon: 'pricetag' },
-  { id: 5, title: 'Location', icon: 'location' },
+  { id: 1, title: 'Basic Details', icon: 'information-circle' },
+  { id: 2, title: 'Pricing & Availability', icon: 'pricetag' },
+  { id: 3, title: 'Location & Delivery', icon: 'location' },
 ];
 
 // Categories (matches your database)
@@ -169,6 +167,51 @@ export default function CreateScreen() {
   };
 
   const pickImage = async () => {
+    // Show action sheet for camera or photo library
+    Alert.alert(
+      'Add Photo',
+      'Choose how you want to add a photo',
+      [
+        {
+          text: 'Camera',
+          onPress: () => takePhoto(),
+        },
+        {
+          text: 'Photo Library',
+          onPress: () => selectFromLibrary(),
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ]
+    );
+  };
+
+  const takePhoto = async () => {
+    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+    
+    if (permissionResult.granted === false) {
+      Alert.alert('Permission required', 'Please allow access to your camera');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setFormData(prev => ({
+        ...prev,
+        images: [...prev.images, result.assets[0]]
+      }));
+    }
+  };
+
+  const selectFromLibrary = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     
     if (permissionResult.granted === false) {
@@ -291,7 +334,7 @@ export default function CreateScreen() {
         await uploadImages(listing.id);
       }
 
-      Alert.alert('Success!', 'Your listing has been created successfully', [
+      Alert.alert('Success!', 'Your listing has been created successfully and is awaiting admin approval.', [
         { text: 'OK', onPress: () => {
           // Reset form
           setFormData({
@@ -340,14 +383,10 @@ export default function CreateScreen() {
   const isStepValid = () => {
     switch (currentStep) {
       case 1:
-        return formData.title && formData.description;
+        return formData.images.length >= 3 && formData.title && formData.description && formData.category && formData.condition && formData.brand && formData.model;
       case 2:
-        return formData.category && formData.condition;
-      case 3:
-        return formData.images.length > 0;
-      case 4:
         return formData.price_per_day;
-      case 5:
+      case 3:
         return formData.address && formData.city && formData.state;
       default:
         return false;
@@ -382,24 +421,58 @@ export default function CreateScreen() {
   const renderStep = () => {
     switch (currentStep) {
       case 1:
-        return renderBasicInfo();
+        return renderBasicDetails();
       case 2:
-        return renderCategory();
+        return renderPricingAvailability();
       case 3:
-        return renderPhotos();
-      case 4:
-        return renderPricing();
-      case 5:
-        return renderLocation();
+        return renderLocationDelivery();
       default:
         return null;
     }
   };
 
-  const renderBasicInfo = () => (
+  const renderBasicDetails = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Tell us about your item</Text>
+      <Text style={styles.stepTitle}>Basic Details</Text>
+      <Text style={styles.stepSubtitle}>Tell us about your item, condition, and photos</Text>
       
+      {/* Photos Section */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Photos *</Text>
+        <Text style={styles.helper}>Add at least 3 photos to showcase your item</Text>
+        
+        <ScrollView horizontal style={styles.photosContainer}>
+          {formData.images.map((image, index) => (
+            <View key={index} style={styles.imageContainer}>
+              <Image source={{ uri: image.uri }} style={styles.image} />
+              <TouchableOpacity 
+                style={styles.removeButton}
+                onPress={() => removeImage(index)}
+              >
+                <Ionicons name="close-circle" size={24} color="#FF4444" />
+              </TouchableOpacity>
+            </View>
+          ))}
+          
+          <TouchableOpacity style={styles.addPhotoButton} onPress={pickImage}>
+            <Ionicons name="add-circle" size={32} color={colors.primary.main} />
+            <Text style={styles.addPhotoText}>Add Photo</Text>
+            <Text style={styles.addPhotoSubtext}>Camera or Library</Text>
+          </TouchableOpacity>
+        </ScrollView>
+        
+        {formData.images.length < 3 && (
+          <Text style={styles.errorText}>
+            Please add at least 3 photos ({formData.images.length}/3)
+          </Text>
+        )}
+        
+        <Text style={styles.helper}>
+          Tap "Add Photo" to take a new photo with your camera or select from your photo library
+        </Text>
+      </View>
+
+      {/* Title */}
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Title *</Text>
         <TextInput
@@ -411,6 +484,7 @@ export default function CreateScreen() {
         />
       </View>
 
+      {/* Description */}
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Description *</Text>
         <TextInput
@@ -424,34 +498,7 @@ export default function CreateScreen() {
         />
       </View>
 
-      <View style={styles.inputRow}>
-        <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
-          <Text style={styles.label}>Brand</Text>
-          <TextInput
-            style={styles.textInput}
-            value={formData.brand}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, brand: text }))}
-            placeholder="e.g., Canon"
-          />
-        </View>
-        
-        <View style={[styles.inputGroup, { flex: 1, marginLeft: 10 }]}>
-          <Text style={styles.label}>Model</Text>
-          <TextInput
-            style={styles.textInput}
-            value={formData.model}
-            onChangeText={(text) => setFormData(prev => ({ ...prev, model: text }))}
-            placeholder="e.g., EOS R5"
-          />
-        </View>
-      </View>
-    </View>
-  );
-
-  const renderCategory = () => (
-    <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Category & Condition</Text>
-      
+      {/* Category */}
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Category *</Text>
         <TouchableOpacity 
@@ -468,6 +515,7 @@ export default function CreateScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Condition */}
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Condition *</Text>
         <TouchableOpacity 
@@ -483,39 +531,38 @@ export default function CreateScreen() {
           <Ionicons name="chevron-down" size={20} color="#6B7280" />
         </TouchableOpacity>
       </View>
-    </View>
-  );
 
-  const renderPhotos = () => (
-    <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Add Photos</Text>
-      <Text style={styles.stepSubtitle}>Add at least one photo of your item</Text>
-      
-      <ScrollView horizontal style={styles.photosContainer}>
-        {formData.images.map((image, index) => (
-          <View key={index} style={styles.imageContainer}>
-            <Image source={{ uri: image.uri }} style={styles.image} />
-            <TouchableOpacity 
-              style={styles.removeButton}
-              onPress={() => removeImage(index)}
-            >
-              <Ionicons name="close-circle" size={24} color="#FF4444" />
-            </TouchableOpacity>
-          </View>
-        ))}
+      {/* Brand & Model */}
+      <View style={styles.inputRow}>
+        <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
+          <Text style={styles.label}>Brand *</Text>
+          <TextInput
+            style={styles.textInput}
+            value={formData.brand}
+            onChangeText={(text) => setFormData(prev => ({ ...prev, brand: text }))}
+            placeholder="e.g., Canon"
+          />
+        </View>
         
-                  <TouchableOpacity style={styles.addPhotoButton} onPress={pickImage}>
-            <Ionicons name="camera" size={32} color={colors.primary.main} />
-            <Text style={styles.addPhotoText}>Add Photo</Text>
-          </TouchableOpacity>
-      </ScrollView>
+        <View style={[styles.inputGroup, { flex: 1, marginLeft: 10 }]}>
+          <Text style={styles.label}>Model *</Text>
+          <TextInput
+            style={styles.textInput}
+            value={formData.model}
+            onChangeText={(text) => setFormData(prev => ({ ...prev, model: text }))}
+            placeholder="e.g., EOS R5"
+          />
+        </View>
+      </View>
     </View>
   );
 
-  const renderPricing = () => (
+  const renderPricingAvailability = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Set Your Pricing</Text>
+      <Text style={styles.stepTitle}>Pricing & Availability</Text>
+      <Text style={styles.stepSubtitle}>Set your rental rates and availability</Text>
       
+      {/* Daily Rate */}
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Daily Rate (AUD) *</Text>
         <TextInput
@@ -527,6 +574,7 @@ export default function CreateScreen() {
         />
       </View>
 
+      {/* Weekly Rate */}
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Weekly Rate (AUD)</Text>
         <Text style={styles.helper}>Optional discount for week-long rentals</Text>
@@ -539,6 +587,7 @@ export default function CreateScreen() {
         />
       </View>
 
+      {/* Security Deposit */}
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Security Deposit (AUD)</Text>
         <Text style={styles.helper}>Refundable deposit to protect your item</Text>
@@ -551,6 +600,7 @@ export default function CreateScreen() {
         />
       </View>
 
+      {/* Insurance Option */}
       <TouchableOpacity 
         style={styles.checkboxContainer}
         onPress={() => setFormData(prev => ({ ...prev, insurance_enabled: !prev.insurance_enabled }))}
@@ -563,10 +613,12 @@ export default function CreateScreen() {
     </View>
   );
 
-  const renderLocation = () => (
+  const renderLocationDelivery = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Where is your item?</Text>
+      <Text style={styles.stepTitle}>Location & Delivery</Text>
+      <Text style={styles.stepSubtitle}>Where and how will renters get the item</Text>
       
+      {/* Address */}
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Address *</Text>
         <TextInput
@@ -577,6 +629,7 @@ export default function CreateScreen() {
         />
       </View>
 
+      {/* City and State */}
       <View style={styles.inputRow}>
         <View style={[styles.inputGroup, { flex: 2, marginRight: 10 }]}>
           <Text style={styles.label}>City *</Text>
@@ -599,6 +652,7 @@ export default function CreateScreen() {
         </View>
       </View>
 
+      {/* Postal Code */}
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Postal Code</Text>
         <TextInput
@@ -614,33 +668,40 @@ export default function CreateScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {renderProgressBar()}
-      
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {renderStep()}
-      </ScrollView>
-      
-      <View style={styles.navigationContainer}>
-        {currentStep > 1 && (
-          <TouchableOpacity style={styles.backButton} onPress={prevStep}>
-            <Text style={styles.backButtonText}>Back</Text>
-          </TouchableOpacity>
-        )}
+      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>List Your Item</Text>
+          <Text style={styles.headerSubtitle}>Share your items with the community and earn money</Text>
+        </View>
         
-        <TouchableOpacity 
-          style={[styles.nextButton, !isStepValid() && styles.nextButtonDisabled]}
-          onPress={nextStep}
-          disabled={!isStepValid() || isLoading}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.nextButtonText}>
-              {currentStep === STEPS.length ? 'Create Listing' : 'Next'}
-            </Text>
+        {renderProgressBar()}
+        
+        <View style={styles.content}>
+          {renderStep()}
+        </View>
+        
+        <View style={styles.navigationContainer}>
+          {currentStep > 1 && (
+            <TouchableOpacity style={styles.backButton} onPress={prevStep}>
+              <Text style={styles.backButtonText}>Back</Text>
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
-      </View>
+          
+          <TouchableOpacity 
+            style={[styles.nextButton, !isStepValid() && styles.nextButtonDisabled]}
+            onPress={nextStep}
+            disabled={!isStepValid() || isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.nextButtonText}>
+                {currentStep === STEPS.length ? 'Create Listing' : 'Next'}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
       {/* Category Modal */}
       <Modal visible={showCategoryModal} transparent animationType="slide">
@@ -712,6 +773,30 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.white,
   },
+  scrollContainer: {
+    flex: 1,
+  },
+  header: {
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray[200],
+  },
+  headerTitle: {
+    fontSize: typography.sizes['2xl'],
+    fontWeight: typography.weights.bold,
+    color: colors.text.primary,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  headerSubtitle: {
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
+    textAlign: 'center',
+  },
   progressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -745,8 +830,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary.main,
   },
   content: {
-    flex: 1,
     paddingHorizontal: spacing.md,
+    paddingBottom: spacing.lg,
   },
   stepContainer: {
     paddingVertical: spacing.md,
@@ -844,6 +929,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
   },
+  addPhotoSubtext: {
+    fontSize: 10,
+    color: '#6B7280',
+    marginTop: 2,
+  },
   checkboxContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -870,10 +960,12 @@ const styles = StyleSheet.create({
   navigationContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 20,
-    backgroundColor: '#FFFFFF',
+    padding: spacing.lg,
+    paddingBottom: spacing.xl,
+    backgroundColor: colors.white,
     borderTopWidth: 1,
-    borderTopColor: '#E5E5E5',
+    borderTopColor: colors.gray[200],
+    marginTop: spacing.md,
   },
   backButton: {
     paddingVertical: 12,
@@ -949,5 +1041,10 @@ const styles = StyleSheet.create({
   modalCloseText: {
     fontSize: 16,
     color: '#6B7280',
+  },
+  errorText: {
+    color: '#FF4444',
+    fontSize: 12,
+    marginTop: 8,
   },
 }); 

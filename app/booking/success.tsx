@@ -216,9 +216,9 @@ export default function BookingSuccessScreen() {
               <Text style={styles.stepNumberText}>1</Text>
             </View>
             <View style={styles.stepContent}>
-              <Text style={styles.stepTitle}>Wait for Confirmation</Text>
+              <Text style={styles.stepTitle}>Host Notification</Text>
               <Text style={styles.stepDescription}>
-                The owner will review your request and confirm within 24 hours
+                The host will be notified of your booking
               </Text>
             </View>
           </View>
@@ -228,9 +228,9 @@ export default function BookingSuccessScreen() {
               <Text style={styles.stepNumberText}>2</Text>
             </View>
             <View style={styles.stepContent}>
-              <Text style={styles.stepTitle}>Arrange Pickup/Delivery</Text>
+              <Text style={styles.stepTitle}>Payment Protection</Text>
               <Text style={styles.stepDescription}>
-                Once confirmed, coordinate with the owner for item collection
+                Your payment is held securely until it's returned
               </Text>
             </View>
           </View>
@@ -240,9 +240,9 @@ export default function BookingSuccessScreen() {
               <Text style={styles.stepNumberText}>3</Text>
             </View>
             <View style={styles.stepContent}>
-              <Text style={styles.stepTitle}>Enjoy Your Rental</Text>
+              <Text style={styles.stepTitle}>Organise Pickup & Drop-off</Text>
               <Text style={styles.stepDescription}>
-                Use the item responsibly and return it in good condition
+                Message each other to organise pickup and drop-off
               </Text>
             </View>
           </View>

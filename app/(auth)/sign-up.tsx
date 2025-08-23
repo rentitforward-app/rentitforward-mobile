@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -31,6 +31,12 @@ export default function SignUpScreen() {
     password?: string;
     confirmPassword?: string;
   }>({});
+
+  // Refs for keyboard navigation
+  const fullNameInputRef = useRef<TextInput>(null);
+  const emailInputRef = useRef<TextInput>(null);
+  const passwordInputRef = useRef<TextInput>(null);
+  const confirmPasswordInputRef = useRef<TextInput>(null);
 
   const validateForm = () => {
     const newErrors: {
@@ -80,6 +86,25 @@ export default function SignUpScreen() {
     }
   };
 
+  // Keyboard navigation handlers
+  const handleFullNameSubmit = () => {
+    emailInputRef.current?.focus();
+  };
+
+  const handleEmailSubmit = () => {
+    passwordInputRef.current?.focus();
+  };
+
+  const handlePasswordSubmit = () => {
+    confirmPasswordInputRef.current?.focus();
+  };
+
+  const handleConfirmPasswordSubmit = () => {
+    // Dismiss keyboard and attempt sign up
+    confirmPasswordInputRef.current?.blur();
+    handleSignUp();
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -120,6 +145,7 @@ export default function SignUpScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Full Name</Text>
               <TextInput
+                ref={fullNameInputRef}
                 style={[styles.input, errors.fullName && styles.inputError]}
                 value={fullName}
                 onChangeText={(text) => {
@@ -131,6 +157,9 @@ export default function SignUpScreen() {
                 placeholder="Enter your full name"
                 autoCapitalize="words"
                 autoCorrect={false}
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={handleFullNameSubmit}
                 editable={!loading}
               />
               {errors.fullName && <Text style={styles.errorText}>{errors.fullName}</Text>}
@@ -139,6 +168,7 @@ export default function SignUpScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email</Text>
               <TextInput
+                ref={emailInputRef}
                 style={[styles.input, errors.email && styles.inputError]}
                 value={email}
                 onChangeText={(text) => {
@@ -151,6 +181,9 @@ export default function SignUpScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={handleEmailSubmit}
                 editable={!loading}
               />
               {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
@@ -159,6 +192,7 @@ export default function SignUpScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Password</Text>
               <TextInput
+                ref={passwordInputRef}
                 style={[styles.input, errors.password && styles.inputError]}
                 value={password}
                 onChangeText={(text) => {
@@ -171,6 +205,9 @@ export default function SignUpScreen() {
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={handlePasswordSubmit}
                 editable={!loading}
               />
               {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
@@ -179,6 +216,7 @@ export default function SignUpScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Confirm Password</Text>
               <TextInput
+                ref={confirmPasswordInputRef}
                 style={[styles.input, errors.confirmPassword && styles.inputError]}
                 value={confirmPassword}
                 onChangeText={(text) => {
@@ -191,6 +229,9 @@ export default function SignUpScreen() {
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
+                returnKeyType="done"
+                blurOnSubmit={true}
+                onSubmitEditing={handleConfirmPasswordSubmit}
                 editable={!loading}
               />
               {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}

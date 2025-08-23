@@ -84,7 +84,9 @@ export default function ConversationScreen() {
       if (error) throw error;
 
       const isOwner = data.owner_id === user?.id;
-      const otherUser = isOwner ? data.renter : data.owner;
+      const otherUser = isOwner ? 
+        (Array.isArray(data.renter) ? data.renter[0] : data.renter) : 
+        (Array.isArray(data.owner) ? data.owner[0] : data.owner);
 
       return {
         id: bookingId,
@@ -97,7 +99,7 @@ export default function ConversationScreen() {
           renterId: data.renter_id,
           startDate: data.start_date,
           endDate: data.end_date,
-          listing: data.listing,
+          listing: Array.isArray(data.listing) ? data.listing[0] : data.listing,
         },
         otherUser,
       } as ConversationData;
