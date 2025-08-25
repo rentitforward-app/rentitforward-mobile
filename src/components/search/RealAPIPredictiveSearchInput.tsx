@@ -4,12 +4,12 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  Modal,
-  FlatList,
   ActivityIndicator,
-  Alert,
+  TouchableWithoutFeedback,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRealSearchSuggestions } from '../../hooks/useRealSearchSuggestions';
+import { colors, spacing, typography } from '../../lib/design-system';
 
 interface SearchSuggestion {
   text: string;
@@ -24,7 +24,7 @@ interface RealAPIPredictiveSearchInputProps {
   onSearch?: (query: string) => void;
   placeholder?: string;
   style?: any;
-  useRealAPI?: boolean; // Toggle between real API and mock data
+  useRealAPI?: boolean;
 }
 
 export function RealAPIPredictiveSearchInput({
@@ -44,39 +44,80 @@ export function RealAPIPredictiveSearchInput({
     useRealAPI ? value : ''
   );
 
+  // Popular searches shown when search bar is focused but empty
+  const popularSearches: SearchSuggestion[] = [
+    { text: 'Camera', type: 'popular', count: 245, icon: '📷' },
+    { text: 'Drill', type: 'popular', count: 189, icon: '🔧' },
+    { text: 'Laptop', type: 'popular', count: 167, icon: '💻' },
+    { text: 'Car', type: 'popular', count: 134, icon: '🚗' },
+    { text: 'Bicycle', type: 'popular', count: 98, icon: '🚲' },
+  ];
+
   // Mock suggestions for fallback
   const mockSuggestions: SearchSuggestion[] = [
-    { text: 'Camera', type: 'category' as any, count: 45, icon: '📷' },
-    { text: 'Canon Camera', type: 'item' as any, count: 12, icon: '📷' },
-    { text: 'Drill', type: 'category' as any, count: 23, icon: '🔧' },
-    { text: 'Power Drill', type: 'item' as any, count: 8, icon: '🔧' },
-    { text: 'Laptop', type: 'category' as any, count: 67, icon: '💻' },
-    { text: 'MacBook Pro', type: 'item' as any, count: 15, icon: '💻' },
-    { text: 'Bicycle', type: 'category' as any, count: 34, icon: '🚲' },
-    { text: 'Mountain Bike', type: 'item', count: 9, icon: '🚲' },
+    { text: 'Camera', type: 'category' as const, count: 45, icon: '📷' },
+    { text: 'Canon Camera', type: 'item' as const, count: 12, icon: '📷' },
+    { text: 'Drill', type: 'category' as const, count: 23, icon: '🔧' },
+    { text: 'Power Drill', type: 'item' as const, count: 8, icon: '🔧' },
+    { text: 'Laptop', type: 'category' as const, count: 67, icon: '💻' },
+    { text: 'MacBook Pro', type: 'item' as const, count: 15, icon: '💻' },
   ].filter(suggestion => 
     suggestion.text.toLowerCase().includes(value.toLowerCase())
   );
 
-  const suggestions = useRealAPI ? realSuggestions : mockSuggestions;
-  const filteredSuggestions = suggestions.slice(0, 8);
+  const getFilteredSuggestions = () => {
+    if (value.length === 0) {
+      return popularSearches;
+    }
+    
+    if (useRealAPI && value.length > 0) {
+      return realSuggestions;
+    }
+    
+    return mockSuggestions;
+  };
+
+  const suggestions = getFilteredSuggestions();
+  const filteredSuggestions = suggestions.slice(0, 5);
 
   const handleInputChange = (text: string) => {
     onChangeText(text);
-    setShowSuggestions(text.length > 0);
+    setShowSuggestions(true);
     setSelectedIndex(-1);
   };
 
   const handleSuggestionPress = (suggestion: SearchSuggestion) => {
+    console.log('Suggestion pressed:', suggestion.text);
     onChangeText(suggestion.text);
     setShowSuggestions(false);
-    onSearch?.(suggestion.text);
+    // Trigger search immediately when suggestion is clicked
+    if (onSearch) {
+      onSearch(suggestion.text);
+    }
   };
 
   const handleInputFocus = () => {
-    if (value.length > 0) {
-      setShowSuggestions(true);
+    setShowSuggestions(true);
+  };
+
+  const handleInputBlur = () => {
+    // Delay hiding suggestions to allow clicking
+    setTimeout(() => setShowSuggestions(false), 150);
+  };
+
+  const handleSearch = () => {
+    console.log('Search button pressed:', value);
+    if (value.trim()) {
+      setShowSuggestions(false);
+      if (onSearch) {
+        onSearch(value.trim());
+      }
     }
+  };
+
+  const handleOutsidePress = () => {
+    console.log('Outside press detected');
+    setShowSuggestions(false);
   };
 
   const getSuggestionTypeLabel = (type: string) => {
@@ -89,161 +130,214 @@ export function RealAPIPredictiveSearchInput({
     }
   };
 
-  const renderSuggestionItem = ({ item, index }: { item: SearchSuggestion; index: number }) => (
-    <TouchableOpacity
-      onPress={() => handleSuggestionPress(item)}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: index < filteredSuggestions.length - 1 ? 1 : 0,
-        borderBottomColor: '#f3f4f6',
-        backgroundColor: index === selectedIndex ? '#f0f9ff' : 'white',
-      }}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-        <Text style={{ fontSize: 18, marginRight: 12 }}>{item.icon}</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={{ 
-            fontSize: 16, 
-            fontWeight: '500', 
-            color: '#111827',
-            marginBottom: 2 
-          }}>
-            {item.text}
-          </Text>
-          <Text style={{ 
-            fontSize: 12, 
-            color: '#6b7280' 
-          }}>
-            {getSuggestionTypeLabel(item.type)}
-            {item.count && ` • ${item.count} items`}
-          </Text>
-        </View>
-      </View>
-      <Text style={{ fontSize: 16, color: '#9ca3af' }}>›</Text>
-    </TouchableOpacity>
-  );
-
   return (
-    <View>
-      <TextInput
-        ref={inputRef}
-        value={value}
-        onChangeText={handleInputChange}
-        onFocus={handleInputFocus}
-        placeholder={placeholder}
-        style={[
-          {
-            backgroundColor: '#f9fafb',
-            borderRadius: 12,
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-            fontSize: 16,
-            borderWidth: 1,
-            borderColor: '#e5e7eb',
-          },
-          style
-        ]}
-      />
+    <TouchableWithoutFeedback onPress={handleOutsidePress}>
+      <View style={{ position: 'relative', zIndex: 99999 }}>
+        {/* Search Input with Button */}
+        <View style={{ position: 'relative' }}>
+          <TextInput
+            ref={inputRef}
+            value={value}
+            onChangeText={handleInputChange}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
+            onSubmitEditing={handleSearch}
+            placeholder={placeholder}
+            returnKeyType="search"
+            style={[
+              {
+                backgroundColor: colors.white,
+                borderRadius: 12,
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                paddingRight: 50, // Make space for search button
+                fontSize: 16,
+                borderWidth: 1,
+                borderColor: showSuggestions ? colors.primary.main : colors.gray[300],
+                color: colors.text.primary,
+              },
+              style
+            ]}
+            placeholderTextColor={colors.text.tertiary}
+          />
+          
+          {/* Search Button - Always visible */}
+          <TouchableOpacity
+            onPress={handleSearch}
+            style={{
+              position: 'absolute',
+              right: 4,
+              top: 4,
+              bottom: 4,
+              width: 40,
+              backgroundColor: colors.primary.main,
+              borderRadius: 8,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <Ionicons name="search" size={18} color={colors.white} />
+          </TouchableOpacity>
+        </View>
 
-      <Modal
-        visible={showSuggestions && filteredSuggestions.length > 0}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowSuggestions(false)}
-      >
-        <TouchableOpacity
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            justifyContent: 'center',
-            paddingHorizontal: 20,
-          }}
-          activeOpacity={1}
-          onPress={() => setShowSuggestions(false)}
-        >
+        {/* Dropdown Suggestions */}
+        {showSuggestions && filteredSuggestions.length > 0 && (
           <View
             style={{
-              backgroundColor: 'white',
-              borderRadius: 16,
-              maxHeight: '70%',
-              overflow: 'hidden',
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              backgroundColor: colors.white,
+              borderRadius: 12,
+              marginTop: 4,
+              shadowColor: colors.black,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 8,
+              elevation: 8,
+              zIndex: 100000,
+              borderWidth: 1,
+              borderColor: colors.gray[200],
             }}
           >
             {/* Header */}
             <View style={{
               paddingHorizontal: 16,
-              paddingTop: 16,
+              paddingTop: 12,
               paddingBottom: 8,
               borderBottomWidth: 1,
-              borderBottomColor: '#f3f4f6',
+              borderBottomColor: colors.gray[200],
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
             }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Text style={{ fontSize: 18 }}>💡</Text>
-                <Text style={{ 
-                  fontSize: 16, 
-                  fontWeight: '600', 
-                  color: '#374151',
-                  marginLeft: 8 
-                }}>
-                  Search Suggestions
-                </Text>
-                {useRealAPI && (
-                  <View style={{
-                    backgroundColor: '#dcfce7',
-                    paddingHorizontal: 8,
-                    paddingVertical: 2,
-                    borderRadius: 12,
-                    marginLeft: 8,
-                  }}>
+                {value.length === 0 ? (
+                  <>
+                    <Text style={{ fontSize: 16 }}>🔥</Text>
                     <Text style={{ 
-                      fontSize: 12, 
-                      color: '#166534',
-                      fontWeight: '500' 
+                      fontSize: 14, 
+                      fontWeight: '600', 
+                      color: colors.text.primary,
+                      marginLeft: 6 
                     }}>
-                      Real-time
+                      Popular Searches
                     </Text>
-                  </View>
+                    <View style={{
+                      backgroundColor: colors.semantic.warning + '20',
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      borderRadius: 8,
+                      marginLeft: 6,
+                    }}>
+                      <Text style={{ 
+                        fontSize: 10, 
+                        color: colors.semantic.warning,
+                        fontWeight: '500' 
+                      }}>
+                        Trending
+                      </Text>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <Text style={{ fontSize: 16 }}>💡</Text>
+                    <Text style={{ 
+                      fontSize: 14, 
+                      fontWeight: '600', 
+                      color: colors.text.primary,
+                      marginLeft: 6 
+                    }}>
+                      Suggestions
+                    </Text>
+                    {useRealAPI && (
+                      <View style={{
+                        backgroundColor: colors.semantic.success + '20',
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 8,
+                        marginLeft: 6,
+                      }}>
+                        <Text style={{ 
+                          fontSize: 10, 
+                          color: colors.semantic.success,
+                          fontWeight: '500' 
+                        }}>
+                          Live
+                        </Text>
+                      </View>
+                    )}
+                  </>
                 )}
               </View>
               
               {useRealAPI && loading && (
-                <ActivityIndicator size="small" color="#3b82f6" />
+                <ActivityIndicator size="small" color={colors.primary.main} />
               )}
             </View>
 
             {/* Error Message */}
             {useRealAPI && error && (
               <View style={{
-                backgroundColor: '#fef2f2',
+                backgroundColor: colors.semantic.error + '10',
                 paddingHorizontal: 16,
-                paddingVertical: 8,
+                paddingVertical: 6,
                 borderBottomWidth: 1,
-                borderBottomColor: '#f3f4f6',
+                borderBottomColor: colors.gray[200],
               }}>
-                <Text style={{ fontSize: 12, color: '#dc2626' }}>
+                <Text style={{ fontSize: 11, color: colors.semantic.error }}>
                   Using offline suggestions
                 </Text>
               </View>
             )}
 
             {/* Suggestions List */}
-            <FlatList
-              data={filteredSuggestions}
-              renderItem={renderSuggestionItem}
-              keyExtractor={(item, index) => `${item.text}-${item.type}-${index}`}
-              showsVerticalScrollIndicator={false}
-              style={{ maxHeight: 400 }}
-            />
+            <View>
+              {filteredSuggestions.map((item, index) => (
+                <TouchableOpacity
+                  key={`${item.text}-${item.type}-${index}`}
+                  onPress={() => handleSuggestionPress(item)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    borderBottomWidth: index < filteredSuggestions.length - 1 ? 1 : 0,
+                    borderBottomColor: colors.gray[200],
+                    backgroundColor: index === selectedIndex ? colors.primary.main + '10' : colors.white,
+                    minHeight: 56,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                    <Text style={{ fontSize: 18, marginRight: 12 }}>{item.icon}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ 
+                        fontSize: 16, 
+                        fontWeight: '500', 
+                        color: colors.text.primary,
+                        marginBottom: 2 
+                      }}>
+                        {item.text}
+                      </Text>
+                      <Text style={{ 
+                        fontSize: 12, 
+                        color: colors.text.secondary 
+                      }}>
+                        {getSuggestionTypeLabel(item.type)}
+                        {item.count && ` • ${item.count} items`}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 16, color: colors.gray[400] }}>›</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-        </TouchableOpacity>
-      </Modal>
-    </View>
+        )}
+      </View>
+    </TouchableWithoutFeedback>
   );
 }
+

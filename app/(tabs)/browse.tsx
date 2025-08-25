@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../src/lib/supabase';
 import Sentry from '../../src/lib/sentry';
 import { colors, spacing, typography, componentStyles } from '../../src/lib/design-system';
@@ -36,15 +37,26 @@ const CATEGORIES = [
 ];
 
 export default function BrowseScreen() {
+  const { search, category } = useLocalSearchParams<{ search?: string; category?: string }>();
   const [listings, setListings] = useState<any[]>([]);
   const [filteredListings, setFilteredListings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [searchQuery, setSearchQuery] = useState(search || '');
+  const [selectedCategory, setSelectedCategory] = useState(category || 'all');
 
   useEffect(() => {
     loadListings();
   }, []);
+
+  // Handle URL parameters
+  useEffect(() => {
+    if (search) {
+      setSearchQuery(search);
+    }
+    if (category) {
+      setSelectedCategory(category);
+    }
+  }, [search, category]);
 
   useEffect(() => {
     filterListings();

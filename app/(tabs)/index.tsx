@@ -11,7 +11,7 @@ import { supabase } from '../../src/lib/supabase';
 
 const logo = require('../../assets/images/RentitForwardMainLogo.png');
 
-// Categories (updated to match new category structure)
+// Categories (updated to match web version with all 12 categories)
 const CATEGORIES = [
   { id: 'tools_diy_equipment', name: 'Tools & DIY Equipment', icon: '🔧' },
   { id: 'cameras_photography_gear', name: 'Cameras & Photography Gear', icon: '📷' },
@@ -24,6 +24,7 @@ const CATEGORIES = [
   { id: 'musical_instruments_gear', name: 'Musical Instruments & Gear', icon: '🎸' },
   { id: 'costumes_props', name: 'Costumes & Props', icon: '🎭' },
   { id: 'maker_craft_supplies', name: 'Maker & Craft Supplies', icon: '✂️' },
+  { id: 'clothing_shoes_accessories', name: 'Clothing, Shoes and Accessories', icon: '👕' },
 ];
 
 export default function HomeScreen() {
@@ -340,38 +341,38 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-        {/* Top Banner with Search */}
-        <View
+      {/* Top Banner with Search - Outside ScrollView */}
+      <View
+        style={{
+          backgroundColor: colors.primary.main,
+          paddingHorizontal: spacing.md,
+          paddingTop: spacing.xl,
+          paddingBottom: spacing['3xl'], // More space for dropdown
+          // Remove border radius for flat bottom
+        }}
+      >
+        <Text
           style={{
-            backgroundColor: colors.primary.main,
-            paddingHorizontal: spacing.md,
-            paddingTop: spacing.xl,
-            paddingBottom: spacing['2xl'],
-            // Remove border radius for flat bottom
+            fontSize: typography.sizes.base,
+            color: colors.white,
+            opacity: 0.95,
+            marginBottom: spacing.xs,
+            fontWeight: typography.weights.medium,
           }}
         >
-          <Text
-            style={{
-              fontSize: typography.sizes.base,
-              color: colors.white,
-              opacity: 0.95,
-              marginBottom: spacing.xs,
-              fontWeight: typography.weights.medium,
-            }}
-          >
-            Good afternoon, {displayName}
-          </Text>
-          <Text
-            style={{
-              fontSize: typography.sizes['2xl'],
-              fontWeight: typography.weights.bold,
-              color: colors.white,
-              marginBottom: spacing.lg,
-            }}
-          >
-            Share More, Buy Less
-          </Text>
+          Good afternoon, {displayName}
+        </Text>
+        <Text
+          style={{
+            fontSize: typography.sizes['2xl'],
+            fontWeight: typography.weights.bold,
+            color: colors.white,
+            marginBottom: spacing.lg,
+          }}
+        >
+          Share More, Buy Less
+        </Text>
+        <View style={{ zIndex: 99999, position: 'relative' }}>
           <RealAPIPredictiveSearchInput
             placeholder="Search for items, e.g. camera, drill..."
             value={search}
@@ -389,6 +390,9 @@ export default function HomeScreen() {
             }}
           />
         </View>
+      </View>
+
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
 
         {/* Top Rental Items Section */}
         <View style={{ marginTop: spacing.xl }}>
@@ -411,16 +415,60 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* Categories Section */}
-        <View style={{ marginTop: spacing.xl, marginBottom: spacing.md, paddingHorizontal: spacing.md }}>
-          <Text style={{ fontSize: typography.sizes.lg, fontWeight: typography.weights.semibold, color: colors.text.primary, marginBottom: spacing.md }}>
+        {/* Browse Categories Section - Updated to match web version */}
+        <View style={{ 
+          marginTop: spacing.xl, 
+          marginBottom: spacing.xl, 
+          paddingHorizontal: spacing.md 
+        }}>
+          <Text style={{ 
+            fontSize: typography.sizes.lg, 
+            fontWeight: typography.weights.semibold, 
+            color: colors.text.primary, 
+            marginBottom: spacing.md
+          }}>
             Browse Categories
           </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-            {CATEGORIES.slice(0, 8).map(category => (
-              <TouchableOpacity key={category.id} onPress={() => handleCategoryPress(category.id)} style={{ width: '48%', backgroundColor: colors.white, borderRadius: 12, alignItems: 'center', paddingVertical: spacing.lg, marginBottom: spacing.md, shadowColor: colors.black, shadowOpacity: 0.03, shadowRadius: 2, elevation: 1 }}>
-                <Text style={{ fontSize: 32, marginBottom: spacing.sm }}>{category.icon}</Text>
-                <Text style={{ fontSize: typography.sizes.sm, fontWeight: typography.weights.medium, color: colors.text.primary, textAlign: 'center' }}>{category.name}</Text>
+          
+          {/* Categories Grid - 2 columns with proper spacing */}
+          <View style={{ 
+            flexDirection: 'row', 
+            flexWrap: 'wrap', 
+            justifyContent: 'space-between'
+          }}>
+            {CATEGORIES.map(category => (
+              <TouchableOpacity 
+                key={category.id} 
+                onPress={() => handleCategoryPress(category.id)} 
+                style={{ 
+                  width: '48%', 
+                  backgroundColor: colors.white, 
+                  borderRadius: 12, 
+                  alignItems: 'center', 
+                  paddingVertical: spacing.lg, 
+                  marginBottom: spacing.md,
+                  shadowColor: colors.black, 
+                  shadowOpacity: 0.03, 
+                  shadowRadius: 2, 
+                  elevation: 1
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={{ 
+                  fontSize: 32, 
+                  marginBottom: spacing.sm,
+                  textAlign: 'center'
+                }}>
+                  {category.icon}
+                </Text>
+                <Text style={{ 
+                  fontSize: typography.sizes.sm, 
+                  fontWeight: typography.weights.medium, 
+                  color: colors.text.primary, 
+                  textAlign: 'center'
+                }}>
+                  {category.name}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
