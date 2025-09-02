@@ -15,8 +15,8 @@ export default function TabLayout() {
   // Protect tabs - redirect unauthenticated users
   useEffect(() => {
     if (!loading && !user) {
-      console.log('Unauthenticated user accessing tabs - redirecting to index');
-      router.replace('/');
+      console.log('Unauthenticated user accessing tabs - redirecting to welcome');
+      router.replace('/(auth)/welcome');
     }
   }, [user, loading, router]);
 

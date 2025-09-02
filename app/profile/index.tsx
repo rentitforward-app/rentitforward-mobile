@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useAuth } from '../../src/components/AuthProvider';
+import { useAuthStore } from '../../src/stores/auth';
 import { supabase } from '../../src/lib/supabase';
 import { colors, spacing, typography } from '../../src/lib/design-system';
 
@@ -37,7 +37,7 @@ interface UserProfile {
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user: currentUser, profile: existingProfile, signOut } = useAuth();
+  const { user: currentUser } = useAuthStore();
   const queryClient = useQueryClient();
   
   const [isEditing, setIsEditing] = useState(false);
@@ -51,25 +51,12 @@ export default function ProfileScreen() {
     state: ''
   });
 
-  // Use existing profile from auth context or fetch if needed
+  // Fetch user profile
   const { data: profile, isLoading } = useQuery({
     queryKey: ['profile', currentUser?.id],
     queryFn: async () => {
       if (!currentUser?.id) throw new Error('No user ID');
       
-      // If we already have a profile from auth context, use it
-      if (existingProfile) {
-        const enhancedProfile: UserProfile = {
-          ...existingProfile,
-          verified: existingProfile.verified || false,
-          stripe_onboarded: false, // Default value, should be fetched from database
-          trust_score: 87,
-          completion_rate: 94
-        };
-        return enhancedProfile;
-      }
-      
-      // Otherwise fetch from database
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -87,13 +74,6 @@ export default function ProfileScreen() {
       return enhancedProfile;
     },
     enabled: !!currentUser?.id,
-    initialData: existingProfile ? {
-      ...existingProfile,
-      verified: existingProfile.verified || false,
-      stripe_onboarded: false,
-      trust_score: 87,
-      completion_rate: 94
-    } : undefined,
   });
 
   // Update profile mutation
@@ -198,27 +178,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleSignOut = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await signOut();
-            } catch (error) {
-              console.error('Sign out error:', error);
-            }
-          },
-        },
-      ]
-    );
-  };
-
   const getTrustScoreColor = (score: number) => {
     if (score >= 90) return colors.semantic.success;
     if (score >= 70) return colors.semantic.warning;
@@ -230,35 +189,6 @@ export default function ProfileScreen() {
     if (score >= 70) return { text: 'Good', color: colors.semantic.warning };
     return { text: 'Needs Improvement', color: colors.semantic.error };
   };
-
-  // If no user is authenticated, show sign-in prompt
-  if (!currentUser) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.gray[50] }}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.lg }}>
-          <Text style={{ fontSize: typography.sizes['2xl'], fontWeight: typography.weights.bold, color: colors.text.primary, marginBottom: spacing.sm }}>
-            Please Sign In
-          </Text>
-          <Text style={{ fontSize: typography.sizes.base, color: colors.text.secondary, marginBottom: spacing.xl }}>
-            Sign in to view your profile
-          </Text>
-          <TouchableOpacity
-            style={{
-              backgroundColor: colors.primary.main,
-              paddingHorizontal: spacing.xl,
-              paddingVertical: spacing.md,
-              borderRadius: 8,
-            }}
-            onPress={() => router.push('/(auth)/sign-in')}
-          >
-            <Text style={{ color: colors.white, fontWeight: typography.weights.semibold }}>
-              Sign In
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   if (isLoading) {
     return (
@@ -316,35 +246,23 @@ export default function ProfileScreen() {
         }}>
           My Profile
         </Text>
-        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          <TouchableOpacity
-            onPress={() => router.push('/settings')}
-            style={{
-              padding: spacing.sm,
-              borderRadius: 8,
-              backgroundColor: colors.gray[100],
-            }}
-          >
-            <Ionicons name="settings-outline" size={20} color={colors.gray[700]} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setIsEditing(!isEditing)}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingHorizontal: spacing.md,
-              paddingVertical: spacing.sm,
-              borderWidth: 1,
-              borderColor: colors.gray[300],
-              borderRadius: 8,
-            }}
-          >
-            <Ionicons name="pencil" size={16} color={colors.gray[600]} />
-            <Text style={{ marginLeft: spacing.xs, color: colors.gray[600], fontWeight: typography.weights.medium }}>
-              {isEditing ? 'Cancel' : 'Edit'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          onPress={() => setIsEditing(!isEditing)}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: spacing.md,
+            paddingVertical: spacing.sm,
+            borderWidth: 1,
+            borderColor: colors.gray[300],
+            borderRadius: 8,
+          }}
+        >
+          <Ionicons name="pencil" size={16} color={colors.gray[600]} />
+          <Text style={{ marginLeft: spacing.xs, color: colors.gray[600], fontWeight: typography.weights.medium }}>
+            {isEditing ? 'Cancel' : 'Edit'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
@@ -387,17 +305,11 @@ export default function ProfileScreen() {
                     width: 120,
                     height: 120,
                     borderRadius: 60,
-                    backgroundColor: colors.primary.main,
+                    backgroundColor: colors.gray[200],
                     justifyContent: 'center',
                     alignItems: 'center',
                   }}>
-                    <Text style={{
-                      fontSize: 48,
-                      fontWeight: typography.weights.bold,
-                      color: colors.white,
-                    }}>
-                      {profile.full_name?.charAt(0)?.toUpperCase() || 'U'}
-                    </Text>
+                    <Ionicons name="person" size={48} color={colors.gray[500]} />
                   </View>
                 )}
                 
@@ -422,7 +334,7 @@ export default function ProfileScreen() {
                   }}
                 >
                   {isUploadingImage ? (
-                    <ActivityIndicator size="small" color={colors.primary.main} />
+                                          <ActivityIndicator size="small" color={colors.primary.main} />
                   ) : (
                     <Ionicons name="camera" size={20} color={colors.gray[600]} />
                   )}
@@ -617,24 +529,6 @@ export default function ProfileScreen() {
                   }}>
                     {profile.email}
                   </Text>
-                  
-                  {profile.verified && (
-                    <View style={{
-                      backgroundColor: colors.semantic.success,
-                      paddingHorizontal: spacing.md,
-                      paddingVertical: spacing.xs,
-                      borderRadius: 16,
-                      marginTop: spacing.xs,
-                    }}>
-                      <Text style={{
-                        color: colors.white,
-                        fontSize: typography.sizes.sm,
-                        fontWeight: typography.weights.medium,
-                      }}>
-                        ✓ Verified
-                      </Text>
-                    </View>
-                  )}
                   
                   {profile.phone_number && (
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -945,27 +839,6 @@ export default function ProfileScreen() {
               </View>
             </View>
           </View>
-
-          {/* Sign Out Button */}
-          <TouchableOpacity
-            onPress={handleSignOut}
-            style={{
-              borderWidth: 1,
-              borderColor: colors.semantic.error,
-              borderRadius: 8,
-              paddingVertical: spacing.md,
-              alignItems: 'center',
-              marginTop: spacing.md,
-            }}
-          >
-            <Text style={{
-              color: colors.semantic.error,
-              fontSize: typography.sizes.base,
-              fontWeight: typography.weights.semibold,
-            }}>
-              Sign Out
-            </Text>
-          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>

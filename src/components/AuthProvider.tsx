@@ -17,6 +17,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading: true,
     error: null,
   });
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   // Fetch user profile from database
   const fetchProfile = async (userId: string): Promise<Profile | null> => {
@@ -84,6 +85,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, session) => {
         if (!mounted) return;
 
+        // Don't update state if we're in the middle of signing out
+        if (isSigningOut && event === 'SIGNED_OUT') {
+          return;
+        }
+
         if (session?.user) {
           const profile = await fetchProfile(session.user.id);
           setState({
@@ -107,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [isSigningOut]);
 
   useEffect(() => {
     if (!state.loading) {
@@ -171,16 +177,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
+      setIsSigningOut(true);
       setState(prev => ({ ...prev, loading: true }));
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       
-      // Let the index.tsx routing logic handle the proper flow
-      // This will show intro for first-time users or welcome for returning users
-      console.log('Signing out - redirecting to index for proper routing');
-      router.replace('/');
+      // Clear the state immediately
+      setState({
+        user: null,
+        profile: null,
+        loading: false,
+        error: null,
+      });
+      
+      // Small delay to ensure state is cleared before navigation
+      setTimeout(() => {
+        // Navigate directly to welcome screen to avoid routing loops
+        console.log('Signing out - redirecting to welcome screen');
+        router.replace('/(auth)/welcome');
+        setIsSigningOut(false);
+      }, 100);
     } catch (error: any) {
       setState(prev => ({ ...prev, loading: false, error: error.message }));
+      setIsSigningOut(false);
       Alert.alert('Sign Out Error', error.message);
     }
   };

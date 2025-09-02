@@ -341,38 +341,38 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Top Banner with Search - Outside ScrollView */}
-      <View
-        style={{
-          backgroundColor: colors.primary.main,
-          paddingHorizontal: spacing.md,
-          paddingTop: spacing.xl,
-          paddingBottom: spacing['3xl'], // More space for dropdown
-          // Remove border radius for flat bottom
-        }}
-      >
-        <Text
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+        {/* Top Banner with Search */}
+        <View
           style={{
-            fontSize: typography.sizes.base,
-            color: colors.white,
-            opacity: 0.95,
-            marginBottom: spacing.xs,
-            fontWeight: typography.weights.medium,
+            backgroundColor: colors.primary.main,
+            paddingHorizontal: spacing.md,
+            paddingTop: spacing.xl,
+            paddingBottom: spacing['2xl'],
+            // Remove border radius for flat bottom
           }}
         >
-          Good afternoon, {displayName}
-        </Text>
-        <Text
-          style={{
-            fontSize: typography.sizes['2xl'],
-            fontWeight: typography.weights.bold,
-            color: colors.white,
-            marginBottom: spacing.lg,
-          }}
-        >
-          Share More, Buy Less
-        </Text>
-        <View style={{ zIndex: 99999, position: 'relative' }}>
+          <Text
+            style={{
+              fontSize: typography.sizes.base,
+              color: colors.white,
+              opacity: 0.95,
+              marginBottom: spacing.xs,
+              fontWeight: typography.weights.medium,
+            }}
+          >
+            Good afternoon, {displayName}
+          </Text>
+          <Text
+            style={{
+              fontSize: typography.sizes['2xl'],
+              fontWeight: typography.weights.bold,
+              color: colors.white,
+              marginBottom: spacing.lg,
+            }}
+          >
+            Share More, Buy Less
+          </Text>
           <RealAPIPredictiveSearchInput
             placeholder="Search for items, e.g. camera, drill..."
             value={search}
@@ -390,9 +390,6 @@ export default function HomeScreen() {
             }}
           />
         </View>
-      </View>
-
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
 
         {/* Top Rental Items Section */}
         <View style={{ marginTop: spacing.xl }}>

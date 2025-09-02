@@ -2,13 +2,13 @@
   "expo": {
     "name": "Rent It Forward",
     "slug": "rentitforward-mobile",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/images/RentItForwardFavicon2.png",
     "splash": {
       "image": "./assets/images/RentitForwardMainLogo.png",
-      "resizeMode": "cover",
+      "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "assetBundlePatterns": [
@@ -19,6 +19,12 @@
       "bundleIdentifier": "au.com.rentitforward.mobile",
       "buildNumber": "1",
       "icon": "./assets/images/RentItForwardFavicon2.png",
+      "splash": {
+        "image": "./assets/images/RentitForwardMainLogo.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff",
+        "tabletImage": "./assets/images/RentitForwardMainLogo.png"
+      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -29,7 +35,12 @@
         "backgroundColor": "#44D62C"
       },
       "package": "au.com.rentitforward.mobile",
-      "versionCode": 1,
+      "versionCode": 2,
+      "splash": {
+        "image": "./assets/images/RentitForwardMainLogo.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff"
+      },
       "permissions": [
         "CAMERA",
         "WRITE_EXTERNAL_STORAGE",
