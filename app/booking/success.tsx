@@ -120,7 +120,8 @@ export default function BookingSuccessScreen() {
     if (!booking) return 0;
     const start = new Date(booking.startDate);
     const end = new Date(booking.endDate);
-    return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    // Inclusive duration for display
+    return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   };
 
   if (isLoading) {

@@ -245,7 +245,7 @@ export default function CalendarScreen() {
     // Calculate minimum rental period (e.g., 1 day)
     const start = new Date(selectedDates.startDate);
     const end = new Date(selectedDates.endDate);
-    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
     if (days < 1) {
       Alert.alert('Invalid Period', 'Minimum rental period is 1 day.');
@@ -269,7 +269,7 @@ export default function CalendarScreen() {
     if (!selectedDates.startDate || !selectedDates.endDate) return 0;
     const start = new Date(selectedDates.startDate);
     const end = new Date(selectedDates.endDate);
-    return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   };
 
   return (
