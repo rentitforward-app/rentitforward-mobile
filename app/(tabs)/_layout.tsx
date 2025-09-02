@@ -50,7 +50,7 @@ export default function TabLayout() {
           backgroundColor: colors.white,
           borderTopColor: colors.gray[200],
           borderTopWidth: 1,
-          paddingTop: spacing.sm,
+          paddingTop: 0, // Remove top padding that could cause white space
           paddingBottom: Math.max(insets.bottom, spacing.sm), // Ensure safe area padding
           height: 70 + Math.max(insets.bottom, spacing.sm), // Increased height for better proportions
           paddingHorizontal: spacing.md,
@@ -104,6 +104,7 @@ export default function TabLayout() {
               color={color} 
             />
           ),
+
         }}
       />
       <Tabs.Screen

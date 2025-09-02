@@ -13,9 +13,10 @@ import {
   Modal,
   Platform
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { supabase } from '../../src/lib/supabase';
 import Sentry from '../../src/lib/sentry';
@@ -49,6 +50,7 @@ const SORT_OPTIONS = [
 ];
 
 export default function BrowseScreen() {
+  const insets = useSafeAreaInsets();
   const { search, category } = useLocalSearchParams<{ search?: string; category?: string }>();
   const [listings, setListings] = useState<any[]>([]);
   const [filteredListings, setFilteredListings] = useState<any[]>([]);
@@ -1009,17 +1011,17 @@ export default function BrowseScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary.main} />
           <Text style={styles.loadingText}>Loading listings...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Browse Items</Text>
@@ -1310,7 +1312,7 @@ export default function BrowseScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -1318,6 +1320,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.white,
+    // Ensure no white space above content
+    margin: 0,
+    padding: 0,
   },
   loadingContainer: {
     flex: 1,
@@ -1337,6 +1342,9 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.neutral.lightGray,
+    // Ensure header starts at the very top with no margin
+    marginTop: 0,
+    marginBottom: 0,
   },
   headerTitle: {
     fontSize: typography.sizes['2xl'],
