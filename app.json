@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "au.com.rentitforward.mobile",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "icon": "./assets/images/RentItForwardFavicon2.png",
       "splash": {
         "image": "./assets/images/RentitForwardMainLogo.png",
@@ -26,7 +26,13 @@
         "tabletImage": "./assets/images/RentitForwardMainLogo.png"
       },
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Rent It Forward needs access to your camera to take photos of items you want to list for rental, and to scan QR codes for quick access to listings.",
+        "NSCalendarsUsageDescription": "Rent It Forward needs access to your calendar to help you schedule and manage rental bookings, ensuring you don't have conflicts with other appointments.",
+        "NSPhotoLibraryUsageDescription": "Rent It Forward needs access to your photo library to select images for your rental listings and to save photos from the app.",
+        "NSLocationWhenInUseUsageDescription": "Rent It Forward needs access to your location to show nearby rental items, help you find items in your area, and provide accurate location information for your listings.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Rent It Forward needs access to your location to show nearby rental items, help you find items in your area, and provide accurate location information for your listings.",
+        "NSMicrophoneUsageDescription": "Rent It Forward needs access to your microphone to record voice notes for your rental listings and to enable voice search functionality."
       }
     },
     "android": {
@@ -35,7 +41,7 @@
         "backgroundColor": "#44D62C"
       },
       "package": "au.com.rentitforward.mobile",
-      "versionCode": 2,
+      "versionCode": 3,
       "splash": {
         "image": "./assets/images/RentitForwardMainLogo.png",
         "resizeMode": "contain",
@@ -46,7 +52,13 @@
         "WRITE_EXTERNAL_STORAGE",
         "READ_EXTERNAL_STORAGE",
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "RECORD_AUDIO",
+        "READ_CALENDAR",
+        "WRITE_CALENDAR",
+        "VIBRATE",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
       ]
     },
     "web": {
