@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -12,78 +12,123 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { mobileTokens } from '../../src/lib/design-system';
+import { addSentryBreadcrumb, captureSentryException } from '../../src/lib/sentry';
+import { ErrorBoundary } from '../../src/components/ErrorBoundary';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function WelcomeScreen() {
   const router = useRouter();
 
+  // Add Sentry breadcrumb when welcome screen loads
+  useEffect(() => {
+    addSentryBreadcrumb('Welcome screen loaded', 'navigation', {
+      screen: 'welcome',
+      timestamp: new Date().toISOString(),
+    });
+  }, []);
+
+  // Enhanced error handling for navigation
+  const handleGetStarted = () => {
+    try {
+      addSentryBreadcrumb('Get Started button pressed', 'user_action', {
+        screen: 'welcome',
+        action: 'get_started',
+      });
+      router.push('/(auth)/sign-up');
+    } catch (error) {
+      captureSentryException(error as Error, {
+        screen: 'welcome',
+        action: 'get_started_navigation',
+        error_type: 'navigation_error',
+      });
+    }
+  };
+
+  const handleSignIn = () => {
+    try {
+      addSentryBreadcrumb('Sign In button pressed', 'user_action', {
+        screen: 'welcome',
+        action: 'sign_in',
+      });
+      router.push('/(auth)/sign-in');
+    } catch (error) {
+      captureSentryException(error as Error, {
+        screen: 'welcome',
+        action: 'sign_in_navigation',
+        error_type: 'navigation_error',
+      });
+    }
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollViewContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Hero Section with Overlaid Text */}
-        <View style={styles.heroSection}>
-          <Image 
-            source={require('../../assets/images/RIF_Onboarding_Image.png')}
-            style={styles.heroImage}
-            resizeMode="cover"
-          />
-          
-          {/* PNG Logo in Top Right */}
-          <View style={styles.logoContainer}>
+    <ErrorBoundary>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollViewContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Hero Section with Overlaid Text */}
+          <View style={styles.heroSection}>
             <Image 
-              source={require('../../assets/images/RentitForwardInvertedColorTransparentbg.png')}
-              style={styles.logoImage}
-              resizeMode="contain"
+              source={require('../../assets/images/RIF_Onboarding_Image.png')}
+              style={styles.heroImage}
+              resizeMode="cover"
             />
-          </View>
-          
-          {/* Overlay Content */}
-          <View style={styles.overlay}>
-            <View style={styles.overlayContent}>
-              <Text style={styles.heroTitle}>Rent What You Need</Text>
-              <Text style={styles.heroSubtitle}>Share What You Have</Text>
+            
+            {/* PNG Logo in Top Right */}
+            <View style={styles.logoContainer}>
+              <Image 
+                source={require('../../assets/images/RentitForwardInvertedColorTransparentbg.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+            </View>
+            
+            {/* Overlay Content */}
+            <View style={styles.overlay}>
+              <View style={styles.overlayContent}>
+                <Text style={styles.heroTitle}>Rent What You Need</Text>
+                <Text style={styles.heroSubtitle}>Share What You Have</Text>
+              </View>
             </View>
           </View>
-        </View>
 
-        {/* Content Section */}
-        <View style={styles.contentSection}>
-          <Text style={styles.description}>
-            Access tools, electronics, sports gear, and more from people in your community.
-          </Text>
-          
-          <Text style={styles.subDescription}>
-            Save money, live sustainably, and make sharing second nature.
-          </Text>
-          
-          {/* Action Buttons */}
-          <TouchableOpacity
-            onPress={() => router.push('/(auth)/sign-up')}
-            style={styles.primaryButton}
-          >
-            <Text style={styles.primaryButtonText}>Get Started</Text>
-          </TouchableOpacity>
+          {/* Content Section */}
+          <View style={styles.contentSection}>
+            <Text style={styles.description}>
+              Access tools, electronics, sports gear, and more from people in your community.
+            </Text>
+            
+            <Text style={styles.subDescription}>
+              Save money, live sustainably, and make sharing second nature.
+            </Text>
+            
+            {/* Action Buttons */}
+            <TouchableOpacity
+              onPress={handleGetStarted}
+              style={styles.primaryButton}
+            >
+              <Text style={styles.primaryButtonText}>Get Started</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => router.push('/(auth)/sign-in')}
-            style={styles.secondaryButton}
-          >
-            <Text style={styles.secondaryButtonText}>Sign In</Text>
-          </TouchableOpacity>
-          
-          <Text style={styles.termsText}>
-            By continuing, you agree to our <Text style={styles.linkText}>Terms of Service</Text> and <Text style={styles.linkText}>Privacy Policy</Text>
-          </Text>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+            <TouchableOpacity
+              onPress={handleSignIn}
+              style={styles.secondaryButton}
+            >
+              <Text style={styles.secondaryButtonText}>Sign In</Text>
+            </TouchableOpacity>
+            
+            <Text style={styles.termsText}>
+              By continuing, you agree to our <Text style={styles.linkText}>Terms of Service</Text> and <Text style={styles.linkText}>Privacy Policy</Text>
+            </Text>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </ErrorBoundary>
   );
 }
 

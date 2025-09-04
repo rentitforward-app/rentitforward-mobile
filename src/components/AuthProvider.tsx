@@ -4,6 +4,7 @@ import { Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { AuthContextType, AuthState, Profile } from '../types/auth';
+import { setSentryUser, clearSentryUser, addSentryBreadcrumb, captureSentryException } from '../lib/sentry';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -61,6 +62,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               loading: false,
               error: null,
             });
+            
+            // Set Sentry user context
+            setSentryUser({
+              id: session.user.id,
+              email: session.user.email,
+              name: profile?.full_name || session.user.user_metadata?.full_name,
+            });
+            
+            addSentryBreadcrumb('User authenticated', 'auth', {
+              userId: session.user.id,
+              email: session.user.email,
+            });
           } else {
             setState({
               user: null,
@@ -68,6 +81,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               loading: false,
               error: null,
             });
+            
+            // Clear Sentry user context
+            clearSentryUser();
+            addSentryBreadcrumb('User signed out', 'auth');
           }
         }
       } catch (error) {
@@ -103,12 +120,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             loading: false,
             error: null,
           });
+          
+          // Set Sentry user context
+          setSentryUser({
+            id: session.user.id,
+            email: session.user.email,
+            name: profile?.full_name || session.user.user_metadata?.full_name,
+          });
+          
+          addSentryBreadcrumb('Auth state changed - user signed in', 'auth', {
+            event,
+            userId: session.user.id,
+            email: session.user.email,
+          });
         } else {
           setState({
             user: null,
             profile: null,
             loading: false,
             error: null,
+          });
+          
+          // Clear Sentry user context
+          clearSentryUser();
+          addSentryBreadcrumb('Auth state changed - user signed out', 'auth', {
+            event,
           });
         }
       }
@@ -136,6 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error: any) {
       setState(prev => ({ ...prev, loading: false, error: error.message }));
+      captureSentryException(error, { action: 'signIn', email });
       Alert.alert('Sign In Error', error.message);
       throw error;
     }
@@ -165,6 +202,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
     } catch (error: any) {
       setState(prev => ({ ...prev, loading: false, error: error.message }));
+      captureSentryException(error, { action: 'signUp', email, fullName });
       Alert.alert('Sign Up Error', error.message);
       throw error;
     }
@@ -194,6 +232,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }, 100);
     } catch (error: any) {
       setState(prev => ({ ...prev, loading: false, error: error.message }));
+      captureSentryException(error, { action: 'signOut' });
       setIsSigningOut(false);
       Alert.alert('Sign Out Error', error.message);
     }
@@ -217,6 +256,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         'Check your email for password reset instructions.'
       );
     } catch (error: any) {
+      captureSentryException(error, { action: 'resetPassword', email });
       Alert.alert('Reset Password Error', error.message);
       throw error;
     }
@@ -242,6 +282,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await refreshProfile();
     } catch (error: any) {
       setState(prev => ({ ...prev, loading: false, error: error.message }));
+      captureSentryException(error, { action: 'updateProfile', updates });
       Alert.alert('Update Profile Error', error.message);
       throw error;
     }

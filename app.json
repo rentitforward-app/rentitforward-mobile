@@ -2,7 +2,7 @@
   "expo": {
     "name": "Rent It Forward",
     "slug": "rentitforward-mobile",
-    "version": "1.0.1",
+    "version": "1.0.8",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/images/RentItForwardFavicon2.png",
@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "au.com.rentitforward.mobile",
-      "buildNumber": "2",
+      "buildNumber": "8",
       "icon": "./assets/images/RentItForwardFavicon2.png",
       "splash": {
         "image": "./assets/images/RentitForwardMainLogo.png",
@@ -41,13 +41,24 @@
         "backgroundColor": "#44D62C"
       },
       "package": "au.com.rentitforward.mobile",
-      "versionCode": 3,
+      "versionCode": 8,
       "splash": {
         "image": "./assets/images/RentitForwardMainLogo.png",
         "resizeMode": "contain",
         "backgroundColor": "#ffffff"
       },
       "permissions": [
+        "CAMERA",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "RECORD_AUDIO",
+        "READ_CALENDAR",
+        "WRITE_CALENDAR",
+        "VIBRATE",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
         "CAMERA",
         "WRITE_EXTERNAL_STORAGE",
         "READ_EXTERNAL_STORAGE",
@@ -66,7 +77,8 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      "expo-calendar"
     ],
     "scheme": "rentitforward",
     "extra": {
@@ -75,8 +87,15 @@
       },
       "eas": {
         "projectId": "c79578fa-7070-423e-a29e-64877b598b60"
-      }
+      },
+      "sentryDsn": "https://3e77ab571d241b2c614f3b82b0cbcfd2@o4509959319453696.ingest.de.sentry.io/4509959409762384"
     },
-    "owner": "rentitforward"
+    "owner": "rentitforward",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/c79578fa-7070-423e-a29e-64877b598b60"
+    }
   }
 }

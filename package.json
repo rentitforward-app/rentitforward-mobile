@@ -42,6 +42,7 @@
     "expo-splash-screen": "~0.30.10",
     "expo-status-bar": "~2.2.3",
     "expo-system-ui": "~5.0.11",
+    "expo-updates": "~0.28.17",
     "graphql": "^16.11.0",
     "nativewind": "^2.0.11",
     "react": "19.0.0",
