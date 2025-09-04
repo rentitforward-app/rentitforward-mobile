@@ -18,7 +18,13 @@ export default function IndexScreen() {
         // DEVELOPMENT: Uncomment the line below to reset intro for testing
         // await AsyncStorage.removeItem(INTRO_SEEN_KEY);
         
-        const seen = await AsyncStorage.getItem(INTRO_SEEN_KEY);
+        // Add timeout for AsyncStorage operations in production
+        const storagePromise = AsyncStorage.getItem(INTRO_SEEN_KEY);
+        const timeoutPromise = new Promise<string | null>((resolve) => 
+          setTimeout(() => resolve(null), 3000)
+        );
+        
+        const seen = await Promise.race([storagePromise, timeoutPromise]);
         setIntroSeen(seen === 'true');
         console.log('Intro seen status:', seen);
       } catch (error) {

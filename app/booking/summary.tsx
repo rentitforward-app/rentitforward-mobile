@@ -89,11 +89,11 @@ export default function BookingSummaryScreen() {
 
   // Recalculate pricing
   const pricingBreakdown = listing ? {
-    dailyRate: listing.pricing?.basePrice || 0,
-    subtotal: totalDays * (listing.pricing?.basePrice || 0),
-    insuranceFee: bookingData.includeInsurance ? (totalDays * (listing.pricing?.basePrice || 0)) * 0.1 : 0,
-    deliveryFee: bookingData.deliveryOption === 'delivery' ? 25 : 0,
-    serviceFee: (totalDays * (listing.pricing?.basePrice || 0)) * 0.05, // 5% service fee
+    dailyRate: listing.price_per_day || 0,
+    subtotal: totalDays * (listing.price_per_day || 0),
+    insuranceFee: bookingData.includeInsurance ? (totalDays * (listing.price_per_day || 0)) * 0.10 : 0,
+    deliveryFee: bookingData.deliveryOption === 'delivery' ? 20 : 0, // Fixed to $20 like web
+    serviceFee: (totalDays * (listing.price_per_day || 0)) * 0.15, // 15% service fee to match web
     total: 0,
   } : null;
 
@@ -112,18 +112,19 @@ export default function BookingSummaryScreen() {
         .insert({
           listing_id: bookingData.listingId,
           renter_id: user?.id,
-          owner_id: listing?.ownerId,
+          owner_id: listing?.owner_id,
           start_date: bookingData.startDate,
           end_date: bookingData.endDate,
+          price_per_day: pricingBreakdown?.dailyRate || 0,
+          subtotal: pricingBreakdown?.subtotal || 0,
+          service_fee: pricingBreakdown?.serviceFee || 0,
+          insurance_fee: pricingBreakdown?.insuranceFee || 0,
+          delivery_fee: pricingBreakdown?.deliveryFee || 0,
           total_amount: pricingBreakdown?.total || 0,
-          delivery_option: bookingData.delivery?.method || 'pickup',
+          delivery_method: bookingData.delivery?.method || 'pickup',
           delivery_address: bookingData.delivery?.deliveryAddress,
-          include_insurance: includeInsurance === 'true',
-          special_requests: bookingData.specialRequests,
+          renter_message: bookingData.specialRequests,
           status: 'pending',
-          contact_phone: contactInfo.phone,
-          contact_email: contactInfo.email,
-          created_at: new Date().toISOString(),
         })
         .select()
         .single();
@@ -280,7 +281,7 @@ export default function BookingSummaryScreen() {
           </View>
 
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Service fee (5%)</Text>
+            <Text style={styles.priceLabel}>Service fee (15%)</Text>
             <Text style={styles.priceValue}>${pricingBreakdown.serviceFee.toFixed(2)}</Text>
           </View>
 

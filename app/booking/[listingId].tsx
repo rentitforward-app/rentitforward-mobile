@@ -60,6 +60,7 @@ export default function BookingScreen() {
   const [deliveryMethod, setDeliveryMethod] = useState('pickup');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
+  const [includeInsurance, setIncludeInsurance] = useState(false);
 
   useEffect(() => {
     fetchListingDetails();
@@ -303,25 +304,25 @@ export default function BookingScreen() {
   const calculatePricing = () => {
     if (!listing || !selectedDates.startDate || !selectedDates.endDate) {
       return {
-        rentalFee: 0,
+        subtotal: 0,
         serviceFee: 0,
-        damageProtection: 0,
+        insuranceFee: 0,
         deliveryFee: deliveryMethod === 'delivery' ? 20 : 0,
         total: 0,
       };
     }
 
     const duration = calculateDuration();
-    const rentalFee = listing.price_per_day * duration;
-    const serviceFee = rentalFee * 0.15; // 15% service fee
-    const damageProtection = rentalFee * 0.10; // 10% damage protection
+    const subtotal = listing.price_per_day * duration;
+    const serviceFee = subtotal * 0.15; // 15% service fee
+    const insuranceFee = includeInsurance ? subtotal * 0.10 : 0; // 10% insurance (optional)
     const deliveryFee = deliveryMethod === 'delivery' ? 20 : 0;
-    const total = rentalFee + serviceFee + damageProtection + deliveryFee;
+    const total = subtotal + serviceFee + insuranceFee + deliveryFee;
 
     return {
-      rentalFee,
+      subtotal,
       serviceFee,
-      damageProtection,
+      insuranceFee,
       deliveryFee,
       total,
     };
@@ -345,13 +346,15 @@ export default function BookingScreen() {
           owner_id: listing.profiles.id,
           start_date: selectedDates.startDate,
           end_date: selectedDates.endDate,
+          price_per_day: listing.price_per_day,
+          subtotal: pricing.subtotal,
+          service_fee: pricing.serviceFee,
+          insurance_fee: pricing.insuranceFee,
+          delivery_fee: pricing.deliveryFee,
           total_amount: pricing.total,
-          rental_fee: pricing.rentalFee,
-          platform_fee: pricing.serviceFee,
           delivery_method: deliveryMethod,
           delivery_address: deliveryMethod === 'delivery' ? deliveryAddress.trim() : null,
-          pickup_location: deliveryMethod === 'pickup' ? `${listing?.address || ''}, ${listing?.city || ''}, ${listing?.state || ''} ${listing?.postal_code || ''}`.trim() : null,
-          special_instructions: specialInstructions || null,
+          renter_message: specialInstructions || null,
           status: 'pending'
         })
         .select()
@@ -734,7 +737,7 @@ export default function BookingScreen() {
                     fontWeight: typography.weights.medium,
                     color: colors.text.primary
                   }}>
-                    ${pricing.rentalFee.toFixed(2)}
+                    ${pricing.subtotal.toFixed(2)}
                   </Text>
                 </View>
 
@@ -766,11 +769,71 @@ export default function BookingScreen() {
                   </Text>
                 </View>
 
-                <View style={{
-                  backgroundColor: colors.gray[50],
-                  borderRadius: 8,
-                  padding: spacing.sm
-                }}>
+                {/* Insurance Toggle */}
+                <TouchableOpacity
+                  onPress={() => setIncludeInsurance(!includeInsurance)}
+                  style={{
+                    backgroundColor: includeInsurance ? colors.primary.main + '10' : colors.gray[50],
+                    borderRadius: 8,
+                    padding: spacing.sm,
+                    borderWidth: 1,
+                    borderColor: includeInsurance ? colors.primary.main : colors.gray[200]
+                  }}
+                >
+                  <View style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <View style={{ flex: 1 }}>
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: spacing.xs
+                      }}>
+                        <View style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: 4,
+                          borderWidth: 2,
+                          borderColor: includeInsurance ? colors.primary.main : colors.gray[400],
+                          backgroundColor: includeInsurance ? colors.primary.main : colors.white,
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          {includeInsurance && (
+                            <Ionicons name="checkmark" size={12} color={colors.white} />
+                          )}
+                        </View>
+                        <Text style={{
+                          fontSize: typography.sizes.base,
+                          color: colors.text.primary,
+                          fontWeight: typography.weights.medium
+                        }}>
+                          Damage Protection
+                        </Text>
+                      </View>
+                      <Text style={{
+                        fontSize: typography.sizes.sm,
+                        color: colors.text.secondary,
+                        marginTop: spacing.xs,
+                        marginLeft: 28
+                      }}>
+                        10% of rental fee - Optional coverage
+                      </Text>
+                    </View>
+                    <Text style={{
+                      fontSize: typography.sizes.base,
+                      fontWeight: typography.weights.medium,
+                      color: includeInsurance ? colors.primary.main : colors.text.secondary
+                    }}>
+                      ${pricing.insuranceFee.toFixed(2)}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Delivery Fee */}
+                {deliveryMethod === 'delivery' && (
                   <View style={{
                     flexDirection: 'row',
                     justifyContent: 'space-between',
@@ -781,13 +844,13 @@ export default function BookingScreen() {
                         fontSize: typography.sizes.base,
                         color: colors.text.primary
                       }}>
-                        Protection fee
+                        Delivery fee
                       </Text>
                       <Text style={{
                         fontSize: typography.sizes.sm,
                         color: colors.text.secondary
                       }}>
-                        10% of rental fee
+                        Delivery service
                       </Text>
                     </View>
                     <Text style={{
@@ -795,10 +858,10 @@ export default function BookingScreen() {
                       fontWeight: typography.weights.medium,
                       color: colors.text.primary
                     }}>
-                      ${pricing.damageProtection.toFixed(2)}
+                      ${pricing.deliveryFee.toFixed(2)}
                     </Text>
                   </View>
-                </View>
+                )}
 
                 <View style={{
                   borderTopWidth: 1,
@@ -837,6 +900,8 @@ export default function BookingScreen() {
                   lineHeight: 16
                 }}>
                   • Service fee helps us run a safe and reliable platform{'\n'}
+                  {includeInsurance ? '• Insurance fee provides damage protection coverage\n' : ''}
+                  {deliveryMethod === 'delivery' ? '• Delivery fee covers transportation to your location\n' : ''}
                   • All prices are in AUD and include GST where applicable
                 </Text>
               </View>
@@ -955,6 +1020,36 @@ export default function BookingScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
+
+              {/* Delivery Address (if delivery selected) */}
+              {deliveryMethod === 'delivery' && (
+                <View style={{ marginBottom: spacing.md }}>
+                  <Text style={{
+                    fontSize: typography.sizes.base,
+                    fontWeight: typography.weights.medium,
+                    color: colors.text.primary,
+                    marginBottom: spacing.sm
+                  }}>
+                    Delivery Address
+                  </Text>
+                  <TextInput
+                    value={deliveryAddress}
+                    onChangeText={setDeliveryAddress}
+                    placeholder="Enter your delivery address..."
+                    multiline
+                    numberOfLines={2}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: colors.gray[300],
+                      borderRadius: 8,
+                      padding: spacing.sm,
+                      fontSize: typography.sizes.base,
+                      color: colors.text.primary,
+                      textAlignVertical: 'top'
+                    }}
+                  />
+                </View>
+              )}
 
               {/* Notes */}
               <View>

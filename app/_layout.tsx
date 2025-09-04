@@ -1,10 +1,11 @@
 import React from 'react';
 import { Stack } from 'expo-router';
-import { AuthProvider } from '../src/components/AuthProvider';
+import { AuthProvider, useAuth } from '../src/components/AuthProvider';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '../src/lib/query-client';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SplashScreenManager } from '../src/components/SplashScreenManager';
 
 // Suppress Text component warnings in development mode
 if (__DEV__) {
@@ -22,12 +23,16 @@ if (__DEV__) {
 }
 
 function RootLayoutNav() {
+  const { loading } = useAuth();
+  
   return (
-    <Stack>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-    </Stack>
+    <SplashScreenManager isReady={!loading}>
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+      </Stack>
+    </SplashScreenManager>
   );
 }
 

@@ -1,11 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { Alert } from 'react-native';
-import { SplashScreen, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { AuthContextType, AuthState, Profile } from '../types/auth';
-
-SplashScreen.preventAutoHideAsync();
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -46,7 +44,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const initializeAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        // Add timeout for production builds to prevent hanging
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session timeout')), 10000)
+        );
+        
+        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
         
         if (mounted) {
           if (session?.user) {
@@ -67,12 +71,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } catch (error) {
+        console.error('Auth initialization error:', error);
         if (mounted) {
           setState({
             user: null,
             profile: null,
             loading: false,
-            error: 'Failed to initialize authentication',
+            error: null, // Don't show error to user, just proceed as unauthenticated
           });
         }
       }
@@ -115,17 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [isSigningOut]);
 
-  useEffect(() => {
-    if (!state.loading) {
-      // Use setTimeout to ensure the splash screen hides properly
-      setTimeout(() => {
-        SplashScreen.hideAsync().catch(() => {
-          // Splash screen was already hidden or couldn't be hidden
-          // This is not a critical error
-        });
-      }, 100);
-    }
-  }, [state.loading]);
+  // Splash screen is now managed by SplashScreenManager in _layout.tsx
 
   const signIn = async (email: string, password: string) => {
     try {

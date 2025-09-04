@@ -33,6 +33,7 @@
         "ORG_GRADLE_JAVA_HOME": "/usr/lib/jvm/java-17-openjdk-amd64",
         "JAVA_TOOLCHAIN_VERSION": "17"
       },
+      "channel": "production",
       "ios": {
         "distribution": "store"
       },

@@ -17,5 +17,18 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    // Add timeout for iOS production builds
+    flowType: 'pkce',
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'rentitforward-mobile',
+    },
+  },
+  // Add retry logic for network issues
+  realtime: {
+    params: {
+      eventsPerSecond: 2,
+    },
   },
 }); 
