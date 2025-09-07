@@ -133,6 +133,7 @@ export default function CreateScreen() {
     condition: '',
     brand: '',
     model: '',
+    year: '',
     price_per_day: '',
     price_weekly: '',
     deposit: '',
@@ -142,11 +143,13 @@ export default function CreateScreen() {
     city: '',
     state: '',
     postal_code: '',
+    features: [],
   });
 
   const [categories, setCategories] = useState([]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showConditionModal, setShowConditionModal] = useState(false);
+  const [newFeature, setNewFeature] = useState('');
 
   // Load categories from database
   useEffect(() => {
@@ -242,6 +245,23 @@ export default function CreateScreen() {
     }));
   };
 
+  const addFeature = () => {
+    if (newFeature.trim() && !formData.features.includes(newFeature.trim())) {
+      setFormData(prev => ({
+        ...prev,
+        features: [...prev.features, newFeature.trim()]
+      }));
+      setNewFeature('');
+    }
+  };
+
+  const removeFeature = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      features: prev.features.filter((_, i) => i !== index)
+    }));
+  };
+
   const uploadImages = async (listingId) => {
     const uploadedUrls = [];
     
@@ -311,6 +331,7 @@ export default function CreateScreen() {
           condition: formData.condition,
           brand: formData.brand || null,
           model: formData.model || null,
+          year: formData.year ? parseInt(formData.year) : null,
           price_per_day: parseFloat(formData.price_per_day),
           price_weekly: formData.price_weekly ? parseFloat(formData.price_weekly) : null,
           deposit: formData.deposit ? parseFloat(formData.deposit) : null,
@@ -324,6 +345,7 @@ export default function CreateScreen() {
           owner_id: user.id,
           is_active: true,
           location: locationPoint,
+          features: formData.features.length > 0 ? formData.features : null,
         })
         .select()
         .single();
@@ -345,6 +367,7 @@ export default function CreateScreen() {
             condition: '',
             brand: '',
             model: '',
+            year: '',
             price_per_day: '',
             price_weekly: '',
             deposit: '',
@@ -354,6 +377,7 @@ export default function CreateScreen() {
             city: '',
             state: '',
             postal_code: '',
+            features: [],
           });
           setCurrentStep(1);
         }}
@@ -554,6 +578,67 @@ export default function CreateScreen() {
             placeholder="e.g., EOS R5"
           />
         </View>
+      </View>
+
+      {/* Year */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Year</Text>
+        <TextInput
+          style={styles.textInput}
+          value={formData.year}
+          onChangeText={(text) => setFormData(prev => ({ ...prev, year: text }))}
+          placeholder="e.g., 2023"
+          keyboardType="numeric"
+          maxLength={4}
+        />
+      </View>
+
+      {/* Features */}
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Features</Text>
+        <Text style={styles.helper}>Add specific features that make your item special (optional)</Text>
+        
+        {/* Add Feature Input */}
+        <View style={styles.featureInputContainer}>
+          <TextInput
+            style={[styles.textInput, { flex: 1, marginRight: 10 }]}
+            value={newFeature}
+            onChangeText={setNewFeature}
+            placeholder="e.g. Turbocharged engine, Premium audio"
+            onSubmitEditing={addFeature}
+          />
+          <TouchableOpacity
+            style={styles.addFeatureButton}
+            onPress={addFeature}
+            disabled={!newFeature.trim() || formData.features.includes(newFeature.trim())}
+          >
+            <Text style={styles.addFeatureButtonText}>Add</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Features List */}
+        {formData.features.length > 0 && (
+          <View style={styles.featuresList}>
+            {formData.features.map((feature, index) => (
+              <View key={index} style={styles.featureItem}>
+                <View style={styles.featureDot} />
+                <Text style={styles.featureText}>{feature}</Text>
+                <TouchableOpacity
+                  style={styles.removeFeatureButton}
+                  onPress={() => removeFeature(index)}
+                >
+                  <Ionicons name="close-circle" size={20} color="#FF4444" />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {formData.features.length === 0 && (
+          <Text style={styles.helper}>
+            No features added yet. Features help renters understand what makes your item special.
+          </Text>
+        )}
       </View>
     </View>
   );
@@ -1047,5 +1132,51 @@ const styles = StyleSheet.create({
     color: '#FF4444',
     fontSize: 12,
     marginTop: 8,
+  },
+  featureInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  addFeatureButton: {
+    backgroundColor: colors.primary.main,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    opacity: 0.7,
+  },
+  addFeatureButtonText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  featuresList: {
+    marginTop: 8,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  featureDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary.main,
+    marginRight: 8,
+  },
+  featureText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#166534',
+  },
+  removeFeatureButton: {
+    marginLeft: 8,
   },
 }); 
