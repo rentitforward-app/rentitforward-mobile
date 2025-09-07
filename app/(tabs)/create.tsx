@@ -384,7 +384,7 @@ export default function CreateScreen() {
   const isStepValid = () => {
     switch (currentStep) {
       case 1:
-        return formData.images.length >= 3 && formData.title && formData.description && formData.category && formData.condition && formData.brand && formData.model;
+        return formData.images.length >= 3 && formData.title && formData.description && formData.category && formData.condition;
       case 2:
         return formData.price_per_day;
       case 3:
@@ -536,7 +536,7 @@ export default function CreateScreen() {
       {/* Brand & Model */}
       <View style={styles.inputRow}>
         <View style={[styles.inputGroup, { flex: 1, marginRight: 10 }]}>
-          <Text style={styles.label}>Brand *</Text>
+          <Text style={styles.label}>Brand</Text>
           <TextInput
             style={styles.textInput}
             value={formData.brand}
@@ -546,7 +546,7 @@ export default function CreateScreen() {
         </View>
         
         <View style={[styles.inputGroup, { flex: 1, marginLeft: 10 }]}>
-          <Text style={styles.label}>Model *</Text>
+          <Text style={styles.label}>Model</Text>
           <TextInput
             style={styles.textInput}
             value={formData.model}
