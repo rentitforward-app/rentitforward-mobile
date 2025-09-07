@@ -1,378 +1,292 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
   FlatList,
-  Dimensions,
-  TextInput,
-  Alert,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+  Image,
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { useAuthStore } from '../../src/stores/auth';
+import { useRouter } from 'expo-router';
 import { supabase } from '../../src/lib/supabase';
-import type { Booking } from '@shared/types/booking';
+import { useAuth } from '../../src/components/AuthProvider';
 import { colors, spacing, typography } from '../../src/lib/design-system';
 
-type UserRole = 'renter' | 'owner';
-type BookingStatus = 'pending' | 'pending_payment' | 'confirmed' | 'active' | 'completed' | 'cancelled' | 'rejected' | 'disputed' | 'refunded';
-
-interface BookingTabData {
-  key: UserRole;
+interface Booking {
+  id: string;
+  status: string;
+  start_date: string;
+  end_date: string;
+  total_amount?: number;
+  subtotal?: number;
+  total_price?: number; // Keep for backward compatibility
+  renter_id: string;
+  owner_id: string;
+  listing: {
+    id: string;
   title: string;
-  count: number;
+    images: string[];
+    price_per_day: number;
+    category: string;
+  };
+  otherUser: {
+    id: string;
+    full_name: string;
+    email: string;
+    avatar_url?: string;
+  };
+  userRole: 'owner' | 'renter';
 }
 
-interface StatsData {
-  total: number;
-  pending: number;
-  active: number;
-  completed: number;
-  cancelled: number;
+interface Profile {
+  id: string;
+  full_name: string;
+  email: string;
+  phone_number?: string;
+  avatar_url?: string;
 }
+
+const statusColors = {
+  pending: { bg: '#fef3c7', text: '#d97706' },
+  confirmed: { bg: '#d1fae5', text: '#065f46' },
+  active: { bg: '#dbeafe', text: '#1e40af' },
+  completed: { bg: '#e0e7ff', text: '#4338ca' },
+  cancelled: { bg: '#fee2e2', text: '#dc2626' },
+  payment_required: { bg: '#fef3c7', text: '#d97706' },
+};
 
 export default function BookingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<UserRole>('renter');
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [dateSort, setDateSort] = useState<'newest' | 'oldest'>('newest');
-  const scrollViewRef = useRef<ScrollView>(null);
 
-  // Fetch user bookings
-  const { data: allBookings = [], isLoading, refetch } = useQuery({
-    queryKey: ['user-bookings', user?.id],
+  // Clean console log without infinite loop
+  console.log('BOOKINGS - User:', user ? user.email : 'No user');
+
+  // Fetch bookings with simplified, working query
+  const { data: allBookings = [], isLoading, refetch, error } = useQuery({
+    queryKey: ['bookings', user?.id],
     queryFn: async () => {
-      if (!user?.id) return [];
-      
-      const [renterBookingsResult, ownerBookingsResult] = await Promise.all([
-        // Bookings where user is the renter
-        supabase
-          .from('bookings')
-          .select(`
-            *,
-            listing:listings(*),
-            owner:profiles!bookings_owner_id_fkey(*)
-          `)
-          .eq('renter_id', user.id)
-          .order('created_at', { ascending: false }),
-        
-        // Bookings where user is the owner
-        supabase
-          .from('bookings')
-          .select(`
-            *,
-            listing:listings(*),
-            renter:profiles!bookings_renter_id_fkey(*)
-          `)
-          .eq('owner_id', user.id)
-          .order('created_at', { ascending: false })
-      ]);
-
-      const renterBookings = renterBookingsResult.data || [];
-      const ownerBookings = ownerBookingsResult.data || [];
-      
-      if (renterBookingsResult.error || ownerBookingsResult.error) {
-        throw renterBookingsResult.error || ownerBookingsResult.error;
+      if (!user?.id) {
+        console.log('BOOKINGS - No user ID, returning empty array');
+        return [];
       }
 
-      // Transform and combine bookings
-      const transformedBookings = [
-        ...renterBookings.map(booking => ({
-          ...booking,
-          userRole: 'renter' as const,
-          otherUser: booking.owner,
-        })),
-        ...ownerBookings.map(booking => ({
-          ...booking,
-          userRole: 'owner' as const,
-          otherUser: booking.renter,
-        }))
-      ];
+      console.log('BOOKINGS - Fetching for user:', user.id);
 
+      // Fetch all bookings for this user
+      const { data: allUserBookings, error: bookingsError } = await supabase
+          .from('bookings')
+          .select(`
+            *,
+          listings (
+            id,
+            title,
+            images,
+            price_per_day,
+            category,
+            owner_id
+          )
+        `)
+        .or(`renter_id.eq.${user.id},owner_id.eq.${user.id}`)
+        .neq('status', 'expired')
+        .order('created_at', { ascending: false });
+
+      if (bookingsError) {
+        console.error('BOOKINGS - Error fetching bookings:', bookingsError);
+        throw bookingsError;
+      }
+
+      console.log('BOOKINGS - Raw bookings:', allUserBookings?.length || 0);
+
+      if (!allUserBookings || allUserBookings.length === 0) {
+        return [];
+      }
+
+      // Get all unique user IDs
+      const userIds = new Set<string>();
+      allUserBookings.forEach(booking => {
+        if (booking.owner_id) userIds.add(booking.owner_id);
+        if (booking.renter_id) userIds.add(booking.renter_id);
+        if (booking.listings?.owner_id) userIds.add(booking.listings.owner_id);
+      });
+
+      // Fetch profiles
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, phone_number, avatar_url')
+        .in('id', Array.from(userIds));
+
+      console.log('BOOKINGS - Profiles fetched:', profiles?.length || 0);
+
+      // Create profiles map
+      const profilesMap: { [key: string]: Profile } = {};
+      profiles?.forEach(profile => {
+        profilesMap[profile.id] = profile;
+      });
+
+      // Transform bookings
+      const transformedBookings = allUserBookings
+        .filter(booking => booking.listings !== null)
+        .map(booking => {
+          const isOwnerBooking = booking.owner_id === user.id;
+          const otherUserId = isOwnerBooking ? booking.renter_id : booking.owner_id;
+          const otherUser = profilesMap[otherUserId] || profilesMap[booking.listings?.owner_id] || {
+            id: otherUserId,
+            full_name: 'Unknown User',
+            email: 'unknown@example.com'
+          };
+
+          return {
+          ...booking,
+            userRole: isOwnerBooking ? 'owner' : 'renter',
+            listing: {
+              id: booking.listings.id,
+              title: booking.listings.title,
+              images: booking.listings.images || [],
+              price_per_day: booking.listings.price_per_day,
+              category: booking.listings.category,
+            },
+            otherUser,
+          };
+        });
+
+      console.log('BOOKINGS - Transformed bookings:', transformedBookings.length);
       return transformedBookings;
     },
     enabled: !!user?.id,
+    staleTime: 30000, // 30 seconds
   });
 
-  // Filter bookings by active tab and search
-  const filteredBookings = allBookings.filter(booking => {
-    // Filter by user role
-    if (booking.userRole !== activeTab) return false;
+  // Filter bookings based on active tab
+  const filteredBookings = useMemo(() => {
+    if (activeTab === 'all') return allBookings;
+    if (activeTab === 'renter') return allBookings.filter(booking => booking.userRole === 'renter');
+    if (activeTab === 'owner') return allBookings.filter(booking => booking.userRole === 'owner');
+    return allBookings;
+  }, [allBookings, activeTab]);
+
+  // Calculate stats
+  const stats = useMemo(() => {
+    const total = allBookings.length;
+    const asRenter = allBookings.filter(booking => booking.userRole === 'renter').length;
+    const asOwner = allBookings.filter(booking => booking.userRole === 'owner').length;
+    const active = allBookings.filter(booking => ['confirmed', 'active'].includes(booking.status)).length;
     
-    // Filter by status
-    if (statusFilter !== 'all' && booking.status !== statusFilter) return false;
-    
-    // Filter by search term
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      const listingTitle = booking.listing?.title?.toLowerCase() || '';
-      const otherUserName = booking.otherUser?.full_name?.toLowerCase() || '';
-      return listingTitle.includes(searchLower) || otherUserName.includes(searchLower);
-    }
-    
-    return true;
-  });
+    return { total, asRenter, asOwner, active };
+  }, [allBookings]);
 
-  // Sort bookings
-  const sortedBookings = [...filteredBookings].sort((a, b) => {
-    const dateA = new Date(a.created_at).getTime();
-    const dateB = new Date(b.created_at).getTime();
-    return dateSort === 'newest' ? dateB - dateA : dateA - dateB;
-  });
-
-  // Calculate stats for active tab
-  const calculateStats = (): StatsData => {
-    const tabBookings = allBookings.filter(booking => booking.userRole === activeTab);
-    return {
-      total: tabBookings.length,
-      pending: tabBookings.filter(b => b.status === 'pending').length,
-      active: tabBookings.filter(b => b.status === 'confirmed' || b.status === 'active').length,
-      completed: tabBookings.filter(b => b.status === 'completed').length,
-      cancelled: tabBookings.filter(b => b.status === 'cancelled' || b.status === 'rejected').length,
-    };
-  };
-
-  const stats = calculateStats();
-
-  // Tab configuration
-  const tabs: BookingTabData[] = [
-    { key: 'renter', title: "I'm Renting", count: allBookings.filter(b => b.userRole === 'renter').length },
-    { key: 'owner', title: 'My Items', count: allBookings.filter(b => b.userRole === 'owner').length },
-  ];
-
-  // Handle refresh
-  const onRefresh = async () => {
+  const handleRefresh = async () => {
     setRefreshing(true);
     await refetch();
     setRefreshing(false);
   };
 
-  // Format date
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-AU', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
+  const renderStatCard = (title: string, value: number, isActive: boolean = false, filterType?: 'all' | 'renter' | 'owner') => (
+    <TouchableOpacity 
+      style={[styles.statCard, isActive && styles.activeStatCard]} 
+      onPress={() => filterType && setActiveTab(filterType)}
+      activeOpacity={0.7}
+    >
+      <Text style={[styles.statValue, isActive && styles.activeStatValue]}>{value}</Text>
+      <Text style={[styles.statLabel, isActive && styles.activeStatLabel]}>{title}</Text>
+    </TouchableOpacity>
+  );
+
+
+  const renderBookingCard = ({ item: booking }: { item: Booking }) => {
+    const statusColor = statusColors[booking.status as keyof typeof statusColors] || statusColors.pending;
+    const imageUri = booking.listing.images?.[0] || 'https://via.placeholder.com/100';
+    
+    // Debug price data
+    console.log('BOOKING PRICE DEBUG:', {
+      id: booking.id,
+      total_amount: booking.total_amount,
+      subtotal: booking.subtotal,
+      total_price: booking.total_price,
+      price_per_day: booking.listing.price_per_day
     });
-  };
-
-  // Format price
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-AU', {
-      style: 'currency',
-      currency: 'AUD'
-    }).format(price);
-  };
-
-  // Get status badge props
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return { color: '#f59e0b', backgroundColor: '#fef3c7', text: 'Pending' };
-      case 'pending_payment':
-        return { color: '#8b5cf6', backgroundColor: '#f3e8ff', text: 'Payment Required' };
-      case 'confirmed':
-        return { color: '#3b82f6', backgroundColor: '#dbeafe', text: 'Confirmed' };
-      case 'active':
-        return { color: '#10b981', backgroundColor: '#d1fae5', text: 'Active' };
-      case 'completed':
-        return { color: '#6b7280', backgroundColor: '#f3f4f6', text: 'Completed' };
-      case 'cancelled':
-      case 'rejected':
-        return { color: '#ef4444', backgroundColor: '#fee2e2', text: 'Cancelled' };
-      case 'disputed':
-        return { color: '#f97316', backgroundColor: '#fed7aa', text: 'Disputed' };
-      default:
-        return { color: '#6b7280', backgroundColor: '#f3f4f6', text: 'Unknown' };
-    }
-  };
-
-  // Update booking status
-  const updateBookingStatus = async (bookingId: string, newStatus: string) => {
-    try {
-      const { error } = await supabase
-        .from('bookings')
-        .update({ 
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', bookingId);
-
-      if (error) throw error;
-
-      await refetch();
-      Alert.alert('Success', `Booking ${newStatus === 'confirmed' ? 'accepted' : 'declined'} successfully!`);
-    } catch (error) {
-      console.error('Failed to update booking status:', error);
-      Alert.alert('Error', 'Failed to update booking status. Please try again.');
-    }
-  };
-
-  // Render booking card
-  const renderBookingCard = ({ item: booking }: { item: any }) => {
-    const statusBadge = getStatusBadge(booking.status);
-    const isRenter = booking.userRole === 'renter';
-    const otherUser = booking.otherUser || { full_name: 'Unknown User' };
 
     return (
       <TouchableOpacity
         style={styles.bookingCard}
         onPress={() => router.push(`/bookings/${booking.id}`)}
       >
-        {/* Header with image and basic info */}
-        <View style={styles.cardHeader}>
-          <View style={styles.cardImageContainer}>
-            <View style={styles.cardImage}>
-              <Text style={styles.cardImageText}>📦</Text>
-            </View>
-          </View>
-          
-          <View style={styles.cardHeaderContent}>
-            <View style={styles.cardTitleRow}>
-              <Text style={styles.cardTitle} numberOfLines={1}>
-                {booking.listing?.title || 'Unknown Item'}
+        <Image source={{ uri: imageUri }} style={styles.bookingImage} />
+        
+        <View style={styles.bookingContent}>
+          <View style={styles.bookingHeader}>
+            <Text style={styles.bookingTitle} numberOfLines={1}>
+              {booking.listing.title}
               </Text>
-              <View style={[styles.statusBadge, { backgroundColor: statusBadge.backgroundColor }]}>
-                <Text style={[styles.statusText, { color: statusBadge.color }]}>
-                  {statusBadge.text}
-                </Text>
-              </View>
-            </View>
-            
-            <View style={styles.cardMeta}>
-              <Text style={styles.cardMetaText}>
-                {formatDate(booking.start_date)} - {formatDate(booking.end_date)}
+            <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
+              <Text style={[styles.statusText, { color: statusColor.text }]}>
+                {booking.status.toUpperCase()}
               </Text>
-              <Text style={styles.cardMetaText}>
-                {formatPrice(booking.total_amount || 0)}
-              </Text>
-            </View>
           </View>
         </View>
 
-        {/* Other user info */}
-        <View style={styles.cardUser}>
-          <View style={styles.userAvatar}>
-            <Text style={styles.userAvatarText}>
-              {otherUser.full_name?.charAt(0) || 'U'}
+          <Text style={styles.bookingRole}>
+            {booking.userRole === 'owner' ? 'Renting to' : 'Renting from'}: {booking.otherUser.full_name}
             </Text>
-          </View>
-          <Text style={styles.userName}>
-            {isRenter ? 'Owner' : 'Renter'}: {otherUser.full_name || 'Unknown User'}
+
+          <Text style={styles.bookingDates}>
+            {new Date(booking.start_date).toLocaleDateString()} - {new Date(booking.end_date).toLocaleDateString()}
           </Text>
-        </View>
 
-        {/* Role badge */}
-        <View style={styles.cardRole}>
-          <Text style={styles.cardRoleText}>
-            {isRenter ? '📦 I\'m Renting' : '🏠 My Item'}
+          <Text style={styles.bookingPrice}>
+            ${booking.total_amount?.toFixed(2) || booking.subtotal?.toFixed(2) || '0.00'}
           </Text>
-        </View>
-
-        {/* Actions */}
-        <View style={styles.cardActions}>
-          {/* Owner actions for pending bookings */}
-          {booking.userRole === 'owner' && booking.status === 'pending' && (
-            <View style={styles.actionButtons}>
-              <TouchableOpacity 
-                style={styles.acceptButton}
-                onPress={() => updateBookingStatus(booking.id, 'confirmed')}
-              >
-                <Text style={styles.acceptButtonText}>Accept</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.declineButton}
-                onPress={() => updateBookingStatus(booking.id, 'rejected')}
-              >
-                <Text style={styles.declineButtonText}>Decline</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Renter cancel option for pending bookings */}
-          {booking.userRole === 'renter' && booking.status === 'pending' && (
-            <TouchableOpacity 
-              style={styles.cancelButton}
-              onPress={() => {
-                Alert.alert(
-                  'Cancel Booking',
-                  'Are you sure you want to cancel this booking request?',
-                  [
-                    { text: 'No', style: 'cancel' },
-                    { text: 'Yes', onPress: () => updateBookingStatus(booking.id, 'cancelled') }
-                  ]
-                );
-              }}
-            >
-              <Text style={styles.cancelButtonText}>Cancel Request</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Common actions */}
-          <View style={styles.commonActions}>
-            <TouchableOpacity 
-              style={styles.messageButton}
-              onPress={() => router.push(`/conversations/${booking.otherUser?.id}`)}
-            >
-              <Text style={styles.messageButtonText}>💬 Message</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.detailsButton}
-              onPress={() => router.push(`/bookings/${booking.id}`)}
-            >
-              <Text style={styles.detailsButtonText}>👁️ Details</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </TouchableOpacity>
     );
   };
 
-  // Render empty state
-  const renderEmptyState = () => {
-    const emptyMessages = {
-      renter: {
-        title: 'No bookings found',
-        description: "You haven't made any bookings yet. Start exploring items to rent!",
-        action: 'Browse Items',
-        onPress: () => router.push('/(tabs)/browse'),
-      },
-      owner: {
-        title: 'No booking requests',
-        description: 'Booking requests for your items will appear here',
-        action: 'Browse Items',
-        onPress: () => router.push('/(tabs)/browse'),
-      },
-    };
-
-    const message = emptyMessages[activeTab];
-
-    return (
-      <View style={styles.emptyState}>
-        <Text style={styles.emptyTitle}>{message.title}</Text>
-        <Text style={styles.emptyDescription}>{message.description}</Text>
-        <TouchableOpacity style={styles.emptyAction} onPress={message.onPress}>
-          <Text style={styles.emptyActionText}>{message.action}</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  if (isLoading) {
+  if (!user) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading your bookings...</Text>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>My Bookings</Text>
+        </View>
+        <View style={styles.centerContent}>
+          <Text style={styles.notLoggedInText}>Please log in to view your bookings</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (isLoading && !refreshing) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>My Bookings</Text>
+        </View>
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={colors.primary?.main || '#44d62c'} />
+          <Text style={styles.loadingText}>Loading bookings...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>My Bookings</Text>
+        </View>
+        <View style={styles.centerContent}>
+          <Text style={styles.errorText}>Error loading bookings</Text>
+          <TouchableOpacity onPress={() => refetch()} style={styles.retryButton}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -383,196 +297,47 @@ export default function BookingsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Bookings</Text>
-        <Text style={styles.headerSubtitle}>Track items you're renting and booking requests for your items</Text>
       </View>
 
-      {/* Tabs */}
-      <View style={styles.tabContainer}>
-        {tabs.map((tab) => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[
-              styles.tab,
-              activeTab === tab.key && styles.activeTab,
-            ]}
-            onPress={() => setActiveTab(tab.key)}
-          >
-            <Text style={[
-              styles.tabText,
-              activeTab === tab.key && styles.activeTabText,
-            ]}>
-              {tab.title}
+      {/* Stats Section */}
+      <View style={styles.statsContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.statsContent}>
+          {renderStatCard('Total', stats.total, activeTab === 'all', 'all')}
+          {renderStatCard('As Renter', stats.asRenter, activeTab === 'renter', 'renter')}
+          {renderStatCard('As Owner', stats.asOwner, activeTab === 'owner', 'owner')}
+          {renderStatCard('Active', stats.active, false)}
+        </ScrollView>
+      </View>
+
+
+      {/* Bookings List */}
+      <View style={styles.listWrapper}>
+        {filteredBookings.length === 0 ? (
+          <View style={styles.centerContent}>
+            <Text style={styles.emptyText}>
+              {activeTab === 'all' ? 'No bookings found' : 
+               activeTab === 'renter' ? 'No bookings as renter' : 
+               'No bookings as owner'}
             </Text>
-            {tab.count > 0 && (
-              <View style={[
-                styles.tabBadge,
-                activeTab === tab.key && styles.activeTabBadge,
-              ]}>
-                <Text style={[
-                  styles.tabBadgeText,
-                  activeTab === tab.key && styles.activeTabBadgeText,
-                ]}>
-                  {tab.count}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Stats Cards */}
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        style={styles.statsContainer}
-        contentContainerStyle={styles.statsContent}
-      >
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.total}</Text>
-          <Text style={styles.statLabel}>Total</Text>
         </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.pending}</Text>
-          <Text style={styles.statLabel}>Pending</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.active}</Text>
-          <Text style={styles.statLabel}>Active</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.completed}</Text>
-          <Text style={styles.statLabel}>Completed</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.cancelled}</Text>
-          <Text style={styles.statLabel}>Cancelled</Text>
-        </View>
-      </ScrollView>
-
-      {/* Search and Filters */}
-      <View style={styles.filtersContainer}>
-        <View style={styles.searchContainer}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search bookings..."
-            value={searchTerm}
-            onChangeText={setSearchTerm}
-          />
-        </View>
-        
-        <View style={styles.filterRow}>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            style={styles.statusFilterContainer}
-          >
-            <TouchableOpacity
-              style={[
-                styles.statusFilter,
-                statusFilter === 'all' && styles.activeStatusFilter,
-              ]}
-              onPress={() => setStatusFilter('all')}
-            >
-              <Text style={[
-                styles.statusFilterText,
-                statusFilter === 'all' && styles.activeStatusFilterText,
-              ]}>
-                All
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.statusFilter,
-                statusFilter === 'pending' && styles.activeStatusFilter,
-              ]}
-              onPress={() => setStatusFilter('pending')}
-            >
-              <Text style={[
-                styles.statusFilterText,
-                statusFilter === 'pending' && styles.activeStatusFilterText,
-              ]}>
-                Pending
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.statusFilter,
-                statusFilter === 'confirmed' && styles.activeStatusFilter,
-              ]}
-              onPress={() => setStatusFilter('confirmed')}
-            >
-              <Text style={[
-                styles.statusFilterText,
-                statusFilter === 'confirmed' && styles.activeStatusFilterText,
-              ]}>
-                Confirmed
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.statusFilter,
-                statusFilter === 'active' && styles.activeStatusFilter,
-              ]}
-              onPress={() => setStatusFilter('active')}
-            >
-              <Text style={[
-                styles.statusFilterText,
-                statusFilter === 'active' && styles.activeStatusFilterText,
-              ]}>
-                Active
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.statusFilter,
-                statusFilter === 'completed' && styles.activeStatusFilter,
-              ]}
-              onPress={() => setStatusFilter('completed')}
-            >
-              <Text style={[
-                styles.statusFilterText,
-                statusFilter === 'completed' && styles.activeStatusFilterText,
-              ]}>
-                Completed
-              </Text>
-            </TouchableOpacity>
-          </ScrollView>
-          
-          <TouchableOpacity
-            style={styles.sortButton}
-            onPress={() => setDateSort(dateSort === 'newest' ? 'oldest' : 'newest')}
-          >
-            <Text style={styles.sortButtonText}>
-              {dateSort === 'newest' ? 'Newest' : 'Oldest'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Results Summary */}
-      {sortedBookings.length > 0 && (
-        <View style={styles.resultsSummary}>
-          <Text style={styles.resultsText}>
-            Showing {sortedBookings.length} booking{sortedBookings.length !== 1 ? 's' : ''}
-          </Text>
-        </View>
-      )}
-
-      {/* Booking List */}
+        ) : (
       <FlatList
-        data={sortedBookings}
+            data={filteredBookings}
         renderItem={renderBookingCard}
         keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContainer}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        contentContainerStyle={[
-          styles.listContainer,
-          sortedBookings.length === 0 && styles.emptyListContainer,
-        ]}
-        ListEmptyComponent={renderEmptyState}
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                colors={[colors.primary?.main || '#44d62c']}
+              />
+            }
         showsVerticalScrollIndicator={false}
+            style={styles.flatList}
       />
+        )}
+      </View>
     </View>
   );
 }
@@ -580,372 +345,165 @@ export default function BookingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.neutral.lightGray,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: typography.sizes.base,
-    color: colors.text.secondary,
+    backgroundColor: colors?.gray?.[50] || '#f8fafc',
   },
   header: {
-    backgroundColor: colors.white,
-    padding: spacing.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing?.lg || 24,
+    paddingVertical: spacing?.md || 16,
+    backgroundColor: colors?.white || 'white',
     borderBottomWidth: 1,
-    borderBottomColor: colors.neutral.mediumGray,
+    borderBottomColor: colors?.gray?.[200] || '#e2e8f0',
   },
   headerTitle: {
-    fontSize: typography.sizes['2xl'],
-    fontWeight: typography.weights.semibold,
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
-  },
-  headerSubtitle: {
-    fontSize: typography.sizes.sm,
-    color: colors.text.secondary,
-  },
-  tabContainer: {
-    backgroundColor: colors.white,
-    flexDirection: 'row',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.neutral.mediumGray,
-  },
-  tab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    marginHorizontal: spacing.xs,
-    borderRadius: 8,
-    backgroundColor: colors.neutral.lightGray,
-  },
-  activeTab: {
-    backgroundColor: colors.primary.main,
-  },
-  tabText: {
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.medium,
-    color: colors.text.secondary,
-  },
-  activeTabText: {
-    color: colors.white,
-  },
-  tabBadge: {
-    marginLeft: spacing.xs,
-    backgroundColor: colors.neutral.mediumGray,
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-  },
-  activeTabBadge: {
-    backgroundColor: colors.white,
-  },
-  tabBadgeText: {
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.semibold,
-    color: colors.text.secondary,
-  },
-  activeTabBadgeText: {
-    color: colors.primary.main,
+    fontSize: typography?.sizes?.xl || 20,
+    fontWeight: typography?.weights?.bold || '700',
+    color: colors?.gray?.[900] || '#1a202c',
   },
   statsContainer: {
-    backgroundColor: colors.white,
-    paddingVertical: spacing.sm,
+    backgroundColor: colors?.white || 'white',
+    paddingVertical: spacing?.sm || 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors?.gray?.[200] || '#e2e8f0',
   },
   statsContent: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing?.md || 16,
+    gap: spacing?.sm || 8,
   },
   statCard: {
-    backgroundColor: colors.neutral.lightGray,
-    padding: spacing.md,
-    borderRadius: 12,
-    marginRight: spacing.sm,
-    minWidth: 80,
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: spacing?.md || 16,
+    paddingVertical: spacing?.sm || 8,
+    borderRadius: 8,
     alignItems: 'center',
+    minWidth: 80,
   },
-  statNumber: {
-    fontSize: typography.sizes['2xl'],
-    fontWeight: typography.weights.bold,
-    color: colors.text.primary,
+  activeStatCard: {
+    backgroundColor: colors?.primary?.main || '#44d62c',
+  },
+  statValue: {
+    fontSize: typography?.sizes?.lg || 18,
+    fontWeight: typography?.weights?.bold || '700',
+    color: colors?.text?.primary || '#1a202c',
+  },
+  activeStatValue: {
+    color: 'white',
   },
   statLabel: {
-    fontSize: typography.sizes.xs,
-    color: colors.text.secondary,
-    marginTop: spacing.xs,
+    fontSize: typography?.sizes?.xs || 12,
+    color: colors?.text?.secondary || '#64748b',
+    marginTop: 2,
   },
-  filtersContainer: {
-    backgroundColor: colors.white,
-    padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.neutral.mediumGray,
+  activeStatLabel: {
+    color: 'white',
   },
-  searchContainer: {
-    marginBottom: spacing.sm,
-  },
-  searchInput: {
-    backgroundColor: colors.neutral.lightGray,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: 8,
-    fontSize: typography.sizes.base,
-    color: colors.text.primary,
-  },
-  filterRow: {
-    flexDirection: 'row',
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: spacing?.md || 16,
+    minHeight: 200,
   },
-  statusFilterContainer: {
+  notLoggedInText: {
+    fontSize: typography?.sizes?.lg || 18,
+    color: colors?.text?.secondary || '#64748b',
+    textAlign: 'center',
+  },
+  loadingText: {
+    marginTop: spacing?.sm || 8,
+    fontSize: typography?.sizes?.base || 16,
+    color: colors?.text?.secondary || '#64748b',
+  },
+  errorText: {
+    fontSize: typography?.sizes?.lg || 18,
+    color: colors?.semantic?.error || '#ef4444',
+    textAlign: 'center',
+    marginBottom: spacing?.md || 16,
+  },
+  retryButton: {
+    backgroundColor: colors?.primary?.main || '#44d62c',
+    paddingHorizontal: spacing?.md || 16,
+    paddingVertical: spacing?.sm || 8,
+    borderRadius: 8,
+  },
+  retryText: {
+    color: 'white',
+    fontSize: typography?.sizes?.base || 16,
+    fontWeight: typography?.weights?.semibold || '600',
+  },
+  emptyText: {
+    fontSize: typography?.sizes?.lg || 18,
+    color: colors?.text?.secondary || '#64748b',
+    textAlign: 'center',
+  },
+  listWrapper: {
     flex: 1,
   },
-  statusFilter: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: 16,
-    marginRight: spacing.xs,
-    backgroundColor: colors.neutral.lightGray,
-  },
-  activeStatusFilter: {
-    backgroundColor: colors.primary.main,
-  },
-  statusFilterText: {
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.medium,
-    color: colors.text.secondary,
-  },
-  activeStatusFilterText: {
-    color: colors.white,
-  },
-  sortButton: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: 8,
-    backgroundColor: colors.neutral.lightGray,
-  },
-  sortButtonText: {
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.medium,
-    color: colors.text.secondary,
-  },
-  resultsSummary: {
-    backgroundColor: colors.white,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.neutral.mediumGray,
-  },
-  resultsText: {
-    fontSize: typography.sizes.sm,
-    color: colors.text.secondary,
+  flatList: {
+    flex: 1,
   },
   listContainer: {
-    padding: spacing.md,
-  },
-  emptyListContainer: {
-    flex: 1,
-    justifyContent: 'center',
+    padding: spacing?.md || 16,
   },
   bookingCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors?.white || 'white',
     borderRadius: 12,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.neutral.mediumGray,
-  },
-  cardHeader: {
+    marginBottom: spacing?.md || 16,
+    padding: spacing?.md || 16,
     flexDirection: 'row',
-    marginBottom: spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  cardImageContainer: {
-    marginRight: spacing.sm,
-  },
-  cardImage: {
-    width: 60,
-    height: 60,
-    backgroundColor: colors.neutral.lightGray,
+  bookingImage: {
+    width: 80,
+    height: 80,
     borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginRight: spacing?.md || 16,
   },
-  cardImageText: {
-    fontSize: 24,
-  },
-  cardHeaderContent: {
+  bookingContent: {
     flex: 1,
   },
-  cardTitleRow: {
+  bookingHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: spacing.xs,
+    marginBottom: spacing?.xs || 4,
   },
-  cardTitle: {
-    fontSize: typography.sizes.base,
-    fontWeight: typography.weights.semibold,
-    color: colors.text.primary,
+  bookingTitle: {
+    fontSize: typography?.sizes?.lg || 18,
+    fontWeight: typography?.weights?.semibold || '600',
+    color: colors?.text?.primary || '#1a202c',
     flex: 1,
-    marginRight: spacing.sm,
+    marginRight: spacing?.sm || 8,
   },
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingHorizontal: spacing?.sm || 8,
+    paddingVertical: spacing?.xs || 4,
+    borderRadius: 12,
   },
   statusText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: typography?.weights?.bold || '700',
+    textTransform: 'uppercase',
   },
-  cardMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  bookingRole: {
+    fontSize: typography?.sizes?.sm || 14,
+    color: colors?.text?.secondary || '#64748b',
+    marginBottom: spacing?.xs || 4,
   },
-  cardMetaText: {
-    fontSize: typography.sizes.sm,
-    color: colors.text.secondary,
+  bookingDates: {
+    fontSize: typography?.sizes?.sm || 14,
+    color: colors?.text?.secondary || '#64748b',
+    marginBottom: spacing?.xs || 4,
   },
-  cardUser: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-    padding: spacing.sm,
-    backgroundColor: colors.neutral.lightGray,
-    borderRadius: 8,
-  },
-  userAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primary.main,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.sm,
-  },
-  userAvatarText: {
-    color: colors.white,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold,
-  },
-  userName: {
-    fontSize: typography.sizes.sm,
-    color: colors.text.primary,
-    fontWeight: typography.weights.medium,
-  },
-  cardRole: {
-    marginBottom: spacing.sm,
-  },
-  cardRoleText: {
-    fontSize: typography.sizes.xs,
-    color: colors.text.secondary,
-    fontWeight: typography.weights.medium,
-  },
-  cardActions: {
-    borderTopWidth: 1,
-    borderTopColor: colors.neutral.mediumGray,
-    paddingTop: spacing.sm,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    marginBottom: spacing.sm,
-    gap: spacing.sm,
-  },
-  acceptButton: {
-    flex: 1,
-    backgroundColor: colors.primary.main,
-    paddingVertical: spacing.sm,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  acceptButtonText: {
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold,
-    color: colors.white,
-  },
-  declineButton: {
-    flex: 1,
-    backgroundColor: colors.neutral.lightGray,
-    paddingVertical: spacing.sm,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  declineButtonText: {
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold,
-    color: colors.text.secondary,
-  },
-  cancelButton: {
-    backgroundColor: colors.neutral.lightGray,
-    paddingVertical: spacing.sm,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  cancelButtonText: {
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold,
-    color: colors.text.secondary,
-  },
-  commonActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  messageButton: {
-    flex: 1,
-    backgroundColor: colors.neutral.lightGray,
-    paddingVertical: spacing.sm,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  messageButtonText: {
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.medium,
-    color: colors.text.secondary,
-  },
-  detailsButton: {
-    flex: 1,
-    backgroundColor: colors.neutral.lightGray,
-    paddingVertical: spacing.sm,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  detailsButtonText: {
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.medium,
-    color: colors.text.secondary,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 48,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: 8,
-  },
-  emptyDescription: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  emptyAction: {
-    backgroundColor: colors.primary.main,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: 8,
-  },
-  emptyActionText: {
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold,
-    color: colors.white,
+  bookingPrice: {
+    fontSize: typography?.sizes?.lg || 18,
+    fontWeight: typography?.weights?.bold || '700',
+    color: colors?.primary?.main || '#44d62c',
   },
 }); 
