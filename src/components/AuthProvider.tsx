@@ -18,6 +18,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
   const [isSigningOut, setIsSigningOut] = useState(false);
 
+  // Add a safety timeout to prevent infinite loading
+  useEffect(() => {
+    const safetyTimeout = setTimeout(() => {
+      if (state.loading) {
+        console.warn('Auth loading timeout - forcing loading to false');
+        addSentryBreadcrumb('Auth loading timeout triggered', 'auth', {
+          user: !!state.user,
+          profile: !!state.profile
+        });
+        setState(prev => ({ ...prev, loading: false }));
+      }
+    }, 12000); // 12 second safety timeout
+
+    return () => clearTimeout(safetyTimeout);
+  }, [state.loading, state.user, state.profile]);
+
   // Fetch user profile from database
   const fetchProfile = async (userId: string): Promise<Profile | null> => {
     try {
@@ -45,10 +61,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const initializeAuth = async () => {
       try {
-        // Add timeout for production builds to prevent hanging
+        // Use default session timeout to avoid interfering with Supabase's retry logic
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Session timeout')), 10000)
+          setTimeout(() => reject(new Error('Session timeout')), 8000) // Reduced to 8s to be more conservative
         );
         
         const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
@@ -95,6 +111,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             profile: null,
             loading: false,
             error: null, // Don't show error to user, just proceed as unauthenticated
+          });
+          
+          // Add Sentry breadcrumb for debugging
+          addSentryBreadcrumb('Auth initialization failed', 'auth', {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            platform: 'mobile'
           });
         }
       }
@@ -162,17 +184,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
-      const { error } = await supabase.auth.signInWithPassword({
+      addSentryBreadcrumb('Starting sign in process', 'auth', { email });
+      
+      // Add timeout to prevent hanging on network issues
+      const signInPromise = supabase.auth.signInWithPassword({
         email: email.toLowerCase().trim(),
         password,
       });
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Sign in timeout - please check your connection')), 10000)
+      );
+      
+      const { error } = await Promise.race([signInPromise, timeoutPromise]) as any;
 
       if (error) {
+        addSentryBreadcrumb('Sign in failed', 'auth', { 
+          email, 
+          error: error.message,
+          code: error.status 
+        });
         throw error;
       }
+      
+      addSentryBreadcrumb('Sign in successful', 'auth', { email });
+      
+      // Set loading to false after successful sign in
+      setState(prev => ({ ...prev, loading: false }));
     } catch (error: any) {
       setState(prev => ({ ...prev, loading: false, error: error.message }));
-      captureSentryException(error, { action: 'signIn', email });
+      captureSentryException(error, { action: 'signIn', email, platform: 'mobile' });
       Alert.alert('Sign In Error', error.message);
       throw error;
     }

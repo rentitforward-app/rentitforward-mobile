@@ -7,7 +7,6 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SplashScreenManager } from '../src/components/SplashScreenManager';
 import { initSentry } from '../src/lib/sentry';
-import { SentryTestButton } from '../src/components/SentryTestButton';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 
 // Initialize Sentry as early as possible
@@ -38,7 +37,6 @@ function RootLayoutNav() {
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="index" options={{ headerShown: false }} />
       </Stack>
-      <SentryTestButton />
     </SplashScreenManager>
   );
 }

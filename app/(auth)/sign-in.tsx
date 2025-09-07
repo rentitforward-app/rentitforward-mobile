@@ -53,7 +53,10 @@ export default function SignInScreen() {
 
     try {
       await signIn(email.trim(), password);
-      router.replace('/(tabs)');
+      // Navigate after successful sign in with a small delay to ensure state is updated
+      setTimeout(() => {
+        router.replace('/(tabs)');
+      }, 100);
     } catch (error) {
       // Error is already handled in AuthProvider
       console.error('Sign in error:', error);
