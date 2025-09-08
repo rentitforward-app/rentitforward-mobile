@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { supabase } from '../../src/lib/supabase';
@@ -51,6 +51,7 @@ const SORT_OPTIONS = [
 
 export default function BrowseScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { search, category } = useLocalSearchParams<{ search?: string; category?: string }>();
   const [listings, setListings] = useState<any[]>([]);
   const [filteredListings, setFilteredListings] = useState<any[]>([]);
@@ -299,8 +300,17 @@ export default function BrowseScreen() {
     const ownerName = item.profiles?.full_name || 'Unknown';
     const rating = item.profiles?.rating ? parseFloat(item.profiles.rating) : null;
     
+    const handleListingPress = () => {
+      // Navigate to listing details page
+      router.push(`/listing/${item.id}`);
+    };
+    
     return (
-      <TouchableOpacity style={styles.listingCard} activeOpacity={0.8}>
+      <TouchableOpacity 
+        style={styles.listingCard} 
+        activeOpacity={0.8}
+        onPress={handleListingPress}
+      >
         <View style={styles.imageContainer}>
           {mainImage ? (
             <Image source={{ uri: mainImage }} style={styles.listingImage} />

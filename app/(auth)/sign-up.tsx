@@ -12,6 +12,7 @@ import {
   Dimensions,
   Image,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/components/AuthProvider';
 import { mobileTokens } from '../../src/lib/design-system';
@@ -25,6 +26,8 @@ export default function SignUpScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<{
     fullName?: string;
     email?: string;
@@ -191,49 +194,75 @@ export default function SignUpScreen() {
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Password</Text>
-              <TextInput
-                ref={passwordInputRef}
-                style={[styles.input, errors.password && styles.inputError]}
-                value={password}
-                onChangeText={(text) => {
-                  setPassword(text);
-                  if (errors.password) {
-                    setErrors(prev => ({ ...prev, password: undefined }));
-                  }
-                }}
-                placeholder="Create a password"
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="next"
-                blurOnSubmit={false}
-                onSubmitEditing={handlePasswordSubmit}
-                editable={!loading}
-              />
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  ref={passwordInputRef}
+                  style={[styles.passwordInput, errors.password && styles.inputError]}
+                  value={password}
+                  onChangeText={(text) => {
+                    setPassword(text);
+                    if (errors.password) {
+                      setErrors(prev => ({ ...prev, password: undefined }));
+                    }
+                  }}
+                  placeholder="Create a password"
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                  onSubmitEditing={handlePasswordSubmit}
+                  editable={!loading}
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setShowPassword(!showPassword)}
+                  disabled={loading}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye-off' : 'eye'}
+                    size={20}
+                    color="#6B7280"
+                  />
+                </TouchableOpacity>
+              </View>
               {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Confirm Password</Text>
-              <TextInput
-                ref={confirmPasswordInputRef}
-                style={[styles.input, errors.confirmPassword && styles.inputError]}
-                value={confirmPassword}
-                onChangeText={(text) => {
-                  setConfirmPassword(text);
-                  if (errors.confirmPassword) {
-                    setErrors(prev => ({ ...prev, confirmPassword: undefined }));
-                  }
-                }}
-                placeholder="Confirm your password"
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="done"
-                blurOnSubmit={true}
-                onSubmitEditing={handleConfirmPasswordSubmit}
-                editable={!loading}
-              />
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  ref={confirmPasswordInputRef}
+                  style={[styles.passwordInput, errors.confirmPassword && styles.inputError]}
+                  value={confirmPassword}
+                  onChangeText={(text) => {
+                    setConfirmPassword(text);
+                    if (errors.confirmPassword) {
+                      setErrors(prev => ({ ...prev, confirmPassword: undefined }));
+                    }
+                  }}
+                  placeholder="Confirm your password"
+                  secureTextEntry={!showConfirmPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="done"
+                  blurOnSubmit={true}
+                  onSubmitEditing={handleConfirmPasswordSubmit}
+                  editable={!loading}
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  disabled={loading}
+                >
+                  <Ionicons
+                    name={showConfirmPassword ? 'eye-off' : 'eye'}
+                    size={20}
+                    color="#6B7280"
+                  />
+                </TouchableOpacity>
+              </View>
               {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
             </View>
 
@@ -357,6 +386,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     fontSize: 16,
     backgroundColor: 'white',
+  },
+  passwordContainer: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  passwordInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingRight: 50, // Make room for the eye icon
+    fontSize: 16,
+    backgroundColor: 'white',
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: 16,
+    padding: 4,
   },
   inputError: {
     borderColor: '#EF4444',

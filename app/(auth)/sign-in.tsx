@@ -12,6 +12,7 @@ import {
   Dimensions,
   Image,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/components/AuthProvider';
 import { mobileTokens } from '../../src/lib/design-system';
@@ -23,6 +24,7 @@ export default function SignInScreen() {
   const { signIn, loading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   
   // Refs for keyboard navigation
@@ -136,25 +138,38 @@ export default function SignInScreen() {
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Password</Text>
-              <TextInput
-                ref={passwordInputRef}
-                style={[styles.input, errors.password && styles.inputError]}
-                value={password}
-                onChangeText={(text) => {
-                  setPassword(text);
-                  if (errors.password) {
-                    setErrors(prev => ({ ...prev, password: undefined }));
-                  }
-                }}
-                placeholder="Enter your password"
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="done"
-                blurOnSubmit={true}
-                onSubmitEditing={handlePasswordSubmit}
-                editable={!loading}
-              />
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  ref={passwordInputRef}
+                  style={[styles.passwordInput, errors.password && styles.inputError]}
+                  value={password}
+                  onChangeText={(text) => {
+                    setPassword(text);
+                    if (errors.password) {
+                      setErrors(prev => ({ ...prev, password: undefined }));
+                    }
+                  }}
+                  placeholder="Enter your password"
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="done"
+                  blurOnSubmit={true}
+                  onSubmitEditing={handlePasswordSubmit}
+                  editable={!loading}
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setShowPassword(!showPassword)}
+                  disabled={loading}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye-off' : 'eye'}
+                    size={20}
+                    color="#6B7280"
+                  />
+                </TouchableOpacity>
+              </View>
               {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
             </View>
 
@@ -279,6 +294,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     fontSize: 16,
     backgroundColor: 'white',
+  },
+  passwordContainer: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  passwordInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingRight: 50, // Make room for the eye icon
+    fontSize: 16,
+    backgroundColor: 'white',
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: 16,
+    padding: 4,
   },
   inputError: {
     borderColor: '#EF4444',

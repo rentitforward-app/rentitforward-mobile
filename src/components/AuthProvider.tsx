@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Use default session timeout to avoid interfering with Supabase's retry logic
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Session timeout')), 8000) // Reduced to 8s to be more conservative
+          setTimeout(() => reject(new Error('Session timeout - please check your connection')), 12000) // Increased to 12s
         );
         
         const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
@@ -180,11 +180,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Splash screen is now managed by SplashScreenManager in _layout.tsx
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string, retryCount = 0) => {
+    const maxRetries = 2;
+    
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
-      addSentryBreadcrumb('Starting sign in process', 'auth', { email });
+      addSentryBreadcrumb('Starting sign in process', 'auth', { email, retryCount });
       
       // Add timeout to prevent hanging on network issues
       const signInPromise = supabase.auth.signInWithPassword({
@@ -193,7 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Sign in timeout - please check your connection')), 10000)
+        setTimeout(() => reject(new Error('Sign in timeout - please check your connection and try again')), 15000) // Increased to 15s
       );
       
       const { error } = await Promise.race([signInPromise, timeoutPromise]) as any;
@@ -202,7 +204,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         addSentryBreadcrumb('Sign in failed', 'auth', { 
           email, 
           error: error.message,
-          code: error.status 
+          code: error.status,
+          retryCount
         });
         throw error;
       }
@@ -212,9 +215,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Set loading to false after successful sign in
       setState(prev => ({ ...prev, loading: false }));
     } catch (error: any) {
+      // Retry logic for network timeouts
+      if (error.message.includes('timeout') && retryCount < maxRetries) {
+        addSentryBreadcrumb('Retrying sign in due to timeout', 'auth', { 
+          email, 
+          retryCount: retryCount + 1 
+        });
+        
+        // Wait 2 seconds before retry
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        return signIn(email, password, retryCount + 1);
+      }
+      
       setState(prev => ({ ...prev, loading: false, error: error.message }));
-      captureSentryException(error, { action: 'signIn', email, platform: 'mobile' });
-      Alert.alert('Sign In Error', error.message);
+      captureSentryException(error, { action: 'signIn', email, platform: 'mobile', retryCount });
+      
+      // Show more helpful error message
+      let errorMessage = error.message;
+      if (error.message.includes('timeout')) {
+        errorMessage = 'Connection timeout. Please check your internet connection and try again.';
+      } else if (error.message.includes('Invalid login credentials')) {
+        errorMessage = 'Invalid email or password. Please check your credentials and try again.';
+      }
+      
+      Alert.alert('Sign In Error', errorMessage);
       throw error;
     }
   };
