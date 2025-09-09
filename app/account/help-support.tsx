@@ -101,7 +101,7 @@ export default function HelpSupportScreen() {
   ];
 
   return (
-    <View style={[{ flex: 1, backgroundColor: colors.gray[50] }, { paddingTop: insets.top }]}>
+    <View style={{ flex: 1, backgroundColor: colors.gray[50] }}>
       <Header 
         title="Help & Support" 
         showBackButton 

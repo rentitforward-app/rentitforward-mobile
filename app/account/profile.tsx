@@ -203,7 +203,7 @@ export default function ProfileDetailsScreen() {
 
   if (isLoading) {
     return (
-      <View style={[{ flex: 1, backgroundColor: colors.gray[50] }, { paddingTop: insets.top }]}>
+      <View style={{ flex: 1, backgroundColor: colors.gray[50] }}>
         <Header title="Profile Details" showBackButton onBackPress={() => router.back()} />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color={colors.primary.main} />
@@ -215,7 +215,7 @@ export default function ProfileDetailsScreen() {
 
   if (!profile) {
     return (
-      <View style={[{ flex: 1, backgroundColor: colors.gray[50] }, { paddingTop: insets.top }]}>
+      <View style={{ flex: 1, backgroundColor: colors.gray[50] }}>
         <Header title="Profile Details" showBackButton onBackPress={() => router.back()} />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.lg }}>
           <Text style={{ fontSize: typography.sizes.xl, fontWeight: typography.weights.bold, color: colors.gray[900], marginBottom: spacing.sm }}>
@@ -240,7 +240,7 @@ export default function ProfileDetailsScreen() {
   }
 
   return (
-    <View style={[{ flex: 1, backgroundColor: colors.gray[50] }, { paddingTop: insets.top }]}>
+    <View style={{ flex: 1, backgroundColor: colors.gray[50] }}>
       <Header 
         title="Profile Details" 
         showBackButton 

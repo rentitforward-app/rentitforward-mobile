@@ -120,7 +120,7 @@ export default function AccountScreen() {
   // If no user is authenticated, show sign-in prompt
   if (!currentUser) {
     return (
-      <View style={[{ flex: 1, backgroundColor: colors.gray[50] }, { paddingTop: insets.top }]}>
+      <View style={{ flex: 1, backgroundColor: colors.gray[50] }}>
         <Header title="Account" />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.lg }}>
           <Text style={{ fontSize: typography.sizes['2xl'], fontWeight: typography.weights.bold, color: colors.text.primary, marginBottom: spacing.sm }}>
@@ -149,7 +149,7 @@ export default function AccountScreen() {
 
   if (isLoading) {
     return (
-      <View style={[{ flex: 1, backgroundColor: colors.gray[50] }, { paddingTop: insets.top }]}>
+      <View style={{ flex: 1, backgroundColor: colors.gray[50] }}>
         <Header title="Account" />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color={colors.primary.main} />
@@ -161,7 +161,7 @@ export default function AccountScreen() {
 
   if (!profile) {
     return (
-      <View style={[{ flex: 1, backgroundColor: colors.gray[50] }, { paddingTop: insets.top }]}>
+      <View style={{ flex: 1, backgroundColor: colors.gray[50] }}>
         <Header title="Account" />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.lg }}>
           <Text style={{ fontSize: typography.sizes.xl, fontWeight: typography.weights.bold, color: colors.gray[900], marginBottom: spacing.sm }}>
@@ -186,7 +186,7 @@ export default function AccountScreen() {
   }
 
   return (
-    <View style={[{ flex: 1, backgroundColor: colors.gray[50] }, { paddingTop: insets.top }]}>
+    <View style={{ flex: 1, backgroundColor: colors.gray[50] }}>
       <Header title="Account" />
       
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>

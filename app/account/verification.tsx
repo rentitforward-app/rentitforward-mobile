@@ -387,7 +387,7 @@ export default function VerificationScreen() {
 
   if (isLoading) {
     return (
-      <View style={[{ flex: 1, backgroundColor: colors.gray[50] }, { paddingTop: insets.top }]}>
+      <View style={{ flex: 1, backgroundColor: colors.gray[50] }}>
         <Header title="Identity Verification" showBackButton onBackPress={() => router.back()} />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <Text style={{ fontSize: typography.sizes.base, color: colors.gray[600] }}>
@@ -402,7 +402,7 @@ export default function VerificationScreen() {
                    steps.filter(s => s.required).every(s => s.status === 'completed');
 
   return (
-    <View style={[{ flex: 1, backgroundColor: colors.gray[50] }, { paddingTop: insets.top }]}>
+    <View style={{ flex: 1, backgroundColor: colors.gray[50] }}>
       <Header 
         title="Identity Verification" 
         showBackButton 

@@ -161,7 +161,7 @@ export default function FAQScreen() {
   ];
 
   return (
-    <View style={[{ flex: 1, backgroundColor: colors.gray[50] }, { paddingTop: insets.top }]}>
+    <View style={{ flex: 1, backgroundColor: colors.gray[50] }}>
       <Header 
         title="FAQ" 
         showBackButton 
