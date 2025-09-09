@@ -108,12 +108,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="create"
+        name="bookings"
         options={{
-          title: 'Post Item',
+          title: 'Bookings',
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons 
-              name={focused ? "add-circle" : "add-circle-outline"} 
+              name={focused ? "calendar" : "calendar-outline"} 
               size={size} 
               color={color} 
             />
@@ -121,12 +121,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="bookings"
+        name="my-listings"
         options={{
-          title: 'Bookings',
+          title: 'My Listings',
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons 
-              name={focused ? "calendar" : "calendar-outline"} 
+              name={focused ? "cube" : "cube-outline"} 
               size={size} 
               color={color} 
             />

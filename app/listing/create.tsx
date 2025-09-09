@@ -1179,4 +1179,5 @@ const styles = StyleSheet.create({
   removeFeatureButton: {
     marginLeft: 8,
   },
-}); 
+});
+
