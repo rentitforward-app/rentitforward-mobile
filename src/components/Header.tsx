@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ViewStyle, TextStyle } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, TouchableOpacity, ViewStyle, TextStyle, StatusBar } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography } from '../lib/design-system';
 
@@ -8,7 +9,9 @@ export interface HeaderProps {
   title: string;
   subtitle?: string;
   showBackButton?: boolean;
+  showNotificationIcon?: boolean;
   onBackPress?: () => void;
+  onNotificationPress?: () => void;
   rightAction?: {
     icon: keyof typeof Ionicons.glyphMap;
     onPress: () => void;
@@ -23,16 +26,43 @@ export function Header({
   title,
   subtitle,
   showBackButton = false,
+  showNotificationIcon = true,
   onBackPress,
+  onNotificationPress,
   rightAction,
   backgroundColor = colors.white,
-  titleColor = colors.text.primary,
+  titleColor = colors.gray[900],
   style,
 }: HeaderProps) {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+
+  const handleBackPress = () => {
+    if (onBackPress) {
+      onBackPress();
+    } else if (router.canGoBack()) {
+      router.back();
+    }
+  };
+
+  const handleNotificationPress = () => {
+    if (onNotificationPress) {
+      onNotificationPress();
+    } else {
+      // Default behavior - navigate to notifications
+      router.push('/notifications');
+    }
+  };
   const headerStyle: ViewStyle = {
+    paddingTop: insets.top,
     backgroundColor,
     borderBottomWidth: 1,
-    borderBottomColor: colors.neutral.mediumGray,
+    borderBottomColor: colors.gray[200],
+    shadowColor: colors.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
     ...style,
   };
 
@@ -41,111 +71,132 @@ export function Header({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
     minHeight: 56,
   };
 
   const titleContainerStyle: ViewStyle = {
     flex: 1,
-    alignItems: showBackButton ? 'flex-start' : 'center',
-    marginLeft: showBackButton ? spacing.sm : 0,
-    marginRight: rightAction ? spacing.sm : 0,
+    alignItems: 'center',
   };
 
   const titleTextStyle: TextStyle = {
-    fontSize: typography.sizes['2xl'],
-    fontWeight: typography.weights.bold,
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.semibold,
     color: titleColor,
-    textAlign: showBackButton ? 'left' : 'center',
+    textAlign: 'center',
   };
 
   const subtitleTextStyle: TextStyle = {
     fontSize: typography.sizes.sm,
     color: colors.text.secondary,
     marginTop: spacing.xs / 2,
-    textAlign: showBackButton ? 'left' : 'center',
+    textAlign: 'center',
   };
 
   const iconButtonStyle: ViewStyle = {
     padding: spacing.xs,
-    borderRadius: 8,
+    borderRadius: 20,
     backgroundColor: 'transparent',
   };
 
   return (
-    <SafeAreaView style={headerStyle} edges={['top']}>
-      <View style={containerStyle}>
-        {/* Back button */}
-        {showBackButton && (
-          <TouchableOpacity 
-            style={iconButtonStyle}
-            onPress={onBackPress}
-            testID="header-back-button"
-          >
-            <Ionicons
-              name="chevron-back"
-              size={24}
-              color={colors.text.primary}
-            />
-          </TouchableOpacity>
-        )}
+    <>
+      <StatusBar barStyle="dark-content" backgroundColor={backgroundColor} />
+      <View style={headerStyle}>
+        <View style={containerStyle}>
+          {/* Left side - Back button or spacer */}
+          <View style={{ width: 40, alignItems: 'flex-start' }}>
+            {showBackButton ? (
+              <TouchableOpacity
+                onPress={handleBackPress}
+                style={iconButtonStyle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                testID="header-back-button"
+              >
+                <Ionicons
+                  name="arrow-back"
+                  size={24}
+                  color={titleColor}
+                />
+              </TouchableOpacity>
+            ) : null}
+          </View>
 
-        {/* Title and subtitle */}
-        <View style={titleContainerStyle}>
-          <Text style={titleTextStyle} numberOfLines={1}>
-            {title}
+          {/* Center - Title and subtitle */}
+          <View style={titleContainerStyle}>
+            <Text style={titleTextStyle} numberOfLines={1}>
+              {title}
+            </Text>
+            {subtitle && (
+              <Text style={subtitleTextStyle} numberOfLines={1}>
+                {subtitle}
               </Text>
-          {subtitle && (
-            <Text style={subtitleTextStyle} numberOfLines={1}>
-              {subtitle}
-              </Text>
-          )}
+            )}
+          </View>
+
+          {/* Right side - Notification icon, custom action, or spacer */}
+          <View style={{ width: 40, alignItems: 'flex-end' }}>
+            {rightAction ? (
+              <TouchableOpacity
+                style={iconButtonStyle}
+                onPress={rightAction.onPress}
+                testID={rightAction.testID || 'header-right-action'}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons
+                  name={rightAction.icon}
+                  size={24}
+                  color={titleColor}
+                />
+              </TouchableOpacity>
+            ) : showNotificationIcon ? (
+              <TouchableOpacity
+                onPress={handleNotificationPress}
+                style={iconButtonStyle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                testID="header-notification-button"
+              >
+                <Ionicons
+                  name="notifications-outline"
+                  size={24}
+                  color={titleColor}
+                />
+              </TouchableOpacity>
+            ) : null}
+          </View>
         </View>
-
-        {/* Right action */}
-        {rightAction ? (
-          <TouchableOpacity
-            style={iconButtonStyle}
-            onPress={rightAction.onPress}
-            testID={rightAction.testID || 'header-right-action'}
-          >
-            <Ionicons
-              name={rightAction.icon}
-              size={24}
-              color={colors.text.primary}
-            />
-          </TouchableOpacity>
-        ) : (
-          // Placeholder to maintain spacing when no right action
-          showBackButton && <View style={{ width: 40 }} />
-        )}
       </View>
-    </SafeAreaView>
+    </>
   );
 }
 
 // Preset header configurations for common use cases
 export const HeaderPresets = {
-  // Main screen header with title only
+  // Main screen header with title and notification icon
   main: (title: string) => ({
     title,
     showBackButton: false,
+    showNotificationIcon: true,
   }),
 
-  // Detail screen header with back button
-  detail: (title: string, onBackPress: () => void) => ({
+  // Detail screen header with back button and notification icon
+  detail: (title: string, onBackPress?: () => void) => ({
     title,
     showBackButton: true,
+    showNotificationIcon: true,
     onBackPress,
   }),
 
-  // Screen with action button
+  // Screen with custom action button (replaces notification icon)
   withAction: (
     title: string,
     icon: keyof typeof Ionicons.glyphMap,
     onActionPress: () => void
   ) => ({
     title,
+    showBackButton: false,
+    showNotificationIcon: false,
     rightAction: {
       icon,
       onPress: onActionPress,
@@ -156,8 +207,17 @@ export const HeaderPresets = {
   settings: (title: string, onBackPress?: () => void) => ({
     title,
     showBackButton: !!onBackPress,
+    showNotificationIcon: true,
     onBackPress,
     backgroundColor: colors.neutral.lightGray,
+  }),
+
+  // Sub-page header with back button and notification icon
+  subPage: (title: string, onBackPress?: () => void) => ({
+    title,
+    showBackButton: true,
+    showNotificationIcon: true,
+    onBackPress,
   }),
 };
 

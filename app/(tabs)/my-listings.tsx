@@ -6,6 +6,7 @@ import { colors, spacing, typography } from '../../src/lib/design-system';
 import { useAuth } from '../../src/components/AuthProvider';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../src/lib/supabase';
+import { Header } from '../../src/components/Header';
 
 interface Listing {
   id: string;
@@ -707,53 +708,43 @@ export default function MyListingsScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.neutral.lightGray }} edges={['top']}>
-      {/* Header */}
+    <View style={{ flex: 1, backgroundColor: colors.neutral.lightGray }}>
+      <Header 
+        title="My Listings" 
+        showBackButton={false}
+        showNotificationIcon={true}
+      />
+      
+      {/* Add Item Button */}
       <View style={{
         backgroundColor: colors.white,
         paddingHorizontal: spacing.md,
-        paddingVertical: spacing.md,
+        paddingVertical: spacing.sm,
         borderBottomWidth: 1,
         borderBottomColor: colors.gray[200],
       }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View>
-            <Text style={{
-              fontSize: typography.sizes['2xl'],
-              fontWeight: typography.weights.bold,
-              color: colors.text.primary,
-            }}>
-              My Listings
-            </Text>
-            <Text style={{
-              fontSize: typography.sizes.sm,
-              color: colors.text.secondary,
-            }}>
-              Manage your items and track bookings
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => router.push('/listing/create')}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingHorizontal: spacing.md,
-              paddingVertical: spacing.sm,
-              backgroundColor: colors.primary.main,
-              borderRadius: 8,
-            }}
-          >
-            <Ionicons name="add" size={20} color={colors.white} />
-            <Text style={{
-              fontSize: typography.sizes.sm,
-              color: colors.white,
-              marginLeft: spacing.xs / 2,
-              fontWeight: typography.weights.semibold,
-            }}>
-              Add Item
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          onPress={() => router.push('/listing/create')}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingHorizontal: spacing.md,
+            paddingVertical: spacing.sm,
+            backgroundColor: colors.primary.main,
+            borderRadius: 8,
+          }}
+        >
+          <Ionicons name="add" size={20} color={colors.white} />
+          <Text style={{
+            fontSize: typography.sizes.sm,
+            color: colors.white,
+            marginLeft: spacing.xs / 2,
+            fontWeight: typography.weights.semibold,
+          }}>
+            Add Item
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Tabs */}
@@ -999,6 +990,6 @@ export default function MyListingsScreen() {
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }

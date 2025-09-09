@@ -22,6 +22,7 @@ import { supabase } from '../../src/lib/supabase';
 import { captureSentryException } from '../../src/lib/sentry';
 import { colors, spacing, typography, componentStyles } from '../../src/lib/design-system';
 import { RealAPIPredictiveSearchInput } from '../../src/components/search/RealAPIPredictiveSearchInput';
+import { Header } from '../../src/components/Header';
 
 // Categories - matching web version
 const CATEGORIES = [
@@ -1021,7 +1022,12 @@ export default function BrowseScreen() {
 
   if (isLoading) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={styles.container}>
+        <Header 
+          title="Browse Items" 
+          showBackButton={false}
+          showNotificationIcon={true}
+        />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary.main} />
           <Text style={styles.loadingText}>Loading listings...</Text>
@@ -1031,11 +1037,12 @@ export default function BrowseScreen() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Browse Items</Text>
-      </View>
+    <View style={styles.container}>
+      <Header 
+        title="Browse Items" 
+        showBackButton={false}
+        showNotificationIcon={true}
+      />
 
       {/* Search Bar */}
         <View style={styles.searchContainer}>

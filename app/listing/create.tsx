@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../src/components/AuthProvider';
 import { supabase } from '../../src/lib/supabase';
 import { colors, spacing, typography, componentStyles } from '../../src/lib/design-system';
+import { Header } from '../../src/components/Header';
 
 // Real geocoding utility function using the web API
 const geocodeAddress = async (address: string, city: string, state: string): Promise<{ latitude: number; longitude: number } | null> => {
@@ -753,10 +754,14 @@ export default function CreateScreen() {
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.container}>
+      <Header 
+        title="List Your Item" 
+        showBackButton={true}
+        showNotificationIcon={true}
+      />
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>List Your Item</Text>
+        <View style={styles.introSection}>
           <Text style={styles.headerSubtitle}>Share your items with the community and earn money</Text>
         </View>
         
@@ -862,14 +867,12 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flex: 1,
   },
-  header: {
+  introSection: {
     paddingTop: spacing.lg,
     paddingBottom: spacing.md,
     paddingHorizontal: spacing.md,
     backgroundColor: colors.white,
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[200],
   },
   headerTitle: {
     fontSize: typography.sizes['2xl'],
