@@ -408,12 +408,12 @@ export default function AccountScreen() {
               paddingTop: spacing.lg,
               paddingBottom: spacing.md,
             }}>
-              EARNING MONEY
+              MY ACTIVITY
             </Text>
             
             <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
               <TouchableOpacity
-                onPress={() => router.push('/account/dashboard')}
+                onPress={() => router.push('/account/saved-items')}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -422,69 +422,76 @@ export default function AccountScreen() {
                   borderBottomColor: colors.gray[100],
                 }}
               >
-                <Ionicons name="speedometer-outline" size={24} color={colors.gray[600]} />
-                <Text style={{
-                  fontSize: typography.sizes.base,
-                  color: colors.gray[900],
-                  marginLeft: spacing.md,
-                  flex: 1,
-                }}>
-                  My dashboard
-                </Text>
-                <Ionicons name="chevron-forward" size={20} color={colors.gray[400]} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => router.push('/account/task-alerts')}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingVertical: spacing.md,
-                  borderBottomWidth: 1,
-                  borderBottomColor: colors.gray[100],
-                }}
-              >
-                <Ionicons name="alert-circle-outline" size={24} color={colors.gray[600]} />
+                <Ionicons name="heart-outline" size={24} color={colors.gray[600]} />
                 <View style={{ flex: 1, marginLeft: spacing.md }}>
                   <Text style={{
                     fontSize: typography.sizes.base,
                     color: colors.gray[900],
                   }}>
-                    Set up task alerts
+                    Saved Items
                   </Text>
                   <Text style={{
                     fontSize: typography.sizes.sm,
                     color: colors.gray[500],
                     marginTop: spacing.xs / 2,
                   }}>
-                    Get notified when new tasks match your skills
+                    View your saved listings and favorites
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={colors.gray[400]} />
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => router.push('/account/list-services')}
+                onPress={() => router.push('/conversations')}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
                   paddingVertical: spacing.md,
+                  borderBottomWidth: 1,
+                  borderBottomColor: colors.gray[100],
                 }}
               >
-                <Ionicons name="megaphone-outline" size={24} color={colors.gray[600]} />
+                <Ionicons name="chatbubble-outline" size={24} color={colors.gray[600]} />
                 <View style={{ flex: 1, marginLeft: spacing.md }}>
                   <Text style={{
                     fontSize: typography.sizes.base,
                     color: colors.gray[900],
                   }}>
-                    List my services
+                    Messages
                   </Text>
                   <Text style={{
                     fontSize: typography.sizes.sm,
                     color: colors.gray[500],
                     marginTop: spacing.xs / 2,
                   }}>
-                    Create listings for your services so customers come to you
+                    Connect with other members of the community
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.gray[400]} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => router.push('/listing/create')}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: spacing.md,
+                }}
+              >
+                <Ionicons name="add-circle-outline" size={24} color={colors.gray[600]} />
+                <View style={{ flex: 1, marginLeft: spacing.md }}>
+                  <Text style={{
+                    fontSize: typography.sizes.base,
+                    color: colors.gray[900],
+                  }}>
+                    List my Items
+                  </Text>
+                  <Text style={{
+                    fontSize: typography.sizes.sm,
+                    color: colors.gray[500],
+                    marginTop: spacing.xs / 2,
+                  }}>
+                    Create listings for your items so customers can rent them
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={colors.gray[400]} />
