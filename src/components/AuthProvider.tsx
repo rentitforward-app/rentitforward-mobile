@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { Alert } from 'react-native';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { AuthContextType, AuthState, Profile } from '../types/auth';
 import { setSentryUser, clearSentryUser, addSentryBreadcrumb, captureSentryException } from '../lib/sentry';
@@ -248,28 +249,82 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
       
-      const { error } = await supabase.auth.signUp({
+      addSentryBreadcrumb('Starting sign up process', 'auth', { email, fullName });
+      
+      // Create user account with email confirmation (OTP code verification)
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: email.toLowerCase().trim(),
         password,
         options: {
+          // Force OTP code verification by not providing emailRedirectTo
+          // This should trigger OTP email instead of magic link
           data: {
             full_name: fullName.trim(),
-          },
-        },
+          }
+        }
       });
 
-      if (error) {
-        throw error;
+      console.log('Signup response:', { authData, authError });
+
+      if (authError) {
+        console.error('Signup error details:', authError);
+        addSentryBreadcrumb('Sign up failed', 'auth', { 
+          email, 
+          error: authError.message,
+          code: authError.status 
+        });
+        throw authError;
       }
 
-      Alert.alert(
-        'Check your email',
-        'Please check your email and click the confirmation link to complete your registration.'
-      );
+      if (authData.user) {
+        // Store email temporarily for verification page
+        try {
+          await AsyncStorage.setItem('signup_email', email.toLowerCase().trim());
+        } catch (storageError) {
+          console.error('Error storing signup email:', storageError);
+        }
+        
+        if (authData.user.email_confirmed_at) {
+          // Email already confirmed (shouldn't happen in signup)
+          addSentryBreadcrumb('Sign up successful - email already confirmed', 'auth', { email });
+          Alert.alert('Success', 'Account created successfully!');
+          // Navigate to onboarding
+          router.replace('/(auth)/onboarding');
+        } else {
+          // Email verification required
+          addSentryBreadcrumb('Sign up successful - email verification required', 'auth', { email });
+          Alert.alert(
+            'Check your email',
+            'Please check your email for a verification code!',
+            [
+              {
+                text: 'Continue',
+                onPress: () => {
+                  // Navigate to verification screen
+                  router.replace('/(auth)/verify-email');
+                }
+              }
+            ]
+          );
+        }
+      }
+      
+      setState(prev => ({ ...prev, loading: false }));
     } catch (error: any) {
       setState(prev => ({ ...prev, loading: false, error: error.message }));
       captureSentryException(error, { action: 'signUp', email, fullName });
-      Alert.alert('Sign Up Error', error.message);
+      
+      // Show more helpful error message
+      let errorMessage = error.message;
+      if (error.message.includes('User already registered')) {
+        errorMessage = 'An account with this email already exists. Please sign in instead.';
+      } else if (error.message.includes('Password should be at least 6 characters')) {
+        errorMessage = 'Password must be at least 6 characters long.';
+      } else if (error.message.includes('Invalid email')) {
+        errorMessage = 'Please enter a valid email address.';
+      }
+      
+      Alert.alert('Sign Up Error', errorMessage);
       throw error;
     }
   };

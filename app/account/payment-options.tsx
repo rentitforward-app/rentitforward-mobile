@@ -5,45 +5,37 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Linking,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography } from '../../src/lib/design-system';
 import { Header } from '../../src/components/Header';
+import { useStripeConnect } from '../../src/hooks/useStripeConnect';
 
 export default function PaymentOptionsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { status, isLoading, error, openStripeDashboard, refetch } = useStripeConnect();
+  const [actionLoading, setActionLoading] = useState(false);
 
-  const handleAddPaymentMethod = () => {
-    Alert.alert(
-      'Add Payment Method',
-      'Payment method setup will be implemented with Stripe integration.',
-      [{ text: 'OK' }]
-    );
-  };
-
-  const handleManageStripeAccount = () => {
-    Alert.alert(
-      'Stripe Account',
-      'Stripe account management will be implemented soon.',
-      [{ text: 'OK' }]
-    );
+  const handleOpenStripeDashboard = async () => {
+    setActionLoading(true);
+    try {
+      await openStripeDashboard();
+    } catch (err) {
+      Alert.alert('Error', 'Failed to open Stripe dashboard. Please try again.');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleViewTransactionHistory = () => {
     Alert.alert(
       'Transaction History',
       'Transaction history will be available soon.',
-      [{ text: 'OK' }]
-    );
-  };
-
-  const handleSetupPayouts = () => {
-    Alert.alert(
-      'Setup Payouts',
-      'Payout setup will be implemented with Stripe Connect.',
       [{ text: 'OK' }]
     );
   };
@@ -58,7 +50,8 @@ export default function PaymentOptionsScreen() {
 
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
         <View style={{ padding: spacing.lg }}>
-          {/* Payment Methods */}
+
+          {/* Seller Account */}
           <View style={{
             backgroundColor: colors.white,
             borderRadius: 12,
@@ -69,129 +62,23 @@ export default function PaymentOptionsScreen() {
             shadowRadius: 4,
             elevation: 3,
           }}>
-            <Text style={{
-              fontSize: typography.sizes.lg,
-              fontWeight: typography.weights.semibold,
-              color: colors.gray[900],
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
               paddingHorizontal: spacing.lg,
               paddingTop: spacing.lg,
               paddingBottom: spacing.md,
             }}>
-              Payment Methods
-            </Text>
-            
-            <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
-              <TouchableOpacity
-                onPress={handleAddPaymentMethod}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingVertical: spacing.md,
-                  borderBottomWidth: 1,
-                  borderBottomColor: colors.gray[100],
-                }}
-              >
-                <Ionicons name="add-circle-outline" size={24} color={colors.primary.main} />
-                <Text style={{
-                  fontSize: typography.sizes.base,
-                  color: colors.gray[900],
-                  marginLeft: spacing.md,
-                  flex: 1,
-                }}>
-                  Add Payment Method
-                </Text>
-                <Ionicons name="chevron-forward" size={20} color={colors.gray[400]} />
-              </TouchableOpacity>
-
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingVertical: spacing.md,
-                borderBottomWidth: 1,
-                borderBottomColor: colors.gray[100],
+              <Ionicons name="card-outline" size={24} color={colors.primary.main} />
+              <Text style={{
+                fontSize: typography.sizes.lg,
+                fontWeight: typography.weights.semibold,
+                color: colors.gray[900],
+                marginLeft: spacing.sm,
               }}>
-                <Ionicons name="card-outline" size={24} color={colors.gray[600]} />
-                <View style={{ flex: 1, marginLeft: spacing.md }}>
-                  <Text style={{
-                    fontSize: typography.sizes.base,
-                    color: colors.gray[900],
-                  }}>
-                    **** **** **** 1234
-                  </Text>
-                  <Text style={{
-                    fontSize: typography.sizes.sm,
-                    color: colors.gray[500],
-                    marginTop: spacing.xs / 2,
-                  }}>
-                    Visa • Expires 12/25
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={{
-                    padding: spacing.sm,
-                    borderRadius: 6,
-                    backgroundColor: colors.gray[100],
-                  }}
-                >
-                  <Ionicons name="pencil" size={16} color={colors.gray[600]} />
-                </TouchableOpacity>
-              </View>
-
-              <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingVertical: spacing.md,
-              }}>
-                <Ionicons name="card-outline" size={24} color={colors.gray[600]} />
-                <View style={{ flex: 1, marginLeft: spacing.md }}>
-                  <Text style={{
-                    fontSize: typography.sizes.base,
-                    color: colors.gray[900],
-                  }}>
-                    **** **** **** 5678
-                  </Text>
-                  <Text style={{
-                    fontSize: typography.sizes.sm,
-                    color: colors.gray[500],
-                    marginTop: spacing.xs / 2,
-                  }}>
-                    Mastercard • Expires 08/26
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={{
-                    padding: spacing.sm,
-                    borderRadius: 6,
-                    backgroundColor: colors.gray[100],
-                  }}
-                >
-                  <Ionicons name="pencil" size={16} color={colors.gray[600]} />
-                </TouchableOpacity>
-              </View>
+                Seller Account
+              </Text>
             </View>
-          </View>
-
-          {/* Stripe Connect */}
-          <View style={{
-            backgroundColor: colors.white,
-            borderRadius: 12,
-            marginBottom: spacing.lg,
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 4,
-            elevation: 3,
-          }}>
-            <Text style={{
-              fontSize: typography.sizes.lg,
-              fontWeight: typography.weights.semibold,
-              color: colors.gray[900],
-              paddingHorizontal: spacing.lg,
-              paddingTop: spacing.lg,
-              paddingBottom: spacing.md,
-            }}>
-              Stripe Connect
-            </Text>
             
             <Text style={{
               fontSize: typography.sizes.sm,
@@ -199,66 +86,233 @@ export default function PaymentOptionsScreen() {
               paddingHorizontal: spacing.lg,
               marginBottom: spacing.lg,
             }}>
-              Manage your Stripe account for receiving payments
+              Required for receiving payments as a sharer
             </Text>
 
-            <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
-              <TouchableOpacity
-                onPress={handleSetupPayouts}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingVertical: spacing.md,
-                  borderBottomWidth: 1,
-                  borderBottomColor: colors.gray[100],
-                }}
-              >
-                <Ionicons name="wallet-outline" size={24} color={colors.gray[600]} />
-                <View style={{ flex: 1, marginLeft: spacing.md }}>
+            {isLoading ? (
+              <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color={colors.primary.main} />
+                <Text style={{ marginTop: spacing.sm, color: colors.gray[600] }}>Loading account status...</Text>
+              </View>
+            ) : error ? (
+              <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
+                <View style={{
+                  backgroundColor: colors.semantic.error + '10',
+                  padding: spacing.md,
+                  borderRadius: 8,
+                  marginBottom: spacing.md,
+                }}>
+                  <Text style={{ color: colors.semantic.error, fontSize: typography.sizes.sm }}>
+                    {error}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={refetch}
+                  style={{
+                    backgroundColor: colors.primary.main,
+                    paddingVertical: spacing.sm,
+                    paddingHorizontal: spacing.md,
+                    borderRadius: 8,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ color: colors.white, fontWeight: typography.weights.medium }}>
+                    Retry
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : !status?.has_account ? (
+              // Not connected - show setup
+              <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
+                <View style={{
+                  backgroundColor: colors.semantic.info + '10',
+                  padding: spacing.md,
+                  borderRadius: 8,
+                  marginBottom: spacing.md,
+                }}>
                   <Text style={{
-                    fontSize: typography.sizes.base,
-                    color: colors.gray[900],
+                    fontSize: typography.sizes.sm,
+                    fontWeight: typography.weights.medium,
+                    color: colors.semantic.info,
+                    marginBottom: spacing.sm,
                   }}>
-                    Setup Payouts
+                    Get paid for your rentals
                   </Text>
                   <Text style={{
                     fontSize: typography.sizes.sm,
-                    color: colors.gray[500],
-                    marginTop: spacing.xs / 2,
+                    color: colors.gray[600],
+                    lineHeight: 18,
                   }}>
-                    Configure how you receive payments
+                    Set up secure payments through Stripe to receive money from renters.
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.gray[400]} />
-              </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={handleManageStripeAccount}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingVertical: spacing.md,
-                }}
-              >
-                <Ionicons name="settings-outline" size={24} color={colors.gray[600]} />
-                <View style={{ flex: 1, marginLeft: spacing.md }}>
+                <TouchableOpacity
+                  onPress={handleOpenStripeDashboard}
+                  disabled={actionLoading}
+                  style={{
+                    backgroundColor: colors.primary.main,
+                    paddingVertical: spacing.md,
+                    paddingHorizontal: spacing.lg,
+                    borderRadius: 8,
+                    alignItems: 'center',
+                    opacity: actionLoading ? 0.6 : 1,
+                  }}
+                >
+                  {actionLoading ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Text style={{
+                      color: colors.white,
+                      fontSize: typography.sizes.base,
+                      fontWeight: typography.weights.semibold,
+                    }}>
+                      Open Settings
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            ) : !status.onboarding_completed ? (
+              // Connected but onboarding incomplete
+              <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
+                <View style={{
+                  backgroundColor: colors.semantic.warning + '10',
+                  padding: spacing.md,
+                  borderRadius: 8,
+                  marginBottom: spacing.md,
+                }}>
                   <Text style={{
-                    fontSize: typography.sizes.base,
-                    color: colors.gray[900],
+                    fontSize: typography.sizes.sm,
+                    fontWeight: typography.weights.medium,
+                    color: colors.semantic.warning,
+                    marginBottom: spacing.sm,
                   }}>
-                    Manage Account
+                    Complete Your Setup
                   </Text>
                   <Text style={{
                     fontSize: typography.sizes.sm,
-                    color: colors.gray[500],
-                    marginTop: spacing.xs / 2,
+                    color: colors.gray[600],
+                    lineHeight: 18,
                   }}>
-                    Update tax information and bank details
+                    Your payment account is created but needs additional information to start receiving payments.
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.gray[400]} />
-              </TouchableOpacity>
-            </View>
+
+                <TouchableOpacity
+                  onPress={handleOpenStripeDashboard}
+                  disabled={actionLoading}
+                  style={{
+                    backgroundColor: colors.primary.main,
+                    paddingVertical: spacing.md,
+                    paddingHorizontal: spacing.lg,
+                    borderRadius: 8,
+                    alignItems: 'center',
+                    opacity: actionLoading ? 0.6 : 1,
+                  }}
+                >
+                  {actionLoading ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <Text style={{
+                      color: colors.white,
+                      fontSize: typography.sizes.base,
+                      fontWeight: typography.weights.semibold,
+                    }}>
+                      Open Settings
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            ) : (
+              // Fully set up
+              <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
+                <View style={{
+                  backgroundColor: colors.semantic.success + '10',
+                  padding: spacing.md,
+                  borderRadius: 8,
+                  marginBottom: spacing.md,
+                }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
+                    <Ionicons name="checkmark-circle" size={20} color={colors.semantic.success} />
+                    <Text style={{
+                      fontSize: typography.sizes.sm,
+                      fontWeight: typography.weights.medium,
+                      color: colors.semantic.success,
+                      marginLeft: spacing.sm,
+                    }}>
+                      Payment Setup Complete
+                    </Text>
+                  </View>
+                  <Text style={{
+                    fontSize: typography.sizes.sm,
+                    color: colors.gray[600],
+                    lineHeight: 18,
+                  }}>
+                    You're all set to receive payments from renters! Payments will be automatically transferred to your bank account.
+                  </Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.md }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: status.charges_enabled ? colors.semantic.success : colors.gray[300],
+                      marginRight: spacing.sm,
+                    }} />
+                    <Text style={{
+                      fontSize: typography.sizes.sm,
+                      color: status.charges_enabled ? colors.semantic.success : colors.gray[500],
+                    }}>
+                      Accept payments
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <View style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: status.payouts_enabled ? colors.semantic.success : colors.gray[300],
+                      marginRight: spacing.sm,
+                    }} />
+                    <Text style={{
+                      fontSize: typography.sizes.sm,
+                      color: status.payouts_enabled ? colors.semantic.success : colors.gray[500],
+                    }}>
+                      Receive payouts
+                    </Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  onPress={handleOpenStripeDashboard}
+                  disabled={actionLoading}
+                  style={{
+                    backgroundColor: colors.white,
+                    borderWidth: 1,
+                    borderColor: colors.primary.main,
+                    paddingVertical: spacing.md,
+                    paddingHorizontal: spacing.lg,
+                    borderRadius: 8,
+                    alignItems: 'center',
+                    opacity: actionLoading ? 0.6 : 1,
+                  }}
+                >
+                  {actionLoading ? (
+                    <ActivityIndicator size="small" color={colors.primary.main} />
+                  ) : (
+                    <Text style={{
+                      color: colors.primary.main,
+                      fontSize: typography.sizes.base,
+                      fontWeight: typography.weights.semibold,
+                    }}>
+                      Open Settings
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           {/* Transaction History */}
@@ -313,7 +367,7 @@ export default function PaymentOptionsScreen() {
             </View>
           </View>
 
-          {/* Payment Information */}
+          {/* Security Information */}
           <View style={{
             backgroundColor: colors.white,
             borderRadius: 12,
@@ -332,40 +386,15 @@ export default function PaymentOptionsScreen() {
               paddingTop: spacing.lg,
               paddingBottom: spacing.md,
             }}>
-              Payment Information
+              Security & Protection
             </Text>
             
             <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
               <View style={{
-                backgroundColor: colors.semantic.info + '10',
-                padding: spacing.md,
-                borderRadius: 8,
-                marginBottom: spacing.md,
-              }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
-                  <Ionicons name="information-circle" size={20} color={colors.semantic.info} />
-                  <Text style={{
-                    fontSize: typography.sizes.sm,
-                    fontWeight: typography.weights.medium,
-                    color: colors.semantic.info,
-                    marginLeft: spacing.sm,
-                  }}>
-                    Platform Fees
-                  </Text>
-                </View>
-                <Text style={{
-                  fontSize: typography.sizes.sm,
-                  color: colors.gray[600],
-                  lineHeight: 18,
-                }}>
-                  Rent It Forward charges a 3% platform fee on successful rentals. This covers payment processing, insurance, and platform maintenance.
-                </Text>
-              </View>
-
-              <View style={{
                 backgroundColor: colors.semantic.success + '10',
                 padding: spacing.md,
                 borderRadius: 8,
+                marginBottom: spacing.md,
               }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
                   <Ionicons name="shield-checkmark" size={20} color={colors.semantic.success} />
@@ -384,6 +413,31 @@ export default function PaymentOptionsScreen() {
                   lineHeight: 18,
                 }}>
                   All payments are processed securely through Stripe with bank-level encryption and fraud protection.
+                </Text>
+              </View>
+
+              <View style={{
+                backgroundColor: colors.semantic.success + '10',
+                padding: spacing.md,
+                borderRadius: 8,
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
+                  <Ionicons name="lock-closed" size={20} color={colors.semantic.success} />
+                  <Text style={{
+                    fontSize: typography.sizes.sm,
+                    fontWeight: typography.weights.medium,
+                    color: colors.semantic.success,
+                    marginLeft: spacing.sm,
+                  }}>
+                    Data Protection
+                  </Text>
+                </View>
+                <Text style={{
+                  fontSize: typography.sizes.sm,
+                  color: colors.gray[600],
+                  lineHeight: 18,
+                }}>
+                  Your payment information is never stored on our servers. All sensitive data is handled securely by Stripe.
                 </Text>
               </View>
             </View>

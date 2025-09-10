@@ -82,7 +82,7 @@ export default function SignUpScreen() {
 
     try {
       await signUp(email.trim(), password, fullName.trim());
-      // User will be redirected to onboarding after email confirmation
+      // User will be redirected to email verification screen
     } catch (error) {
       // Error is already handled in AuthProvider
       console.error('Sign up error:', error);
