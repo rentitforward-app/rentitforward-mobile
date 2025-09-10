@@ -13,20 +13,25 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography } from '../../src/lib/design-system';
 import { Header } from '../../src/components/Header';
-import { useStripeConnect } from '../../src/hooks/useStripeConnect';
 
 export default function PaymentOptionsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { status, isLoading, error, openStripeDashboard, refetch } = useStripeConnect();
   const [actionLoading, setActionLoading] = useState(false);
 
-  const handleOpenStripeDashboard = async () => {
+  const handleOpenSettings = async () => {
     setActionLoading(true);
     try {
-      await openStripeDashboard();
+      // Simple redirect to web app settings with anchor to seller account section
+      const webUrl = 'https://rentitforward.com.au/settings#seller-account';
+      const canOpen = await Linking.canOpenURL(webUrl);
+      if (canOpen) {
+        await Linking.openURL(webUrl);
+      } else {
+        Alert.alert('Error', 'Cannot open web browser');
+      }
     } catch (err) {
-      Alert.alert('Error', 'Failed to open Stripe dashboard. Please try again.');
+      Alert.alert('Error', 'Failed to open settings. Please try again.');
     } finally {
       setActionLoading(false);
     }
@@ -89,230 +94,55 @@ export default function PaymentOptionsScreen() {
               Required for receiving payments as a sharer
             </Text>
 
-            {isLoading ? (
-              <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, alignItems: 'center' }}>
-                <ActivityIndicator size="small" color={colors.primary.main} />
-                <Text style={{ marginTop: spacing.sm, color: colors.gray[600] }}>Loading account status...</Text>
-              </View>
-            ) : error ? (
-              <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
-                <View style={{
-                  backgroundColor: colors.semantic.error + '10',
-                  padding: spacing.md,
-                  borderRadius: 8,
-                  marginBottom: spacing.md,
+            <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
+              <View style={{
+                backgroundColor: colors.semantic.info + '10',
+                padding: spacing.md,
+                borderRadius: 8,
+                marginBottom: spacing.md,
+              }}>
+                <Text style={{
+                  fontSize: typography.sizes.sm,
+                  fontWeight: typography.weights.medium,
+                  color: colors.semantic.info,
+                  marginBottom: spacing.sm,
                 }}>
-                  <Text style={{ color: colors.semantic.error, fontSize: typography.sizes.sm }}>
-                    {error}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={refetch}
-                  style={{
-                    backgroundColor: colors.primary.main,
-                    paddingVertical: spacing.sm,
-                    paddingHorizontal: spacing.md,
-                    borderRadius: 8,
-                    alignItems: 'center',
-                  }}
-                >
-                  <Text style={{ color: colors.white, fontWeight: typography.weights.medium }}>
-                    Retry
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ) : !status?.has_account ? (
-              // Not connected - show setup
-              <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
-                <View style={{
-                  backgroundColor: colors.semantic.info + '10',
-                  padding: spacing.md,
-                  borderRadius: 8,
-                  marginBottom: spacing.md,
+                  Manage Your Seller Account
+                </Text>
+                <Text style={{
+                  fontSize: typography.sizes.sm,
+                  color: colors.gray[600],
+                  lineHeight: 18,
                 }}>
-                  <Text style={{
-                    fontSize: typography.sizes.sm,
-                    fontWeight: typography.weights.medium,
-                    color: colors.semantic.info,
-                    marginBottom: spacing.sm,
-                  }}>
-                    Get paid for your rentals
-                  </Text>
-                  <Text style={{
-                    fontSize: typography.sizes.sm,
-                    color: colors.gray[600],
-                    lineHeight: 18,
-                  }}>
-                    Set up secure payments through Stripe to receive money from renters.
-                  </Text>
-                </View>
-
-                <TouchableOpacity
-                  onPress={handleOpenStripeDashboard}
-                  disabled={actionLoading}
-                  style={{
-                    backgroundColor: colors.primary.main,
-                    paddingVertical: spacing.md,
-                    paddingHorizontal: spacing.lg,
-                    borderRadius: 8,
-                    alignItems: 'center',
-                    opacity: actionLoading ? 0.6 : 1,
-                  }}
-                >
-                  {actionLoading ? (
-                    <ActivityIndicator size="small" color={colors.white} />
-                  ) : (
-                    <Text style={{
-                      color: colors.white,
-                      fontSize: typography.sizes.base,
-                      fontWeight: typography.weights.semibold,
-                    }}>
-                      Open Settings
-                    </Text>
-                  )}
-                </TouchableOpacity>
+                  Set up and manage your Stripe Connect account to receive payments from renters. All account management is handled through our web platform.
+                </Text>
               </View>
-            ) : !status.onboarding_completed ? (
-              // Connected but onboarding incomplete
-              <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
-                <View style={{
-                  backgroundColor: colors.semantic.warning + '10',
-                  padding: spacing.md,
+
+              <TouchableOpacity
+                onPress={handleOpenSettings}
+                disabled={actionLoading}
+                style={{
+                  backgroundColor: colors.primary.main,
+                  paddingVertical: spacing.md,
+                  paddingHorizontal: spacing.lg,
                   borderRadius: 8,
-                  marginBottom: spacing.md,
-                }}>
+                  alignItems: 'center',
+                  opacity: actionLoading ? 0.6 : 1,
+                }}
+              >
+                {actionLoading ? (
+                  <ActivityIndicator size="small" color={colors.white} />
+                ) : (
                   <Text style={{
-                    fontSize: typography.sizes.sm,
-                    fontWeight: typography.weights.medium,
-                    color: colors.semantic.warning,
-                    marginBottom: spacing.sm,
+                    color: colors.white,
+                    fontSize: typography.sizes.base,
+                    fontWeight: typography.weights.semibold,
                   }}>
-                    Complete Your Setup
+                    Open Settings
                   </Text>
-                  <Text style={{
-                    fontSize: typography.sizes.sm,
-                    color: colors.gray[600],
-                    lineHeight: 18,
-                  }}>
-                    Your payment account is created but needs additional information to start receiving payments.
-                  </Text>
-                </View>
-
-                <TouchableOpacity
-                  onPress={handleOpenStripeDashboard}
-                  disabled={actionLoading}
-                  style={{
-                    backgroundColor: colors.primary.main,
-                    paddingVertical: spacing.md,
-                    paddingHorizontal: spacing.lg,
-                    borderRadius: 8,
-                    alignItems: 'center',
-                    opacity: actionLoading ? 0.6 : 1,
-                  }}
-                >
-                  {actionLoading ? (
-                    <ActivityIndicator size="small" color={colors.white} />
-                  ) : (
-                    <Text style={{
-                      color: colors.white,
-                      fontSize: typography.sizes.base,
-                      fontWeight: typography.weights.semibold,
-                    }}>
-                      Open Settings
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            ) : (
-              // Fully set up
-              <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
-                <View style={{
-                  backgroundColor: colors.semantic.success + '10',
-                  padding: spacing.md,
-                  borderRadius: 8,
-                  marginBottom: spacing.md,
-                }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
-                    <Ionicons name="checkmark-circle" size={20} color={colors.semantic.success} />
-                    <Text style={{
-                      fontSize: typography.sizes.sm,
-                      fontWeight: typography.weights.medium,
-                      color: colors.semantic.success,
-                      marginLeft: spacing.sm,
-                    }}>
-                      Payment Setup Complete
-                    </Text>
-                  </View>
-                  <Text style={{
-                    fontSize: typography.sizes.sm,
-                    color: colors.gray[600],
-                    lineHeight: 18,
-                  }}>
-                    You're all set to receive payments from renters! Payments will be automatically transferred to your bank account.
-                  </Text>
-                </View>
-
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.md }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: status.charges_enabled ? colors.semantic.success : colors.gray[300],
-                      marginRight: spacing.sm,
-                    }} />
-                    <Text style={{
-                      fontSize: typography.sizes.sm,
-                      color: status.charges_enabled ? colors.semantic.success : colors.gray[500],
-                    }}>
-                      Accept payments
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <View style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: status.payouts_enabled ? colors.semantic.success : colors.gray[300],
-                      marginRight: spacing.sm,
-                    }} />
-                    <Text style={{
-                      fontSize: typography.sizes.sm,
-                      color: status.payouts_enabled ? colors.semantic.success : colors.gray[500],
-                    }}>
-                      Receive payouts
-                    </Text>
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  onPress={handleOpenStripeDashboard}
-                  disabled={actionLoading}
-                  style={{
-                    backgroundColor: colors.white,
-                    borderWidth: 1,
-                    borderColor: colors.primary.main,
-                    paddingVertical: spacing.md,
-                    paddingHorizontal: spacing.lg,
-                    borderRadius: 8,
-                    alignItems: 'center',
-                    opacity: actionLoading ? 0.6 : 1,
-                  }}
-                >
-                  {actionLoading ? (
-                    <ActivityIndicator size="small" color={colors.primary.main} />
-                  ) : (
-                    <Text style={{
-                      color: colors.primary.main,
-                      fontSize: typography.sizes.base,
-                      fontWeight: typography.weights.semibold,
-                    }}>
-                      Open Settings
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            )}
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Transaction History */}
