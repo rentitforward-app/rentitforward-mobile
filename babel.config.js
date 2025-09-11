@@ -21,7 +21,7 @@ module.exports = function (api) {
         },
       ],
       // 'nativewind/babel', // Temporarily disabled
-      'react-native-reanimated/plugin',
+      'react-native-worklets/plugin',
     ],
   };
 }; 

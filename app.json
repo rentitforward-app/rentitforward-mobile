@@ -2,12 +2,12 @@
   "expo": {
     "name": "Rent It Forward",
     "slug": "rentitforward-mobile",
-    "version": "1.0.15",
+    "version": "1.0.17",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/icons/ios-light.png",
     "splash": {
-      "image": "./assets/icons/splash-icon-light.png",
+      "image": "./assets/icons/splash-icon-dark.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -17,13 +17,13 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "au.com.rentitforward.mobile",
-      "buildNumber": "15",
+      "buildNumber": "17",
       "icon": "./assets/icons/ios-light.png",
       "splash": {
-        "image": "./assets/icons/splash-icon-light.png",
+        "image": "./assets/icons/splash-icon-dark.png",
         "resizeMode": "contain",
         "backgroundColor": "#ffffff",
-        "tabletImage": "./assets/icons/splash-icon-light.png"
+        "tabletImage": "./assets/icons/splash-icon-dark.png"
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -38,12 +38,12 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/icons/adaptive-icon.png",
-        "backgroundColor": "#44D62C"
+        "backgroundColor": "#ffffff"
       },
       "package": "au.com.rentitforward.mobile",
-      "versionCode": 15,
+      "versionCode": 17,
       "splash": {
-        "image": "./assets/icons/splash-icon-light.png",
+        "image": "./assets/icons/splash-icon-dark.png",
         "resizeMode": "contain",
         "backgroundColor": "#ffffff"
       },
