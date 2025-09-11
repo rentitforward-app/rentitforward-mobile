@@ -9,7 +9,9 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Calendar, DateData } from 'react-native-calendars';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../../src/lib/supabase';
+import { availabilityAPI } from '../../src/lib/api/availability';
+import { CalendarAvailability } from '../../shared-dist/utils/calendar';
+import { format, addDays, startOfDay } from 'date-fns';
 
 interface MarkedDates {
   [key: string]: {
@@ -41,47 +43,40 @@ export default function CalendarScreen() {
 
   const [markedDates, setMarkedDates] = useState<MarkedDates>({});
 
-  // Fetch booking availability for the listing
-  const { data: unavailableDates = [] } = useQuery({
+  // Fetch booking availability for the listing using the proper API
+  const { data: availability = [] } = useQuery({
     queryKey: ['listing-availability', listingId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('bookings')
-        .select('start_date, end_date')
-        .eq('listing_id', listingId)
-        .in('status', ['confirmed', 'active', 'pending'])
-        .gte('end_date', new Date().toISOString().split('T')[0]);
-
-      if (error) throw error;
+      const today = format(startOfDay(new Date()), 'yyyy-MM-dd');
+      const maxDate = format(addDays(new Date(), 365), 'yyyy-MM-dd');
       
-      // Generate array of unavailable dates
-      const unavailable: string[] = [];
-      data.forEach(booking => {
-        const start = new Date(booking.start_date);
-        const end = new Date(booking.end_date);
-        
-        for (let d = start; d <= end; d.setDate(d.getDate() + 1)) {
-          unavailable.push(d.toISOString().split('T')[0]);
-        }
-      });
-      
-      return unavailable;
+      return await availabilityAPI.getAvailabilitySafe(listingId, today, maxDate);
     },
     enabled: !!listingId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: true,
   });
 
   // Update marked dates when selection or availability changes
   useEffect(() => {
     const marked: MarkedDates = {};
 
-    // Mark unavailable dates
-    unavailableDates.forEach(date => {
-      marked[date] = {
-        disabled: true,
-        disableTouchEvent: true,
-        color: '#fee2e2',
-        textColor: '#dc2626',
-      };
+    // Mark availability status for each date
+    availability.forEach((dateAvailability: CalendarAvailability) => {
+      const { date, status } = dateAvailability;
+      
+      if (status !== 'available') {
+        marked[date] = {
+          ...marked[date],
+          disabled: status === 'booked' || status === 'blocked',
+          disableTouchEvent: status === 'booked' || status === 'blocked',
+          color: status === 'booked' ? '#fee2e2' : '#f3f4f6',
+          textColor: status === 'booked' ? '#dc2626' : '#6b7280',
+          // Add dot for booked dates
+          marked: status === 'booked' || status === 'blocked',
+          dotColor: status === 'booked' ? '#dc2626' : '#6b7280',
+        };
+      }
     });
 
     // Mark today and past dates as disabled
@@ -137,15 +132,17 @@ export default function CalendarScreen() {
       
       while (current < end) {
         const dateString = current.toISOString().split('T')[0];
-        if (!unavailableDates.includes(dateString)) {
-          marked[dateString] = {
-            selected: true,
-            color: '#dcfce7',
-            textColor: '#166534',
-            disabled: false,
-            disableTouchEvent: false,
-          };
-        }
+        const dateAvailability = availability.find(a => a.date === dateString);
+        
+        // Always mark the range, but respect availability status
+        marked[dateString] = {
+          ...marked[dateString], // Preserve existing availability status
+          selected: true,
+          color: '#dcfce7', // Light green for range
+          textColor: '#166534',
+          disabled: dateAvailability?.status === 'booked' || dateAvailability?.status === 'blocked',
+          disableTouchEvent: dateAvailability?.status === 'booked' || dateAvailability?.status === 'blocked',
+        };
         current.setDate(current.getDate() + 1);
       }
     } else if (selectedDates.startDate) {
@@ -161,14 +158,18 @@ export default function CalendarScreen() {
     }
 
     setMarkedDates(marked);
-  }, [selectedDates, unavailableDates]);
+  }, [selectedDates, availability]);
 
   const handleDayPress = (day: DateData) => {
     const dateString = day.dateString;
 
-    // Check if date is unavailable
-    if (unavailableDates.includes(dateString)) {
-      Alert.alert('Date Unavailable', 'This date is already booked.');
+    // Check if date is unavailable using availability data
+    const dateAvailability = availability.find(a => a.date === dateString);
+    if (dateAvailability && dateAvailability.status !== 'available') {
+      const statusMessage = dateAvailability.status === 'booked'
+        ? 'This date is already booked.'
+        : 'This date is not available.';
+      Alert.alert('Date Unavailable', statusMessage);
       return;
     }
 
@@ -182,13 +183,13 @@ export default function CalendarScreen() {
       return;
     }
 
-    if (!selectedDates.startDate || (selectedDates.startDate && selectedDates.endDate)) {
-      // Start new selection
+    if (!selectedDates.startDate) {
+      // Start new selection - immediately set as single day booking
       setSelectedDates({
         startDate: dateString,
-        endDate: null,
+        endDate: dateString,
       });
-    } else if (selectedDates.startDate && !selectedDates.endDate) {
+    } else {
       const startDate = new Date(selectedDates.startDate);
       const endDate = new Date(dateString);
 
@@ -199,10 +200,10 @@ export default function CalendarScreen() {
           endDate: selectedDates.startDate,
         });
       } else if (endDate.getTime() === startDate.getTime()) {
-        // Same date selected, clear selection
+        // Same date selected, keep as single day booking
         setSelectedDates({
-          startDate: null,
-          endDate: null,
+          startDate: dateString,
+          endDate: dateString,
         });
       } else {
         // Check if any dates in between are unavailable
@@ -215,9 +216,10 @@ export default function CalendarScreen() {
           current.setDate(current.getDate() + 1);
         }
 
-        const hasUnavailableDates = datesInBetween.some(date => 
-          unavailableDates.includes(date)
-        );
+        const hasUnavailableDates = datesInBetween.some(date => {
+          const dateAvailability = availability.find(a => a.date === date);
+          return dateAvailability && dateAvailability.status !== 'available';
+        });
 
         if (hasUnavailableDates) {
           Alert.alert(
@@ -238,7 +240,7 @@ export default function CalendarScreen() {
 
   const handleConfirmDates = () => {
     if (!selectedDates.startDate || !selectedDates.endDate) {
-      Alert.alert('Incomplete Selection', 'Please select both start and end dates.');
+      Alert.alert('Incomplete Selection', 'Please select a date.');
       return;
     }
 
@@ -286,10 +288,8 @@ export default function CalendarScreen() {
       <View style={styles.instructions}>
         <Text style={styles.instructionsText}>
           {!selectedDates.startDate 
-            ? 'Tap to select your start date'
-            : !selectedDates.endDate 
-            ? 'Tap to select your end date'
-            : `${getTotalDays()} day${getTotalDays() === 1 ? '' : 's'} selected`
+            ? 'Tap to select a date'
+            : `${getTotalDays()} day${getTotalDays() === 1 ? '' : 's'} selected - tap another date to create a range`
           }
         </Text>
       </View>
@@ -333,7 +333,11 @@ export default function CalendarScreen() {
         <View style={styles.legendItems}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#fee2e2' }]} />
-            <Text style={styles.legendText}>Unavailable</Text>
+            <Text style={styles.legendText}>Booked</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: '#f3f4f6' }]} />
+            <Text style={styles.legendText}>Blocked</Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#44d62c' }]} />
@@ -357,10 +361,10 @@ export default function CalendarScreen() {
         <TouchableOpacity
           style={[
             styles.confirmButton,
-            (!selectedDates.startDate || !selectedDates.endDate) && styles.confirmButtonDisabled
+            !selectedDates.startDate && styles.confirmButtonDisabled
           ]}
           onPress={handleConfirmDates}
-          disabled={!selectedDates.startDate || !selectedDates.endDate}
+          disabled={!selectedDates.startDate}
         >
           <Text style={styles.confirmButtonText}>
             Confirm Dates

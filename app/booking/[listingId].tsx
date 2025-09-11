@@ -7,7 +7,10 @@ import { colors, spacing, typography } from '../../src/lib/design-system';
 import { useAuth } from '../../src/components/AuthProvider';
 import { supabase } from '../../src/lib/supabase';
 import { Calendar, DateData } from 'react-native-calendars';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { availabilityAPI } from '../../src/lib/api/availability';
+import { CalendarAvailability } from '../../shared-dist/utils/calendar';
+import { format, addDays, startOfDay } from 'date-fns';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -41,6 +44,7 @@ export default function BookingScreen() {
   const { listingId } = useLocalSearchParams();
   const router = useRouter();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   
   const [listing, setListing] = useState<ListingData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,47 +70,40 @@ export default function BookingScreen() {
     fetchListingDetails();
   }, [listingId]);
 
-  // Fetch booking availability for the listing
-  const { data: unavailableDates = [] } = useQuery({
+  // Fetch booking availability for the listing using the proper API
+  const { data: availability = [], isLoading: availabilityLoading } = useQuery({
     queryKey: ['listing-availability', listingId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('bookings')
-        .select('start_date, end_date')
-        .eq('listing_id', listingId)
-        .in('status', ['confirmed', 'active', 'pending'])
-        .gte('end_date', new Date().toISOString().split('T')[0]);
-
-      if (error) throw error;
+      const today = format(startOfDay(new Date()), 'yyyy-MM-dd');
+      const maxDate = format(addDays(new Date(), 365), 'yyyy-MM-dd');
       
-      // Generate array of unavailable dates
-      const unavailable: string[] = [];
-      data.forEach(booking => {
-        const start = new Date(booking.start_date);
-        const end = new Date(booking.end_date);
-        
-        for (let d = start; d <= end; d.setDate(d.getDate() + 1)) {
-          unavailable.push(d.toISOString().split('T')[0]);
-        }
-      });
-      
-      return unavailable;
+      return await availabilityAPI.getAvailabilitySafe(listingId, today, maxDate);
     },
     enabled: !!listingId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: true,
   });
 
   // Calculate marked dates for calendar
   const markedDates = useMemo(() => {
-    const marked: any = {}; // Changed from MarkedDates to any
+    const marked: any = {};
 
-    // Mark unavailable dates
-    unavailableDates.forEach(date => {
-      marked[date] = {
-        disabled: true,
-        disableTouchEvent: true,
-        color: colors.gray[200],
-        textColor: colors.text.secondary,
-      };
+    // Mark availability status for each date
+    availability.forEach((dateAvailability: CalendarAvailability) => {
+      const { date, status } = dateAvailability;
+      
+      if (status !== 'available') {
+        marked[date] = {
+          ...marked[date],
+          disabled: status === 'booked' || status === 'blocked',
+          disableTouchEvent: status === 'booked' || status === 'blocked',
+          color: status === 'booked' ? colors.semantic.error + '20' : colors.gray[200],
+          textColor: status === 'booked' ? colors.semantic.error : colors.text.secondary,
+          // Add dot for booked dates
+          marked: status === 'booked' || status === 'blocked',
+          dotColor: status === 'booked' ? colors.semantic.error : colors.gray[500],
+        };
+      }
     });
 
     // Mark today and past dates as disabled
@@ -143,6 +140,7 @@ export default function BookingScreen() {
         textColor: colors.white,
         disabled: false,
         disableTouchEvent: false,
+        marked: false, // Clear dot when selected
       };
 
       // Mark end date
@@ -154,6 +152,7 @@ export default function BookingScreen() {
         textColor: colors.white,
         disabled: false,
         disableTouchEvent: false,
+        marked: false, // Clear dot when selected
       };
 
       // Mark days in between
@@ -162,21 +161,35 @@ export default function BookingScreen() {
       
       while (current < end) {
         const dateString = current.toISOString().split('T')[0];
-        if (!unavailableDates.includes(dateString)) {
-          marked[dateString] = {
-            selected: true,
-            color: colors.primary.main + '40', // Semi-transparent
-            textColor: colors.primary.main,
-            disabled: false,
-            disableTouchEvent: false,
-          };
-        }
+        const dateAvailability = availability.find(a => a.date === dateString);
+        
+        // Always mark the range, but respect availability status
+        marked[dateString] = {
+          ...marked[dateString], // Preserve existing availability status
+          selected: true,
+          color: colors.primary.main + '40', // Semi-transparent green for range
+          textColor: colors.primary.main,
+          disabled: dateAvailability?.status === 'booked' || dateAvailability?.status === 'blocked',
+          disableTouchEvent: dateAvailability?.status === 'booked' || dateAvailability?.status === 'blocked',
+          marked: false, // Clear dot when selected
+        };
         current.setDate(current.getDate() + 1);
       }
+    } else if (selectedDates.startDate) {
+      // Mark only start date
+      marked[selectedDates.startDate] = {
+        ...marked[selectedDates.startDate],
+        selected: true,
+        color: colors.primary.main,
+        textColor: colors.white,
+        disabled: false,
+        disableTouchEvent: false,
+        marked: false, // Clear dot when selected
+      };
     }
 
     return marked;
-  }, [unavailableDates, selectedDates.startDate, selectedDates.endDate]);
+  }, [availability, selectedDates.startDate, selectedDates.endDate]);
 
   const fetchListingDetails = async () => {
     if (!listingId || typeof listingId !== 'string') {
@@ -218,9 +231,13 @@ export default function BookingScreen() {
   const handleDayPress = (day: DateData) => {
     const dateString = day.dateString;
     
-    // Check if date is unavailable
-    if (unavailableDates.includes(dateString)) {
-      Alert.alert('Date Unavailable', 'This date is already booked.');
+    // Check if date is unavailable using availability data
+    const dateAvailability = availability.find(a => a.date === dateString);
+    if (dateAvailability && dateAvailability.status !== 'available') {
+      const statusMessage = dateAvailability.status === 'booked' 
+        ? 'This date is already booked.' 
+        : 'This date is not available.';
+      Alert.alert('Date Unavailable', statusMessage);
       return;
     }
 
@@ -234,13 +251,14 @@ export default function BookingScreen() {
       return;
     }
 
-    if (!selectedDates.startDate || (selectedDates.startDate && selectedDates.endDate)) {
-      // Start new selection
+    if (!selectedDates.startDate) {
+      // Start new selection - immediately set as single day booking
       setSelectedDates({
         startDate: dateString,
-        endDate: null,
+        endDate: dateString,
       });
-    } else if (selectedDates.startDate && !selectedDates.endDate) {
+    } else {
+      // Handle range selection - both startDate and endDate exist, so start new selection
       const startDate = new Date(selectedDates.startDate);
       const endDate = new Date(dateString);
 
@@ -251,10 +269,10 @@ export default function BookingScreen() {
           endDate: selectedDates.startDate,
         });
       } else if (endDate.getTime() === startDate.getTime()) {
-        // Same date selected, clear selection
+        // Same date selected, keep as single day booking
         setSelectedDates({
-          startDate: null,
-          endDate: null,
+          startDate: dateString,
+          endDate: dateString,
         });
       } else {
         // Check if any dates in between are unavailable
@@ -267,9 +285,10 @@ export default function BookingScreen() {
           current.setDate(current.getDate() + 1);
         }
 
-        const hasUnavailableDates = datesInBetween.some(date => 
-          unavailableDates.includes(date)
-        );
+        const hasUnavailableDates = datesInBetween.some(date => {
+          const dateAvailability = availability.find(a => a.date === date);
+          return dateAvailability && dateAvailability.status !== 'available';
+        });
 
         if (hasUnavailableDates) {
           Alert.alert(
@@ -631,13 +650,31 @@ export default function BookingScreen() {
                       width: 12,
                       height: 12,
                       borderRadius: 6,
-                      backgroundColor: colors.gray[300]
+                      backgroundColor: colors.semantic.error
                     }} />
                     <Text style={{
                       fontSize: typography.sizes.xs,
                       color: colors.text.secondary
                     }}>
                       Booked
+                    </Text>
+                  </View>
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: spacing.xs
+                  }}>
+                    <View style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: 6,
+                      backgroundColor: colors.gray[500]
+                    }} />
+                    <Text style={{
+                      fontSize: typography.sizes.xs,
+                      color: colors.text.secondary
+                    }}>
+                      Blocked
                     </Text>
                   </View>
                 </View>
@@ -673,20 +710,32 @@ export default function BookingScreen() {
                 )}
                 
                 <TouchableOpacity
+                  onPress={() => {
+                    // Refetch availability data
+                    if (availabilityLoading) return;
+                    queryClient.invalidateQueries({ queryKey: ['listing-availability', listingId] });
+                  }}
+                  disabled={availabilityLoading}
                   style={{
                     flex: 1,
-                    backgroundColor: colors.gray[100],
+                    backgroundColor: availabilityLoading ? colors.gray[200] : colors.gray[100],
                     padding: spacing.sm,
                     borderRadius: 8,
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    flexDirection: 'row',
+                    justifyContent: 'center',
+                    gap: spacing.xs
                   }}
                 >
+                  {availabilityLoading && (
+                    <ActivityIndicator size="small" color={colors.text.secondary} />
+                  )}
                   <Text style={{
                     fontSize: typography.sizes.sm,
                     fontWeight: typography.weights.medium,
                     color: colors.text.secondary
                   }}>
-                    Refresh
+                    {availabilityLoading ? 'Loading...' : 'Refresh'}
                   </Text>
                 </TouchableOpacity>
               </View>

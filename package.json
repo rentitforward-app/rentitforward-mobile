@@ -30,6 +30,7 @@
     "@stripe/stripe-react-native": "0.50.3",
     "@supabase/supabase-js": "^2.39.0",
     "@tanstack/react-query": "^5.82.0",
+    "date-fns": "^4.1.0",
     "expo-calendar": "~15.0.6",
     "expo-constants": "~18.0.8",
     "expo-document-picker": "~14.0.6",
@@ -81,7 +82,9 @@
   "expo": {
     "doctor": {
       "reactNativeDirectoryCheck": {
-        "exclude": ["react-native-encrypted-storage"]
+        "exclude": [
+          "react-native-encrypted-storage"
+        ]
       }
     }
   },
