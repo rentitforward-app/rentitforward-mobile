@@ -10,7 +10,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../src/stores/auth';
@@ -56,7 +56,6 @@ export default function ConversationScreen() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const flatListRef = useRef<FlatList>(null);
-  const insets = useSafeAreaInsets();
   
   const [messageText, setMessageText] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -277,29 +276,29 @@ export default function ConversationScreen() {
 
   if (conversationLoading || messagesLoading) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
+      <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Loading conversation...</Text>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (!conversation) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
+      <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Conversation not found</Text>
           <TouchableOpacity style={styles.button} onPress={() => router.back()}>
             <Text style={styles.buttonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -385,7 +384,7 @@ export default function ConversationScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </View>
+    </SafeAreaView>
   );
 }
 

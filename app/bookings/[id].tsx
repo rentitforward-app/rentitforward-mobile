@@ -140,6 +140,7 @@ export default function BookingDetailScreen() {
       // Get the current session token
       const { data: { session } } = await supabase.auth.getSession();
       
+      
       if (!session?.access_token) {
         throw new Error('No authentication token found. Please log in again.');
       }
@@ -154,8 +155,8 @@ export default function BookingDetailScreen() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to cancel booking');
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to cancel booking');
       }
 
       return response.json();
@@ -163,19 +164,25 @@ export default function BookingDetailScreen() {
     onSuccess: () => {
       // Invalidate and refetch booking details
       queryClient.invalidateQueries({ queryKey: ['booking-details', id] });
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
       setShowCancelModal(false);
+      Alert.alert('Success', 'Booking has been cancelled successfully');
+    },
+    onError: (error) => {
+      Alert.alert('Error', error.message || 'Failed to cancel booking');
     },
   });
-
-  const handleCancelBooking = async (reason: string, note: string) => {
-    await cancelBookingMutation.mutateAsync({ reason, note });
-  };
 
   // Check if booking can be cancelled
   const canCancel = booking && 
     user && 
     (booking.renter_id === user.id || booking.owner_id === user.id) &&
     (booking.status === 'confirmed' || booking.status === 'pending' || booking.status === 'payment_required');
+
+
+  const handleCancelBooking = async (reason: string, note: string) => {
+    cancelBookingMutation.mutate({ reason, note });
+  };
 
   if (isLoading) {
     return (
@@ -432,6 +439,7 @@ export default function BookingDetailScreen() {
               </TouchableOpacity>
             )}
             
+            
             <TouchableOpacity 
               style={[styles.actionButton, styles.reportButton]}
               onPress={() => {
@@ -440,7 +448,7 @@ export default function BookingDetailScreen() {
                   'What issue would you like to report?',
                   [
                     { text: 'Cancel', style: 'cancel' },
-                    { text: 'Report', onPress: () => console.log('Report issue') }
+                    { text: 'Report', onPress: () => {} }
                   ]
                 );
               }}
@@ -453,7 +461,6 @@ export default function BookingDetailScreen() {
               style={[styles.actionButton, styles.messageButton]}
               onPress={() => {
                 // Navigate to messages
-                console.log('Navigate to messages');
               }}
             >
               <Ionicons name="chatbubble-outline" size={20} color={colors.primary.main} />
@@ -464,7 +471,6 @@ export default function BookingDetailScreen() {
               style={[styles.actionButton, styles.viewButton]}
               onPress={() => {
                 // Navigate to listing
-                console.log('Navigate to listing');
               }}
             >
               <Ionicons name="document-text-outline" size={20} color={colors.text.primary} />
@@ -486,7 +492,7 @@ export default function BookingDetailScreen() {
                     'Are you sure you want to approve this booking?',
                     [
                       { text: 'Cancel', style: 'cancel' },
-                      { text: 'Approve', onPress: () => console.log('Approve booking') }
+                      { text: 'Approve', onPress: () => {} }
                     ]
                   );
                 }}
@@ -502,7 +508,7 @@ export default function BookingDetailScreen() {
                     'Are you sure you want to decline this booking?',
                     [
                       { text: 'Cancel', style: 'cancel' },
-                      { text: 'Decline', onPress: () => console.log('Decline booking') }
+                      { text: 'Decline', onPress: () => {} }
                     ]
                   );
                 }}
@@ -956,6 +962,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: spacing.sm,
   },
+  cancelBookingButton: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.semantic.error,
+  },
   reportButton: {
     backgroundColor: colors.white,
     borderWidth: 1,
@@ -971,6 +982,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.gray[300],
   },
+  cancelBookingButtonText: {
+    color: colors.semantic.error,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold,
+    marginLeft: spacing.sm,
+  },
   reportButtonText: {
     color: colors.semantic.error,
     fontSize: typography.sizes.base,
@@ -985,17 +1002,6 @@ const styles = StyleSheet.create({
   },
   viewButtonText: {
     color: colors.text.primary,
-    fontSize: typography.sizes.base,
-    fontWeight: typography.weights.semibold,
-    marginLeft: spacing.sm,
-  },
-  cancelBookingButton: {
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.semantic.error,
-  },
-  cancelBookingButtonText: {
-    color: colors.semantic.error,
     fontSize: typography.sizes.base,
     fontWeight: typography.weights.semibold,
     marginLeft: spacing.sm,

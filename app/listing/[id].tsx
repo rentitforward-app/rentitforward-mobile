@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, Dimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { colors, spacing, typography } from '../../src/lib/design-system';
@@ -54,7 +54,6 @@ export default function ListingDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { user } = useAuth();
-  const insets = useSafeAreaInsets();
   
   const [listing, setListing] = useState<ListingData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -291,12 +290,12 @@ export default function ListingDetailScreen() {
     return (
       <>
         <Stack.Screen options={{ headerShown: false }} />
-        <View style={{ flex: 1, backgroundColor: colors.white, paddingTop: insets.top }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator size="large" color={colors.primary.main} />
             <Text style={{ marginTop: spacing.md, color: colors.text.secondary }}>Loading listing...</Text>
           </View>
-        </View>
+        </SafeAreaView>
       </>
     );
   }
@@ -305,7 +304,7 @@ export default function ListingDetailScreen() {
     return (
       <>
         <Stack.Screen options={{ headerShown: false }} />
-        <View style={{ flex: 1, backgroundColor: colors.white, paddingTop: insets.top }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ fontSize: typography.sizes.lg, color: colors.text.primary }}>Listing not found</Text>
             <TouchableOpacity
@@ -321,7 +320,7 @@ export default function ListingDetailScreen() {
               <Text style={{ color: colors.white, fontWeight: typography.weights.semibold }}>Go Back</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </SafeAreaView>
       </>
     );
   }
@@ -329,7 +328,7 @@ export default function ListingDetailScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={{ flex: 1, backgroundColor: colors.white, paddingTop: insets.top }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }} edges={['top', 'left', 'right']}>
         <View style={{
           flexDirection: 'row',
           alignItems: 'center',
@@ -681,7 +680,7 @@ export default function ListingDetailScreen() {
           </View>
         </ScrollView>
 
-        <View style={{ backgroundColor: colors.white, paddingBottom: insets.bottom }}>
+        <SafeAreaView edges={['bottom']} style={{ backgroundColor: colors.white }}>
           <View style={{
             flexDirection: 'row',
             padding: spacing.md,
@@ -739,8 +738,8 @@ export default function ListingDetailScreen() {
               )}
             </TouchableOpacity>
           </View>
-        </View>
-      </View>
+        </SafeAreaView>
+      </SafeAreaView>
     </>
   );
 } 

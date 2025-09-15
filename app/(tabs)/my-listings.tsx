@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, FlatList, Alert, ActivityIndicator, RefreshControl } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography } from '../../src/lib/design-system';
 import { useAuth } from '../../src/components/AuthProvider';
@@ -49,7 +49,6 @@ export default function MyListingsScreen() {
   const [activeTab, setActiveTab] = useState<'items' | 'bookings' | 'earnings'>('items');
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const insets = useSafeAreaInsets();
   const [updatingListings, setUpdatingListings] = useState<Set<string>>(new Set());
   
   const { user } = useAuth();
@@ -702,14 +701,14 @@ export default function MyListingsScreen() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.neutral.lightGray, paddingTop: insets.top }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.neutral.lightGray }}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color={colors.primary.main} />
           <Text style={{ marginTop: spacing.md, color: colors.text.secondary }}>
             Loading your listings...
           </Text>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
