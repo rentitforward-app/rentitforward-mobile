@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useAuthStore } from '../../src/stores/auth';
+import { useAuth } from '../../src/components/AuthProvider';
 import { supabase } from '../../src/lib/supabase';
 
 interface Message {
@@ -53,7 +53,7 @@ interface ConversationData {
 export default function ConversationScreen() {
   const { id: bookingId } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const flatListRef = useRef<FlatList>(null);
   

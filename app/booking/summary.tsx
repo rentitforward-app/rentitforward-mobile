@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useAuthStore } from '../../src/stores/auth';
+import { useAuth } from '../../src/components/AuthProvider';
 import { supabase } from '../../src/lib/supabase';
 import type { Listing } from '@shared/types/listing';
 import type { CreateBooking, DeliveryMethod } from '@shared/types/booking';
@@ -40,7 +40,7 @@ export default function BookingSummaryScreen() {
   } = useLocalSearchParams();
 
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user } = useAuth();
 
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [additionalRequests, setAdditionalRequests] = useState(

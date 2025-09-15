@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, createContext, useContext } from 'react';
-import { useAuthStore } from '../stores/auth';
+import { useAuth } from './AuthProvider';
 import { getMobileOneSignalService, MobileOneSignalService } from '../lib/onesignal';
 
 interface OneSignalContextType {
@@ -26,7 +26,7 @@ interface OneSignalProviderProps {
 }
 
 export function OneSignalProvider({ children }: OneSignalProviderProps) {
-  const { user } = useAuthStore();
+  const { user } = useAuth();
   const hasInitialized = useRef(false);
   const oneSignalService = getMobileOneSignalService();
 

@@ -134,34 +134,46 @@ export default function BookingDetailScreen() {
     return diffDays;
   };
 
-  // Cancel booking mutation
+  // Cancel booking mutation - Direct database operation
   const cancelBookingMutation = useMutation({
     mutationFn: async ({ reason, note }: { reason: string; note: string }) => {
-      // Get the current session token
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      
-      if (!session?.access_token) {
-        throw new Error('No authentication token found. Please log in again.');
+      if (!booking) {
+        throw new Error('Booking not found');
       }
 
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/bookings/${id}/cancel`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ reason, note }),
-      });
+      // Calculate cancellation fee and refund amount
+      const now = new Date();
+      const startDate = new Date(booking.start_date);
+      const hoursUntilStart = (startDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+      const isLessThan24Hours = hoursUntilStart < 24;
+      
+      const totalAmount = booking.total_amount || 0;
+      const cancellationFee = isLessThan24Hours ? totalAmount * 0.5 : 0;
+      const refundAmount = totalAmount - cancellationFee;
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to cancel booking');
+      // Update booking in database
+      const { data, error } = await supabase
+        .from('bookings')
+        .update({
+          status: 'cancelled',
+          cancelled_at: new Date().toISOString(),
+          cancellation_reason: reason,
+          cancellation_note: note,
+          cancellation_fee: cancellationFee,
+          refund_amount: refundAmount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error(error.message || 'Failed to cancel booking');
       }
 
-      return response.json();
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       // Invalidate and refetch booking details
       queryClient.invalidateQueries({ queryKey: ['booking-details', id] });
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
@@ -181,7 +193,7 @@ export default function BookingDetailScreen() {
 
 
   const handleCancelBooking = async (reason: string, note: string) => {
-    cancelBookingMutation.mutate({ reason, note });
+    await cancelBookingMutation.mutateAsync({ reason, note });
   };
 
   if (isLoading) {
@@ -429,7 +441,7 @@ export default function BookingDetailScreen() {
           <Text style={styles.sectionTitle}>Actions</Text>
           <View style={styles.actionsCard}>
             {/* Cancel Booking Button */}
-            {canCancel && (
+            {booking && user && canCancel && (
               <TouchableOpacity 
                 style={[styles.actionButton, styles.cancelBookingButton]}
                 onPress={() => setShowCancelModal(true)}

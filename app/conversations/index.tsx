@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { useAuthStore } from '../../src/stores/auth';
+import { useAuth } from '../../src/components/AuthProvider';
 import { supabase } from '../../src/lib/supabase';
 
 interface Conversation {
@@ -45,7 +45,7 @@ interface Conversation {
 
 export default function ConversationsScreen() {
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
