@@ -18,9 +18,9 @@ export function initSentry(): void {
     // Enable error monitoring
     enableAutoSessionTracking: true,
     // Enable performance monitoring
-    tracesSampleRate: __DEV__ ? 1.0 : 0.1, // 100% in dev, 10% in production
+    tracesSampleRate: __DEV__ ? 0 : 0.1, // 0% in dev, 10% in production
     // Enable profiling
-    profilesSampleRate: __DEV__ ? 1.0 : 0.1, // 100% in dev, 10% in production
+    profilesSampleRate: __DEV__ ? 0 : 0.1, // 0% in dev, 10% in production
     // Add more context data to events (IP address, cookies, user, etc.)
     sendDefaultPii: true,
     // Set environment
@@ -37,9 +37,7 @@ export function initSentry(): void {
       };
       
       // Filter out sensitive data in development
-      if (__DEV__) {
-        console.log('Sentry Event:', event);
-      }
+      // Removed console.log to reduce spam in development
       
       return event;
     },

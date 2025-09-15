@@ -657,40 +657,45 @@ export default function MyListingsScreen() {
   const renderStatsCard = (title: string, value: string | number, icon: string, color: string) => (
     <View style={{
       backgroundColor: colors.white,
-      borderRadius: 12,
-      padding: spacing.md,
+      borderRadius: 16,
+      padding: spacing.lg,
+      flexDirection: 'row',
       alignItems: 'center',
       shadowColor: colors.black,
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 2,
+      shadowOpacity: 0.08,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 3,
+      marginBottom: spacing.sm,
     }}>
       <View style={{
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: color + '20',
+        width: 56,
+        height: 56,
+        borderRadius: 16,
+        backgroundColor: color + '15',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: spacing.sm,
+        marginRight: spacing.md,
       }}>
-        <Ionicons name={icon as any} size={24} color={color} />
+        <Ionicons name={icon as any} size={28} color={color} />
       </View>
-      <Text style={{
-        fontSize: typography.sizes['2xl'],
-        fontWeight: typography.weights.bold,
-        color: colors.text.primary,
-        marginBottom: spacing.xs / 2,
-      }}>
-        {value}
-      </Text>
-      <Text style={{
-        fontSize: typography.sizes.sm,
-        color: colors.text.secondary,
-        textAlign: 'center',
-      }}>
-        {title}
-      </Text>
+      <View style={{ flex: 1 }}>
+        <Text style={{
+          fontSize: typography.sizes['3xl'],
+          fontWeight: typography.weights.bold,
+          color: colors.text.primary,
+          marginBottom: spacing.xs / 2,
+        }}>
+          {value}
+        </Text>
+        <Text style={{
+          fontSize: typography.sizes.base,
+          color: colors.text.secondary,
+          fontWeight: typography.weights.medium,
+        }}>
+          {title}
+        </Text>
+      </View>
     </View>
   );
 
@@ -869,54 +874,69 @@ export default function MyListingsScreen() {
 
         {activeTab === 'earnings' && (
           <View style={{ padding: spacing.md }}>
-            {/* Stats Cards */}
+            {/* Stats Cards - Single Column Layout */}
             <View style={{
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              gap: spacing.md,
-              marginBottom: spacing.lg,
+              gap: spacing.sm,
+              marginBottom: spacing.xl,
             }}>
-              <View style={{ width: '48%' }}>
-                {renderStatsCard('Total Items', listings.length, 'cube-outline', colors.primary.main)}
-              </View>
-              <View style={{ width: '48%' }}>
-                {renderStatsCard('Total Bookings', totalBookings, 'calendar-outline', colors.semantic.success)}
-              </View>
-              <View style={{ width: '48%' }}>
-                {renderStatsCard('Total Earnings', formatPrice(totalEarnings), 'cash-outline', colors.semantic.warning)}
-              </View>
-              <View style={{ width: '48%' }}>
-                {renderStatsCard('Avg Rating', averageRating > 0 ? averageRating.toFixed(1) : 'N/A', 'star-outline', colors.semantic.info)}
-              </View>
+              {renderStatsCard('Total Items', listings.length, 'cube-outline', colors.primary.main)}
+              {renderStatsCard('Total Bookings', totalBookings, 'calendar-outline', colors.semantic.success)}
+              {renderStatsCard('Total Earnings', formatPrice(totalEarnings), 'cash-outline', colors.semantic.warning)}
+              {renderStatsCard('Avg Rating', averageRating > 0 ? averageRating.toFixed(1) : 'N/A', 'star-outline', colors.semantic.info)}
             </View>
 
             {/* Top Performing Items */}
             <View style={{
               backgroundColor: colors.white,
-              borderRadius: 12,
-              padding: spacing.md,
+              borderRadius: 16,
+              padding: spacing.lg,
               shadowColor: colors.black,
-              shadowOpacity: 0.1,
-              shadowRadius: 4,
-              elevation: 2,
+              shadowOpacity: 0.08,
+              shadowRadius: 8,
+              shadowOffset: { width: 0, height: 2 },
+              elevation: 3,
             }}>
               <Text style={{
-                fontSize: typography.sizes.lg,
+                fontSize: typography.sizes.xl,
                 fontWeight: typography.weights.semibold,
                 color: colors.text.primary,
-                marginBottom: spacing.md,
+                marginBottom: spacing.lg,
               }}>
                 Top Performing Items
               </Text>
               {listings.length === 0 ? (
-                <View style={{ alignItems: 'center', paddingVertical: spacing.lg }}>
-                  <Ionicons name="cube-outline" size={32} color={colors.gray[400]} />
+                <View style={{ 
+                  alignItems: 'center', 
+                  paddingVertical: spacing.xl,
+                  paddingHorizontal: spacing.md,
+                }}>
+                  <View style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 32,
+                    backgroundColor: colors.gray[100],
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: spacing.md,
+                  }}>
+                    <Ionicons name="cube-outline" size={32} color={colors.gray[400]} />
+                  </View>
+                  <Text style={{
+                    fontSize: typography.sizes.lg,
+                    fontWeight: typography.weights.semibold,
+                    color: colors.text.primary,
+                    marginBottom: spacing.sm,
+                    textAlign: 'center',
+                  }}>
+                    No items yet
+                  </Text>
                   <Text style={{
                     fontSize: typography.sizes.sm,
                     color: colors.text.secondary,
-                    marginTop: spacing.sm,
+                    textAlign: 'center',
+                    lineHeight: typography.lineHeights.relaxed * typography.sizes.sm,
                   }}>
-                    No items to show earnings for yet.
+                    Start earning by listing your first item!
                   </Text>
                 </View>
               ) : (
@@ -929,22 +949,22 @@ export default function MyListingsScreen() {
                         flexDirection: 'row',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        paddingVertical: spacing.sm,
+                        paddingVertical: spacing.md,
                         borderBottomWidth: index < 2 ? 1 : 0,
-                        borderBottomColor: colors.gray[200],
+                        borderBottomColor: colors.gray[100],
                       }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                           <View style={{
-                            width: 24,
-                            height: 24,
-                            borderRadius: 12,
+                            width: 32,
+                            height: 32,
+                            borderRadius: 16,
                             backgroundColor: colors.primary.main,
                             alignItems: 'center',
                             justifyContent: 'center',
-                            marginRight: spacing.sm,
+                            marginRight: spacing.md,
                           }}>
                             <Text style={{
-                              fontSize: typography.sizes.sm,
+                              fontSize: typography.sizes.base,
                               fontWeight: typography.weights.bold,
                               color: colors.white,
                             }}>
@@ -953,14 +973,15 @@ export default function MyListingsScreen() {
                           </View>
                           <View style={{ flex: 1 }}>
                             <Text style={{
-                              fontSize: typography.sizes.sm,
-                              fontWeight: typography.weights.medium,
+                              fontSize: typography.sizes.base,
+                              fontWeight: typography.weights.semibold,
                               color: colors.text.primary,
+                              marginBottom: spacing.xs / 2,
                             }} numberOfLines={1}>
                               {listing.title}
                             </Text>
                             <Text style={{
-                              fontSize: typography.sizes.xs,
+                              fontSize: typography.sizes.sm,
                               color: colors.text.secondary,
                             }}>
                               {listing.total_bookings} bookings
@@ -969,14 +990,15 @@ export default function MyListingsScreen() {
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
                           <Text style={{
-                            fontSize: typography.sizes.sm,
-                            fontWeight: typography.weights.semibold,
+                            fontSize: typography.sizes.base,
+                            fontWeight: typography.weights.bold,
                             color: colors.text.primary,
+                            marginBottom: spacing.xs / 2,
                           }}>
                             {formatPrice(listing.total_earnings)}
                           </Text>
                           <Text style={{
-                            fontSize: typography.sizes.xs,
+                            fontSize: typography.sizes.sm,
                             color: colors.text.secondary,
                           }}>
                             {formatPrice(listing.price_per_day)}/day

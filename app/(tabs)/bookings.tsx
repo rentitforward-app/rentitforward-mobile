@@ -69,18 +69,18 @@ export default function BookingsScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   // Clean console log without infinite loop
-  console.log('BOOKINGS - User:', user ? user.email : 'No user');
+  // Removed console.log to reduce spam
 
   // Fetch bookings with simplified, working query
   const { data: allBookings = [], isLoading, refetch, error } = useQuery({
     queryKey: ['bookings', user?.id],
     queryFn: async () => {
       if (!user?.id) {
-        console.log('BOOKINGS - No user ID, returning empty array');
+        // Removed console.log to reduce spam
         return [];
       }
 
-      console.log('BOOKINGS - Fetching for user:', user.id);
+      // Removed console.log to reduce spam
 
       // Fetch all bookings for this user
       const { data: allUserBookings, error: bookingsError } = await supabase
@@ -105,7 +105,7 @@ export default function BookingsScreen() {
         throw bookingsError;
       }
 
-      console.log('BOOKINGS - Raw bookings:', allUserBookings?.length || 0);
+      // Removed console.log to reduce spam
 
       if (!allUserBookings || allUserBookings.length === 0) {
         return [];
@@ -125,7 +125,7 @@ export default function BookingsScreen() {
         .select('id, full_name, email, phone_number, avatar_url')
         .in('id', Array.from(userIds));
 
-      console.log('BOOKINGS - Profiles fetched:', profiles?.length || 0);
+      // Removed console.log to reduce spam
 
       // Create profiles map
       const profilesMap: { [key: string]: Profile } = {};
@@ -159,7 +159,7 @@ export default function BookingsScreen() {
           };
         });
 
-      console.log('BOOKINGS - Transformed bookings:', transformedBookings.length);
+      // Removed console.log to reduce spam
       return transformedBookings;
     },
     enabled: !!user?.id,
@@ -206,14 +206,7 @@ export default function BookingsScreen() {
     const statusColor = statusColors[booking.status as keyof typeof statusColors] || statusColors.pending;
     const imageUri = booking.listing.images?.[0] || 'https://via.placeholder.com/100';
     
-    // Debug price data
-    console.log('BOOKING PRICE DEBUG:', {
-      id: booking.id,
-      total_amount: booking.total_amount,
-      subtotal: booking.subtotal,
-      total_price: booking.total_price,
-      price_per_day: booking.listing.price_per_day
-    });
+    // Debug price data - removed console.log to reduce spam
 
     return (
       <TouchableOpacity

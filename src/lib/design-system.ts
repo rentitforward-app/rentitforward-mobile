@@ -42,6 +42,13 @@ const lightColors = {
     error: '#EF4444',
     info: '#3B82F6',
   },
+  success: '#10B981',
+  warning: '#F59E0B',
+  error: '#EF4444',
+  info: '#3B82F6',
+  accent: {
+    yellow: '#F59E0B',
+  },
 } as const;
 
 // Local typography definitions
@@ -93,6 +100,11 @@ export const colors = {
   gray: lightColors.gray,
   text: lightColors.text,
   semantic: lightColors.semantic,
+  success: lightColors.success,
+  warning: lightColors.warning,
+  error: lightColors.error,
+  info: lightColors.info,
+  accent: lightColors.accent,
 } as const;
 
 // Export shared typography with React Native compatible values
@@ -109,6 +121,47 @@ export const typography = {
     tight: 1.25,
     normal: 1.5,
     relaxed: 1.75,
+  },
+  // Add missing typography properties for booking details
+  h1: {
+    fontSize: 32,
+    fontWeight: '700' as const,
+    lineHeight: 1.3,
+  },
+  h2: {
+    fontSize: 24,
+    fontWeight: '600' as const,
+    lineHeight: 1.4,
+  },
+  h3: {
+    fontSize: 18,
+    fontWeight: '600' as const,
+    lineHeight: 1.4,
+  },
+  body: {
+    fontSize: 16,
+    fontWeight: '400' as const,
+    lineHeight: 1.5,
+  },
+  bodySmall: {
+    fontSize: 14,
+    fontWeight: '400' as const,
+    lineHeight: 1.4,
+  },
+  caption: {
+    fontSize: 12,
+    fontWeight: '400' as const,
+    lineHeight: 1.4,
+  },
+  titleMedium: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    lineHeight: 1.4,
+  },
+  titleSmall: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    lineHeight: 1.4,
   },
 } as const;
 

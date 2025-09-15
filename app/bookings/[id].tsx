@@ -5,14 +5,18 @@ import {
   TouchableOpacity, 
   StyleSheet,
   ScrollView,
-  ActivityIndicator 
+  ActivityIndicator,
+  Image,
+  Alert
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../src/lib/supabase';
 import { useAuthStore } from '../../src/stores/auth';
 import { colors, spacing, typography } from '../../src/lib/design-system';
+import { Header } from '../../src/components/Header';
 
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -26,7 +30,7 @@ export default function BookingDetailScreen() {
     queryFn: async () => {
       if (!id) throw new Error('No booking ID provided');
       
-      console.log('Fetching booking details for ID:', id);
+      // Removed console.log to reduce spam
       
       const { data, error } = await supabase
         .from('bookings')
@@ -47,7 +51,7 @@ export default function BookingDetailScreen() {
               avatar_url
             )
           ),
-          renter:renter_id (
+          renter:profiles!renter_id (
             id,
             full_name,
             email,
@@ -63,25 +67,81 @@ export default function BookingDetailScreen() {
         throw error;
       }
 
-      console.log('Booking details fetched:', data);
+      // Removed console.log to reduce spam
       return data;
     },
     enabled: !!id,
   });
 
+  // Helper functions
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'confirmed':
+        return { bg: colors.semantic.success, text: colors.white };
+      case 'pending':
+        return { bg: colors.semantic.warning, text: colors.text.primary };
+      case 'payment_required':
+        return { bg: '#FFA500', text: colors.white };
+      case 'cancelled':
+        return { bg: colors.semantic.error, text: colors.white };
+      case 'completed':
+        return { bg: colors.semantic.info, text: colors.white };
+      default:
+        return { bg: colors.neutral.mediumGray, text: colors.text.primary };
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'confirmed':
+        return 'Confirmed';
+      case 'pending':
+        return 'Pending';
+      case 'payment_required':
+        return 'Payment Required';
+      case 'cancelled':
+        return 'Cancelled';
+      case 'completed':
+        return 'Completed';
+      default:
+        return status.charAt(0).toUpperCase() + status.slice(1);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+
+  const formatPrice = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount);
+  };
+
+  const calculateDuration = (startDate: string, endDate: string) => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
   if (isLoading) {
     return (
-      <View style={[screenStyles.container, { paddingTop: insets.top }]}>
-        <View style={screenStyles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={screenStyles.backButton}>
-            <Text style={screenStyles.backButtonText}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={screenStyles.headerTitle}>Booking Details</Text>
-          <View style={screenStyles.placeholder} />
-        </View>
-        <View style={screenStyles.loadingContainer}>
+      <View style={styles.container}>
+        <Header 
+          title="Booking Details"
+          showBackButton={true}
+          onBackPress={() => router.back()}
+        />
+        <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary.main} />
-          <Text style={screenStyles.loadingText}>Loading booking details...</Text>
+          <Text style={styles.loadingText}>Loading booking details...</Text>
         </View>
       </View>
     );
@@ -89,125 +149,348 @@ export default function BookingDetailScreen() {
 
   if (error || !booking) {
     return (
-      <View style={[screenStyles.container, { paddingTop: insets.top }]}>
-        <View style={screenStyles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={screenStyles.backButton}>
-            <Text style={screenStyles.backButtonText}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={screenStyles.headerTitle}>Booking Details</Text>
-          <View style={screenStyles.placeholder} />
-        </View>
-        <View style={screenStyles.errorContainer}>
-          <Text style={screenStyles.errorText}>
-            {error?.message || 'Booking not found'}
+      <View style={styles.container}>
+        <Header 
+          title="Booking Details"
+          showBackButton={true}
+          onBackPress={() => router.back()}
+        />
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={48} color={colors.semantic.error} />
+          <Text style={styles.errorTitle}>Error Loading Booking</Text>
+          <Text style={styles.errorText}>
+            {error?.message || 'Unable to load booking details. Please try again.'}
           </Text>
           <TouchableOpacity 
-            style={screenStyles.retryButton} 
+            style={styles.retryButton}
             onPress={() => router.back()}
           >
-            <Text style={screenStyles.retryButtonText}>Go Back</Text>
+            <Text style={styles.retryButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
       </View>
     );
   }
 
-  const isOwner = booking.owner_id === user?.id;
-  const isRenter = booking.renter_id === user?.id;
-  const otherUser = isRenter ? booking.listings?.profiles : booking.renter;
+  const statusColor = getStatusColor(booking.status);
+  const duration = calculateDuration(booking.start_date, booking.end_date);
 
   return (
-    <View style={[screenStyles.container, { paddingTop: insets.top }]}>
-      <View style={screenStyles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={screenStyles.backButton}>
-          <Text style={screenStyles.backButtonText}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={screenStyles.headerTitle}>Booking Details</Text>
-        <View style={screenStyles.placeholder} />
-      </View>
+    <View style={styles.container}>
+      <Header 
+        title="Booking Details"
+        showBackButton={true}
+        onBackPress={() => router.back()}
+      />
 
-      <ScrollView style={screenStyles.scrollContainer} showsVerticalScrollIndicator={false}>
-        {/* Status Section */}
-        <View style={screenStyles.section}>
-          <Text style={screenStyles.sectionTitle}>Booking Status</Text>
-          <View style={screenStyles.statusContainer}>
-            <Text style={screenStyles.statusText}>{booking.status}</Text>
+      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        {/* Status Badge */}
+        <View style={styles.statusContainer}>
+          <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
+            <Text style={[styles.statusText, { color: statusColor.text }]}>
+              {getStatusText(booking.status)}
+            </Text>
           </View>
-          <Text style={screenStyles.bookingId}>Booking ID: {booking.id}</Text>
         </View>
 
         {/* Item Information */}
-        <View style={screenStyles.section}>
-          <Text style={screenStyles.sectionTitle}>Item Details</Text>
-          <View style={screenStyles.itemCard}>
-            <Text style={screenStyles.itemTitle}>
-              {booking.listings?.title || 'Unknown Item'}
-            </Text>
-            <Text style={screenStyles.itemPrice}>
-              ${booking.listings?.price_per_day || 0}/day
-            </Text>
-          </View>
-        </View>
-
-        {/* User Information */}
-        <View style={screenStyles.section}>
-          <Text style={screenStyles.sectionTitle}>
-            {isRenter ? 'Owner Information' : 'Renter Information'}
-          </Text>
-          <View style={screenStyles.userCard}>
-            <Text style={screenStyles.userName}>
-              {otherUser?.full_name || 'Unknown User'}
-            </Text>
-            <Text style={screenStyles.userEmail}>{otherUser?.email}</Text>
-          </View>
-        </View>
-
-        {/* Price Information */}
-        <View style={screenStyles.section}>
-          <Text style={screenStyles.sectionTitle}>Price Details</Text>
-          <View style={screenStyles.priceCard}>
-            <View style={screenStyles.priceRow}>
-              <Text style={screenStyles.priceLabel}>Total Amount</Text>
-              <Text style={screenStyles.priceValue}>
-                ${booking.total_amount?.toFixed(2) || booking.subtotal?.toFixed(2) || '0.00'}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Item Information</Text>
+          <View style={styles.itemCard}>
+            {booking.listings?.images?.[0] && (
+              <Image 
+                source={{ uri: booking.listings.images[0] }} 
+                style={styles.itemImage}
+                resizeMode="cover"
+              />
+            )}
+            <View style={styles.itemDetails}>
+              <Text style={styles.itemTitle}>{booking.listings?.title}</Text>
+              <Text style={styles.itemCategory}>{booking.listings?.category}</Text>
+              <Text style={styles.itemPrice}>
+                {formatPrice(booking.price_per_day)}/day
               </Text>
             </View>
           </View>
         </View>
+
+        {/* Rental Period */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Rental Period</Text>
+          <View style={styles.periodCard}>
+            <View style={styles.dateRow}>
+              <View style={styles.dateItem}>
+                <Ionicons name="calendar-outline" size={20} color={colors.primary.main} />
+                <View style={styles.dateContent}>
+                  <Text style={styles.dateLabel}>Start Date</Text>
+                  <Text style={styles.dateValue}>{formatDate(booking.start_date)}</Text>
+                </View>
+              </View>
+              <View style={styles.dateItem}>
+                <Ionicons name="calendar-outline" size={20} color={colors.primary.main} />
+                <View style={styles.dateContent}>
+                  <Text style={styles.dateLabel}>End Date</Text>
+                  <Text style={styles.dateValue}>{formatDate(booking.end_date)}</Text>
+                </View>
+              </View>
+            </View>
+            <View style={styles.durationRow}>
+              <Text style={styles.durationText}>
+                Duration: {duration} day{duration !== 1 ? 's' : ''}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Pickup Confirmation */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Pickup Confirmation</Text>
+          <View style={styles.pickupConfirmationCard}>
+            <View style={styles.pickupHeader}>
+              <Ionicons name="cube-outline" size={24} color={colors.primary.main} />
+              <Text style={styles.pickupTitle}>Pickup Confirmation</Text>
+            </View>
+            
+            {booking.pickup_location && (
+              <View style={styles.locationSection}>
+                <View style={styles.locationRow}>
+                  <Ionicons name="location-outline" size={20} color={colors.text.secondary} />
+                  <Text style={styles.locationText}>{booking.pickup_location}</Text>
+                </View>
+                {booking.pickup_instructions && (
+                  <Text style={styles.pickupInstructions}>{booking.pickup_instructions}</Text>
+                )}
+              </View>
+            )}
+            
+            <TouchableOpacity 
+              style={[
+                styles.pickupButton, 
+                booking.status === 'confirmed' ? styles.pickupButtonActive : styles.pickupButtonDisabled
+              ]}
+              disabled={booking.status !== 'confirmed'}
+            >
+              <Ionicons 
+                name="checkmark-circle" 
+                size={20} 
+                color={booking.status === 'confirmed' ? colors.white : colors.gray[400]} 
+              />
+              <Text style={[
+                styles.pickupButtonText,
+                booking.status === 'confirmed' ? styles.pickupButtonTextActive : styles.pickupButtonTextDisabled
+              ]}>
+                {booking.status === 'confirmed' ? 'Confirm Pickup' : 'Confirm Pickup (Not Available Yet)'}
+              </Text>
+            </TouchableOpacity>
+            
+            {booking.status !== 'confirmed' && (
+              <Text style={styles.pickupNote}>
+                Pickup button will be active on {formatDate(booking.start_date)} ({Math.ceil((new Date(booking.start_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days from now)
+              </Text>
+            )}
+          </View>
+        </View>
+
+
+        {/* Your Host */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Your Host</Text>
+          <View style={styles.hostCard}>
+            <View style={styles.hostHeader}>
+              <Ionicons name="person" size={24} color={colors.primary.main} />
+              <Text style={styles.hostTitle}>Your Host</Text>
+            </View>
+            <View style={styles.hostInfo}>
+              {booking.listings?.profiles?.avatar_url ? (
+                <Image 
+                  source={{ uri: booking.listings.profiles.avatar_url }} 
+                  style={styles.hostAvatar}
+                />
+              ) : (
+                <View style={styles.hostAvatarPlaceholder}>
+                  <Ionicons name="person" size={24} color={colors.gray[400]} />
+                </View>
+              )}
+              <View style={styles.hostDetails}>
+                <Text style={styles.hostName}>{booking.listings?.profiles?.full_name || 'Unknown'}</Text>
+                <Text style={styles.hostRole}>Host</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Payment Summary */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Payment Summary</Text>
+          <View style={styles.paymentSummaryCard}>
+            <View style={styles.paymentHeader}>
+              <Ionicons name="card-outline" size={24} color={colors.primary.main} />
+              <Text style={styles.paymentTitle}>Payment Summary</Text>
+            </View>
+            
+            <View style={styles.paymentDetails}>
+              <View style={styles.pricingRow}>
+                <Text style={styles.pricingLabel}>Subtotal</Text>
+                <Text style={styles.pricingValue}>{formatPrice(booking.subtotal)}</Text>
+              </View>
+              {booking.service_fee > 0 && (
+                <View style={styles.pricingRow}>
+                  <Text style={styles.pricingLabel}>Service Fee</Text>
+                  <Text style={styles.pricingValue}>{formatPrice(booking.service_fee)}</Text>
+                </View>
+              )}
+              {booking.insurance_fee > 0 && (
+                <View style={styles.pricingRow}>
+                  <Text style={styles.pricingLabel}>Insurance Fee</Text>
+                  <Text style={styles.pricingValue}>{formatPrice(booking.insurance_fee)}</Text>
+                </View>
+              )}
+              {booking.delivery_fee > 0 && (
+                <View style={styles.pricingRow}>
+                  <Text style={styles.pricingLabel}>Delivery Fee</Text>
+                  <Text style={styles.pricingValue}>{formatPrice(booking.delivery_fee)}</Text>
+                </View>
+              )}
+              <View style={styles.pricingRow}>
+                <Text style={styles.pricingLabel}>Security Deposit</Text>
+                <Text style={styles.pricingValue}>{formatPrice(booking.deposit_amount || 0)}</Text>
+              </View>
+              
+              <View style={[styles.pricingRow, styles.totalRow]}>
+                <Text style={styles.totalLabel}>Total</Text>
+                <Text style={styles.totalValue}>{formatPrice(booking.total_amount)}</Text>
+              </View>
+            </View>
+            
+            {booking.payment_status === 'pending' && (
+              <TouchableOpacity style={styles.paymentButton}>
+                <Ionicons name="card" size={20} color={colors.white} />
+                <Text style={styles.paymentButtonText}>Complete Payment</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Actions Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Actions</Text>
+          <View style={styles.actionsCard}>
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.reportButton]}
+              onPress={() => {
+                Alert.alert(
+                  'Report Issue',
+                  'What issue would you like to report?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Report', onPress: () => console.log('Report issue') }
+                  ]
+                );
+              }}
+            >
+              <Ionicons name="warning" size={20} color={colors.semantic.error} />
+              <Text style={styles.reportButtonText}>Report Issue</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.messageButton]}
+              onPress={() => {
+                // Navigate to messages
+                console.log('Navigate to messages');
+              }}
+            >
+              <Ionicons name="chatbubble-outline" size={20} color={colors.primary.main} />
+              <Text style={styles.messageButtonText}>Message Host</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.viewButton]}
+              onPress={() => {
+                // Navigate to listing
+                console.log('Navigate to listing');
+              }}
+            >
+              <Ionicons name="document-text-outline" size={20} color={colors.text.primary} />
+              <Text style={styles.viewButtonText}>View Listing</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Owner Actions (for owners only) */}
+        {booking.status === 'pending' && user?.id === booking.owner_id && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Owner Actions</Text>
+            <View style={styles.ownerActionsCard}>
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.approveButton]}
+                onPress={() => {
+                  Alert.alert(
+                    'Approve Booking',
+                    'Are you sure you want to approve this booking?',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Approve', onPress: () => console.log('Approve booking') }
+                    ]
+                  );
+                }}
+              >
+                <Ionicons name="checkmark" size={20} color={colors.white} />
+                <Text style={styles.approveButtonText}>Approve Booking</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.declineButton]}
+                onPress={() => {
+                  Alert.alert(
+                    'Decline Booking',
+                    'Are you sure you want to decline this booking?',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Decline', onPress: () => console.log('Decline booking') }
+                    ]
+                  );
+                }}
+              >
+                <Ionicons name="close" size={20} color={colors.white} />
+                <Text style={styles.declineButtonText}>Decline Booking</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* Additional Information */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Additional Information</Text>
+          <View style={styles.infoCard}>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Booking ID</Text>
+              <Text style={styles.infoValue}>#{booking.id.slice(-8)}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Created</Text>
+              <Text style={styles.infoValue}>{formatDate(booking.created_at)}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Payment Status</Text>
+              <Text style={[styles.infoValue, { 
+                color: booking.payment_status === 'paid' ? colors.semantic.success : colors.semantic.warning 
+              }]}>
+                {booking.payment_status.charAt(0).toUpperCase() + booking.payment_status.slice(1)}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Bottom Spacing */}
+        <View style={styles.bottomSpacing} />
       </ScrollView>
     </View>
   );
 }
 
-const screenStyles = StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.neutral?.lightGray || '#f9fafb',
-  },
-  header: {
-    backgroundColor: colors.white || '#ffffff',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing?.md || 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray?.[200] || '#e5e7eb',
-  },
-  headerTitle: {
-    fontSize: typography?.sizes?.lg || 18,
-    fontWeight: typography?.weights?.semibold || '600',
-    color: colors.text?.primary || '#111827',
-  },
-  backButton: {
-    padding: spacing?.sm || 8,
-  },
-  backButtonText: {
-    fontSize: typography?.sizes?.base || 16,
-    color: colors.primary?.main || '#44d62c',
-    fontWeight: typography?.weights?.medium || '500',
-  },
-  placeholder: {
-    width: 60,
+    backgroundColor: colors.neutral.lightGray,
   },
   scrollContainer: {
     flex: 1,
@@ -216,119 +499,460 @@ const screenStyles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: spacing.xl,
   },
   loadingText: {
-    fontSize: typography?.sizes?.base || 16,
-    color: colors.text?.secondary || '#6b7280',
-    marginTop: spacing?.md || 16,
+    marginTop: spacing.md,
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing?.lg || 24,
+    padding: spacing.xl,
+  },
+  errorTitle: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.primary,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
   errorText: {
-    fontSize: typography?.sizes?.lg || 18,
-    color: colors.semantic?.error || '#ef4444',
-    marginBottom: spacing?.lg || 24,
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
     textAlign: 'center',
+    marginBottom: spacing.lg,
   },
   retryButton: {
-    backgroundColor: colors.primary?.main || '#44d62c',
-    paddingHorizontal: spacing?.lg || 24,
-    paddingVertical: spacing?.md || 16,
+    backgroundColor: colors.primary.main,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     borderRadius: 8,
   },
   retryButtonText: {
-    color: colors.white || '#ffffff',
-    fontSize: typography?.sizes?.base || 16,
-    fontWeight: typography?.weights?.semibold || '600',
-  },
-  section: {
-    backgroundColor: colors.white || '#ffffff',
-    marginTop: spacing?.sm || 8,
-    padding: spacing?.md || 16,
-  },
-  sectionTitle: {
-    fontSize: typography?.sizes?.lg || 18,
-    fontWeight: typography?.weights?.semibold || '600',
-    color: colors.text?.primary || '#111827',
-    marginBottom: spacing?.sm || 8,
+    color: colors.white,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold,
   },
   statusContainer: {
-    backgroundColor: colors.primary?.main || '#44d62c',
-    paddingHorizontal: spacing?.sm || 8,
-    paddingVertical: spacing?.xs || 4,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-  },
-  statusText: {
-    color: colors.white || '#ffffff',
-    fontSize: typography?.sizes?.sm || 14,
-    fontWeight: typography?.weights?.semibold || '600',
-    textTransform: 'capitalize',
-  },
-  bookingId: {
-    fontSize: typography?.sizes?.xs || 12,
-    color: colors.text?.secondary || '#6b7280',
-    marginTop: spacing?.sm || 8,
-    fontFamily: 'monospace',
-  },
-  itemCard: {
-    backgroundColor: colors.neutral?.lightGray || '#f9fafb',
-    padding: spacing?.md || 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.gray?.[200] || '#e5e7eb',
-  },
-  itemTitle: {
-    fontSize: typography?.sizes?.base || 16,
-    fontWeight: typography?.weights?.semibold || '600',
-    color: colors.text?.primary || '#111827',
-    marginBottom: spacing?.xs || 4,
-  },
-  itemPrice: {
-    fontSize: typography?.sizes?.sm || 14,
-    color: colors.primary?.main || '#44d62c',
-    fontWeight: typography?.weights?.semibold || '600',
-  },
-  userCard: {
-    backgroundColor: colors.neutral?.lightGray || '#f9fafb',
-    padding: spacing?.md || 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.gray?.[200] || '#e5e7eb',
-  },
-  userName: {
-    fontSize: typography?.sizes?.base || 16,
-    fontWeight: typography?.weights?.semibold || '600',
-    color: colors.text?.primary || '#111827',
-    marginBottom: spacing?.xs || 4,
-  },
-  userEmail: {
-    fontSize: typography?.sizes?.sm || 14,
-    color: colors.text?.secondary || '#6b7280',
-  },
-  priceCard: {
-    backgroundColor: colors.neutral?.lightGray || '#f9fafb',
-    padding: spacing?.md || 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.gray?.[200] || '#e5e7eb',
-  },
-  priceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    padding: spacing.md,
+    backgroundColor: colors.white,
+    marginBottom: spacing.sm,
   },
-  priceLabel: {
-    fontSize: typography?.sizes?.sm || 14,
-    color: colors.text?.secondary || '#6b7280',
+  statusBadge: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 20,
   },
-  priceValue: {
-    fontSize: typography?.sizes?.base || 16,
-    color: colors.text?.primary || '#111827',
-    fontWeight: typography?.weights?.semibold || '600',
+  statusText: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+  },
+  section: {
+    marginBottom: spacing.md,
+  },
+  sectionTitle: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  itemCard: {
+    backgroundColor: colors.white,
+    marginHorizontal: spacing.md,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  itemImage: {
+    width: '100%',
+    height: 200,
+  },
+  itemDetails: {
+    padding: spacing.md,
+  },
+  itemTitle: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
+  },
+  itemCategory: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+    marginBottom: spacing.sm,
+  },
+  itemPrice: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold,
+    color: colors.primary.main,
+  },
+  periodCard: {
+    backgroundColor: colors.white,
+    marginHorizontal: spacing.md,
+    borderRadius: 12,
+    padding: spacing.md,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  dateItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  dateContent: {
+    marginLeft: spacing.sm,
+  },
+  dateLabel: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+    marginBottom: spacing.xs,
+  },
+  dateValue: {
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.medium,
+    color: colors.text.primary,
+  },
+  durationRow: {
+    borderTopWidth: 1,
+    borderTopColor: colors.gray[200],
+    paddingTop: spacing.md,
+  },
+  durationText: {
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.medium,
+    color: colors.text.primary,
+    textAlign: 'center',
+  },
+  pickupConfirmationCard: {
+    backgroundColor: colors.white,
+    marginHorizontal: spacing.md,
+    borderRadius: 12,
+    padding: spacing.md,
+  },
+  pickupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  pickupTitle: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.primary,
+    marginLeft: spacing.sm,
+  },
+  locationSection: {
+    marginBottom: spacing.md,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  locationText: {
+    fontSize: typography.sizes.base,
+    color: colors.text.primary,
+    marginLeft: spacing.sm,
+    flex: 1,
+  },
+  pickupInstructions: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+    fontStyle: 'italic',
+    marginTop: spacing.xs,
+  },
+  pickupButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    borderRadius: 8,
+    marginBottom: spacing.sm,
+  },
+  pickupButtonActive: {
+    backgroundColor: colors.primary.main,
+  },
+  pickupButtonDisabled: {
+    backgroundColor: colors.gray[300],
+  },
+  pickupButtonText: {
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold,
+    marginLeft: spacing.sm,
+  },
+  pickupButtonTextActive: {
+    color: colors.white,
+  },
+  pickupButtonTextDisabled: {
+    color: colors.gray[400],
+  },
+  pickupNote: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+    textAlign: 'center',
+  },
+  userCard: {
+    backgroundColor: colors.white,
+    marginHorizontal: spacing.md,
+    borderRadius: 12,
+    padding: spacing.md,
+  },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  avatarPlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: colors.gray[200],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  userDetails: {
+    marginLeft: spacing.md,
+    flex: 1,
+  },
+  userName: {
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
+  },
+  userEmail: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+    marginBottom: spacing.xs,
+  },
+  userPhone: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+  },
+  hostCard: {
+    backgroundColor: colors.white,
+    marginHorizontal: spacing.md,
+    borderRadius: 12,
+    padding: spacing.md,
+  },
+  hostHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  hostTitle: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.primary,
+    marginLeft: spacing.sm,
+  },
+  hostInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  hostAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  hostAvatarPlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: colors.gray[200],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  hostDetails: {
+    marginLeft: spacing.md,
+    flex: 1,
+  },
+  hostName: {
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
+  },
+  hostRole: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+  },
+  paymentSummaryCard: {
+    backgroundColor: colors.white,
+    marginHorizontal: spacing.md,
+    borderRadius: 12,
+    padding: spacing.md,
+  },
+  paymentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  paymentTitle: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.primary,
+    marginLeft: spacing.sm,
+  },
+  paymentDetails: {
+    marginBottom: spacing.md,
+  },
+  paymentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary.main,
+    paddingVertical: spacing.md,
+    borderRadius: 8,
+  },
+  paymentButtonText: {
+    color: colors.white,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold,
+    marginLeft: spacing.sm,
+  },
+  pricingCard: {
+    backgroundColor: colors.white,
+    marginHorizontal: spacing.md,
+    borderRadius: 12,
+    padding: spacing.md,
+  },
+  pricingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  pricingLabel: {
+    fontSize: typography.sizes.base,
+    color: colors.text.primary,
+  },
+  pricingValue: {
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.medium,
+    color: colors.text.primary,
+  },
+  totalRow: {
+    borderTopWidth: 1,
+    borderTopColor: colors.gray[200],
+    marginTop: spacing.sm,
+    paddingTop: spacing.md,
+  },
+  totalLabel: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold,
+    color: colors.text.primary,
+  },
+  totalValue: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold,
+    color: colors.primary.main,
+  },
+  actionsCard: {
+    backgroundColor: colors.white,
+    marginHorizontal: spacing.md,
+    borderRadius: 12,
+    padding: spacing.md,
+  },
+  ownerActionsCard: {
+    backgroundColor: colors.white,
+    marginHorizontal: spacing.md,
+    borderRadius: 12,
+    padding: spacing.md,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    borderRadius: 8,
+    marginBottom: spacing.sm,
+  },
+  reportButton: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.semantic.error,
+  },
+  messageButton: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.primary.main,
+  },
+  viewButton: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.gray[300],
+  },
+  reportButtonText: {
+    color: colors.semantic.error,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold,
+    marginLeft: spacing.sm,
+  },
+  messageButtonText: {
+    color: colors.primary.main,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold,
+    marginLeft: spacing.sm,
+  },
+  viewButtonText: {
+    color: colors.text.primary,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold,
+    marginLeft: spacing.sm,
+  },
+  approveButton: {
+    backgroundColor: colors.semantic.success,
+  },
+  declineButton: {
+    backgroundColor: colors.semantic.error,
+  },
+  approveButtonText: {
+    color: colors.white,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold,
+    marginLeft: spacing.sm,
+  },
+  declineButtonText: {
+    color: colors.white,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold,
+    marginLeft: spacing.sm,
+  },
+  infoCard: {
+    backgroundColor: colors.white,
+    marginHorizontal: spacing.md,
+    borderRadius: 12,
+    padding: spacing.md,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  infoLabel: {
+    fontSize: typography.sizes.base,
+    color: colors.text.secondary,
+  },
+  infoValue: {
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.medium,
+    color: colors.text.primary,
+  },
+  bottomSpacing: {
+    height: spacing.xl,
   },
 });
