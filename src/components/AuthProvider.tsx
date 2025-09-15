@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         setState(prev => ({ ...prev, loading: false }));
       }
-    }, 12000); // 12 second safety timeout
+    }, 8000); // Reduced to 8 second safety timeout
 
     return () => clearTimeout(safetyTimeout);
   }, [state.loading, state.user, state.profile]);
@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Use default session timeout to avoid interfering with Supabase's retry logic
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Session timeout - please check your connection')), 12000) // Increased to 12s
+          setTimeout(() => reject(new Error('Session timeout - please check your connection')), 8000) // Reduced to 8s
         );
         
         const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
@@ -114,11 +114,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             error: null, // Don't show error to user, just proceed as unauthenticated
           });
           
-          // Add Sentry breadcrumb for debugging
-          addSentryBreadcrumb('Auth initialization failed', 'auth', {
-            error: error instanceof Error ? error.message : 'Unknown error',
-            platform: 'mobile'
-          });
+          // Add Sentry breadcrumb for debugging (only for non-timeout errors)
+          if (!(error instanceof Error && error.message.includes('timeout'))) {
+            addSentryBreadcrumb('Auth initialization failed', 'auth', {
+              error: error instanceof Error ? error.message : 'Unknown error',
+              platform: 'mobile'
+            });
+          }
         }
       }
     };
@@ -196,7 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Sign in timeout - please check your connection and try again')), 15000) // Increased to 15s
+        setTimeout(() => reject(new Error('Sign in timeout - please check your connection and try again')), 10000) // Reduced to 10s
       );
       
       const { error } = await Promise.race([signInPromise, timeoutPromise]) as any;

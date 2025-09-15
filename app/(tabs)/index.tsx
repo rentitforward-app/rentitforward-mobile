@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, TextInput, Image, ScrollView, FlatList, Alert, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography } from '../../src/lib/design-system';
 import { RealAPIPredictiveSearchInput } from '../../src/components/search/RealAPIPredictiveSearchInput';
@@ -33,6 +33,7 @@ export default function HomeScreen() {
   const notificationCount = notifications.length;
   const { user, profile, loading } = useAuth();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   // Top rentals state
   const [topRentals, setTopRentals] = useState<any[]>([]);
@@ -273,7 +274,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.neutral.lightGray }} edges={['top']}>
+    <View style={{ flex: 1, backgroundColor: colors.neutral.lightGray, paddingTop: insets.top }}>
       <View style={{ backgroundColor: colors.white }}>
         {/* Header */}
         <View
@@ -471,6 +472,6 @@ export default function HomeScreen() {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 } 

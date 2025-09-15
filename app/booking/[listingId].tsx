@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, TextInput, Modal, Dimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { colors, spacing, typography } from '../../src/lib/design-system';
@@ -45,6 +45,7 @@ export default function BookingScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   
   const [listing, setListing] = useState<ListingData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -407,12 +408,12 @@ export default function BookingScreen() {
     return (
       <>
         <Stack.Screen options={{ headerShown: false }} />
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>
+        <View style={{ flex: 1, backgroundColor: colors.white, paddingTop: insets.top }}>
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator size="large" color={colors.primary.main} />
             <Text style={{ marginTop: spacing.md, color: colors.text.secondary }}>Loading booking details...</Text>
           </View>
-        </SafeAreaView>
+        </View>
       </>
     );
   }
@@ -421,7 +422,7 @@ export default function BookingScreen() {
     return (
       <>
         <Stack.Screen options={{ headerShown: false }} />
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>
+        <View style={{ flex: 1, backgroundColor: colors.white, paddingTop: insets.top }}>
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ fontSize: typography.sizes.lg, color: colors.text.primary }}>Listing not found</Text>
             <TouchableOpacity
@@ -437,7 +438,7 @@ export default function BookingScreen() {
               <Text style={{ color: colors.white, fontWeight: typography.weights.semibold }}>Go Back</Text>
             </TouchableOpacity>
           </View>
-        </SafeAreaView>
+        </View>
       </>
     );
   }
@@ -453,7 +454,7 @@ export default function BookingScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }} edges={['top', 'left', 'right']}>
+      <View style={{ flex: 1, backgroundColor: colors.white, paddingTop: insets.top }}>
         {/* Header */}
         <View style={{
           flexDirection: 'row',
@@ -1159,7 +1160,7 @@ export default function BookingScreen() {
             </TouchableOpacity>
           </View>
         </ScrollView>
-      </SafeAreaView>
+      </View>
     </>
   );
 } 

@@ -11,18 +11,21 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../src/lib/supabase';
-import { useAuthStore } from '../../src/stores/auth';
+import { useAuth } from '../../src/components/AuthProvider';
 import { colors, spacing, typography } from '../../src/lib/design-system';
 import { Header } from '../../src/components/Header';
+import { CancelBookingModal } from '../../src/components/booking/CancelBookingModal';
 
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user } = useAuthStore();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [showCancelModal, setShowCancelModal] = React.useState(false);
 
   // Fetch booking details
   const { data: booking, isLoading, error } = useQuery({
@@ -130,6 +133,49 @@ export default function BookingDetailScreen() {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
   };
+
+  // Cancel booking mutation
+  const cancelBookingMutation = useMutation({
+    mutationFn: async ({ reason, note }: { reason: string; note: string }) => {
+      // Get the current session token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error('No authentication token found. Please log in again.');
+      }
+
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/bookings/${id}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ reason, note }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to cancel booking');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      // Invalidate and refetch booking details
+      queryClient.invalidateQueries({ queryKey: ['booking-details', id] });
+      setShowCancelModal(false);
+    },
+  });
+
+  const handleCancelBooking = async (reason: string, note: string) => {
+    await cancelBookingMutation.mutateAsync({ reason, note });
+  };
+
+  // Check if booking can be cancelled
+  const canCancel = booking && 
+    user && 
+    (booking.renter_id === user.id || booking.owner_id === user.id) &&
+    (booking.status === 'confirmed' || booking.status === 'pending' || booking.status === 'payment_required');
 
   if (isLoading) {
     return (
@@ -375,6 +421,17 @@ export default function BookingDetailScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Actions</Text>
           <View style={styles.actionsCard}>
+            {/* Cancel Booking Button */}
+            {canCancel && (
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.cancelBookingButton]}
+                onPress={() => setShowCancelModal(true)}
+              >
+                <Ionicons name="close-circle" size={20} color={colors.semantic.error} />
+                <Text style={styles.cancelBookingButtonText}>Cancel Booking</Text>
+              </TouchableOpacity>
+            )}
+            
             <TouchableOpacity 
               style={[styles.actionButton, styles.reportButton]}
               onPress={() => {
@@ -483,6 +540,25 @@ export default function BookingDetailScreen() {
         {/* Bottom Spacing */}
         <View style={styles.bottomSpacing} />
       </ScrollView>
+
+      {/* Cancel Booking Modal */}
+      {booking && (
+        <CancelBookingModal
+          isOpen={showCancelModal}
+          onClose={() => setShowCancelModal(false)}
+          onConfirm={handleCancelBooking}
+          booking={{
+            id: booking.id,
+            title: booking.listings?.title || 'Unknown Item',
+            start_date: booking.start_date,
+            end_date: booking.end_date,
+            total_amount: booking.total_amount || 0,
+            owner_name: booking.listings?.profiles?.full_name || 'Unknown Owner',
+            renter_name: booking.renter?.full_name || 'Unknown Renter',
+          }}
+          isRenter={user?.id === booking.renter_id}
+        />
+      )}
     </View>
   );
 }
@@ -909,6 +985,17 @@ const styles = StyleSheet.create({
   },
   viewButtonText: {
     color: colors.text.primary,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold,
+    marginLeft: spacing.sm,
+  },
+  cancelBookingButton: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.semantic.error,
+  },
+  cancelBookingButtonText: {
+    color: colors.semantic.error,
     fontSize: typography.sizes.base,
     fontWeight: typography.weights.semibold,
     marginLeft: spacing.sm,

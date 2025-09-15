@@ -7,9 +7,9 @@ import {
   ScrollView,
   StatusBar,
   StyleSheet,
-  SafeAreaView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -55,6 +55,7 @@ export default function IntroScreen() {
   const router = useRouter();
   const [currentSlide, setCurrentSlide] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
+  const insets = useSafeAreaInsets();
 
   const markIntroAsSeen = async () => {
     try {
@@ -92,7 +93,7 @@ export default function IntroScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor="white" />
       
       {/* Header */}
@@ -163,7 +164,7 @@ export default function IntroScreen() {
           </TouchableOpacity>
         </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 

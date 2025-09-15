@@ -7,10 +7,10 @@ import {
   StyleSheet, 
   Dimensions, 
   Image, 
-  ScrollView, 
-  SafeAreaView 
+  ScrollView
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mobileTokens } from '../../src/lib/design-system';
 import { addSentryBreadcrumb, captureSentryException } from '../../src/lib/sentry';
 import { ErrorBoundary } from '../../src/components/ErrorBoundary';
@@ -19,6 +19,7 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   // Add Sentry breadcrumb when welcome screen loads
   useEffect(() => {
@@ -63,7 +64,7 @@ export default function WelcomeScreen() {
 
   return (
     <ErrorBoundary>
-      <SafeAreaView style={styles.container}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
         
         <ScrollView 
@@ -127,7 +128,7 @@ export default function WelcomeScreen() {
             </Text>
           </View>
         </ScrollView>
-      </SafeAreaView>
+      </View>
     </ErrorBoundary>
   );
 }
