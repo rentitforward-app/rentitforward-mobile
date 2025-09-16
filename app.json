@@ -33,7 +33,8 @@
         "NSPhotoLibraryUsageDescription": "Rent It Forward needs access to your photo library to select images for your rental listings and to save photos from the app.",
         "NSLocationWhenInUseUsageDescription": "Rent It Forward needs access to your location to show nearby rental items, help you find items in your area, and provide accurate location information for your listings.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Rent It Forward needs access to your location to show nearby rental items, help you find items in your area, and provide accurate location information for your listings.",
-        "NSMicrophoneUsageDescription": "Rent It Forward needs access to your microphone to record voice notes for your rental listings and to enable voice search functionality."
+        "NSMicrophoneUsageDescription": "Rent It Forward needs access to your microphone to record voice notes for your rental listings and to enable voice search functionality.",
+        "NSUserTrackingUsageDescription": "Rent It Forward uses tracking to provide personalized recommendations, improve your experience, and show relevant rental items in your area. This helps us connect you with the best local rentals and optimize our service."
       }
     },
     "android": {
@@ -79,7 +80,8 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-calendar"
+      "expo-calendar",
+      "expo-tracking-transparency"
     ],
     "scheme": "rentitforward",
     "extra": {

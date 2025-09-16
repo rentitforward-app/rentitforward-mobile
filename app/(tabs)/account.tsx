@@ -105,6 +105,7 @@ export default function AccountScreen() {
     );
   };
 
+
   const getTrustScoreColor = (score: number) => {
     if (score >= 90) return colors.semantic.success;
     if (score >= 70) return colors.semantic.warning;
@@ -373,6 +374,8 @@ export default function AccountScreen() {
                   flexDirection: 'row',
                   alignItems: 'center',
                   paddingVertical: spacing.md,
+                  borderBottomWidth: 1,
+                  borderBottomColor: colors.gray[100],
                 }}
               >
                 <Ionicons name="shield-checkmark-outline" size={24} color={colors.gray[600]} />
@@ -383,6 +386,26 @@ export default function AccountScreen() {
                   flex: 1,
                 }}>
                   Identity verification
+                </Text>
+                <Ionicons name="chevron-forward" size={20} color={colors.gray[400]} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => router.push('/account/account-management')}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: spacing.md,
+                }}
+              >
+                <Ionicons name="settings-outline" size={24} color={colors.gray[600]} />
+                <Text style={{
+                  fontSize: typography.sizes.base,
+                  color: colors.gray[900],
+                  marginLeft: spacing.md,
+                  flex: 1,
+                }}>
+                  Account management
                 </Text>
                 <Ionicons name="chevron-forward" size={20} color={colors.gray[400]} />
               </TouchableOpacity>
