@@ -11,6 +11,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { availabilityAPI } from '../../src/lib/api/availability';
 import { CalendarAvailability } from '../../shared-dist/utils/calendar';
 import { format, addDays, startOfDay } from 'date-fns';
+import { PaymentWebView } from '../../src/components/PaymentWebView';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -64,7 +65,12 @@ export default function BookingScreen() {
   const [deliveryMethod, setDeliveryMethod] = useState('pickup');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [specialInstructions, setSpecialInstructions] = useState('');
+  
+  // Payment WebView state
+  const [showPaymentWebView, setShowPaymentWebView] = useState(false);
+  const [paymentUrl, setPaymentUrl] = useState('');
   const [includeInsurance, setIncludeInsurance] = useState(false);
+  const [currentBookingId, setCurrentBookingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchListingDetails();
@@ -353,48 +359,195 @@ export default function BookingScreen() {
       return;
     }
 
+    // Check if user is trying to book their own listing
+    if (user.id === listing.profiles.id) {
+      Alert.alert('Error', 'You cannot book your own listing');
+      return;
+    }
+
     setBookingLoading(true);
     try {
       const pricing = calculatePricing();
-      
+
+      // Convert dates to local timezone strings to avoid UTC conversion issues
+      const startDateStr = selectedDates.startDate;
+      const endDateStr = selectedDates.endDate;
+
+      // Check for booking conflicts using RPC function
+      const { data: conflictCheck, error: conflictError } = await supabase
+        .rpc('check_booking_conflicts', {
+          p_listing_id: listing.id,
+          p_start_date: startDateStr,
+          p_end_date: endDateStr,
+          p_exclude_booking_id: null,
+        });
+
+      if (conflictError) {
+        console.error('Conflict check error:', conflictError);
+        Alert.alert('Error', 'Failed to check availability. Please try again.');
+        return;
+      }
+
+      if (conflictCheck) {
+        Alert.alert('Dates Unavailable', 'Sorry, these dates are no longer available. Please select different dates and try again.');
+        return;
+      }
+
+      // Create booking with expiration for payment
+      const expirationTime = new Date();
+      expirationTime.setMinutes(expirationTime.getMinutes() + 30); // 30 minutes from now
+
       const { data: booking, error } = await supabase
         .from('bookings')
         .insert({
           listing_id: listing.id,
           renter_id: user.id,
           owner_id: listing.profiles.id,
-          start_date: selectedDates.startDate,
-          end_date: selectedDates.endDate,
+          start_date: startDateStr,
+          end_date: endDateStr,
           price_per_day: listing.price_per_day,
           subtotal: pricing.subtotal,
           service_fee: pricing.serviceFee,
           insurance_fee: pricing.insuranceFee,
           delivery_fee: pricing.deliveryFee,
+          deposit_amount: 0, // Security deposit (can be configured later)
           total_amount: pricing.total,
           delivery_method: deliveryMethod,
           delivery_address: deliveryMethod === 'delivery' ? deliveryAddress.trim() : null,
           renter_message: specialInstructions || null,
-          status: 'pending'
+          status: 'payment_required',
+          expires_at: expirationTime.toISOString(),
         })
         .select()
         .single();
 
       if (error) {
-        throw error;
+        console.error('Booking creation error:', error);
+        Alert.alert('Booking Failed', `Failed to create booking: ${error.message || 'Please try again.'}`);
+        return;
       }
 
-      Alert.alert(
-        'Booking Request Sent!',
-        `Your booking request has been sent to ${listing?.profiles?.full_name || 'the owner'}. You'll receive a notification when they respond.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              router.replace('/bookings');
+      console.log('Booking created successfully:', booking.id);
+      
+      // Store booking ID for potential cancellation
+      setCurrentBookingId(booking.id);
+
+      // Small delay to ensure booking is committed to database (handle replica lag)
+      await new Promise(resolve => setTimeout(resolve, 1200));
+
+      // Create Stripe Checkout session via secure backend API
+      console.log('Creating Stripe Checkout session via backend API...');
+
+      try {
+        // Get fresh session and refresh if needed
+        let { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+        if (sessionError || !session?.access_token) {
+          console.log('Session error or no access token, trying to refresh...');
+
+          // Try to refresh the session
+          const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+
+          if (refreshError || !refreshedSession?.access_token) {
+            console.error('Session refresh failed:', refreshError);
+            Alert.alert(
+              'Authentication Required', 
+              'Your session has expired. Please sign in again to continue with payment.',
+              [
+                {
+                  text: 'Sign In',
+                  onPress: () => router.replace('/auth/sign-in')
+                }
+              ]
+            );
+            return;
+          }
+
+          // Use refreshed session
+          session = refreshedSession;
+          console.log('Session refreshed successfully');
+        }
+
+        console.log('Using session token for Edge Function call');
+
+        // Call Supabase Edge Function to create Stripe Checkout session
+        let checkoutData, checkoutError;
+        
+        try {
+          console.log('Calling create-checkout-session Edge Function...');
+          console.log('Booking ID:', booking.id);
+          
+          // Use direct fetch to avoid supabase.functions.invoke issues
+          const fnUrl = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/create-checkout-session`;
+          const res = await fetch(fnUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+              'apikey': process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string,
+            },
+            body: JSON.stringify({ bookingId: booking.id }),
+          });
+
+          const text = await res.text();
+          console.log('Edge Function response status:', res.status);
+          console.log('Edge Function response body:', text);
+
+          if (!res.ok) {
+            checkoutError = new Error(`HTTP ${res.status}: ${text}`);
+          } else {
+            try {
+              checkoutData = JSON.parse(text);
+              checkoutError = null;
+              console.log('Parsed checkout data:', checkoutData);
+            } catch (parseErr) {
+              console.error('JSON parse error:', parseErr);
+              checkoutError = new Error('Invalid JSON from Edge Function');
             }
           }
-        ]
-      );
+        } catch (edgeFunctionError) {
+          console.error('Edge Function call failed:', edgeFunctionError);
+          checkoutError = edgeFunctionError;
+        }
+
+        if (checkoutError) {
+          console.error('Checkout session creation error:', checkoutError);
+          
+          // Check if it's a configuration error (missing Stripe key)
+          if (checkoutError.message?.includes('Stripe configuration missing') || 
+              checkoutError.message?.includes('STRIPE_SECRET_KEY')) {
+            Alert.alert(
+              'Payment Setup Required',
+              'Payment processing is not fully configured yet. For now, your booking has been created and the owner will be notified.',
+              [
+                {
+                  text: 'View Bookings',
+                  onPress: () => router.replace('/bookings')
+                }
+              ]
+            );
+            return;
+          }
+          
+          Alert.alert('Payment Error', `Failed to create payment session: ${checkoutError.message}`);
+          return;
+        }
+
+        if (checkoutData?.url) {
+          console.log('Stripe Checkout session created successfully');
+          console.log('Opening Stripe Checkout URL:', checkoutData.url);
+          
+          // Open Stripe Checkout in WebView
+          setPaymentUrl(checkoutData.url);
+          setShowPaymentWebView(true);
+        } else {
+          Alert.alert('Payment Error', 'Failed to get payment URL. Please try again.');
+        }
+        
+      } catch (error) {
+        console.error('Payment session error:', error);
+        Alert.alert('Payment Error', 'Failed to create payment session. Please try again.');
+      }
     } catch (error) {
       console.error('Booking error:', error);
       Alert.alert('Booking Failed', 'Failed to create booking. Please try again.');
@@ -443,6 +596,125 @@ export default function BookingScreen() {
   }
 
   const pricing = calculatePricing();
+
+  // Payment WebView callback functions
+  const handlePaymentSuccess = () => {
+    setShowPaymentWebView(false);
+    
+    // Clear booking ID since payment was successful
+    setCurrentBookingId(null);
+    
+    Alert.alert(
+      'Payment Successful!',
+      'Your booking has been confirmed. You will receive a confirmation email shortly.',
+      [
+        {
+          text: 'View My Bookings',
+          onPress: () => router.replace('/bookings')
+        },
+        {
+          text: 'OK',
+          style: 'default'
+        }
+      ]
+    );
+  };
+
+  const handlePaymentCancel = async () => {
+    setShowPaymentWebView(false);
+    
+    // Delete the booking since payment was cancelled
+    if (currentBookingId) {
+      try {
+        console.log('Deleting cancelled booking:', currentBookingId);
+        
+        const { error } = await supabase
+          .from('bookings')
+          .delete()
+          .eq('id', currentBookingId);
+          
+        if (error) {
+          console.error('Error deleting cancelled booking:', error);
+        } else {
+          console.log('Cancelled booking deleted successfully');
+          
+          // Invalidate availability cache to refresh blocked dates
+          const listingIdStr = Array.isArray(listingId) ? listingId[0] : listingId;
+          queryClient.invalidateQueries({ queryKey: ['listing-availability', listingIdStr] });
+          console.log('Availability cache invalidated for listing:', listingIdStr);
+        }
+      } catch (error) {
+        console.error('Failed to delete cancelled booking:', error);
+      }
+    }
+    
+    Alert.alert(
+      'Payment Cancelled',
+      'Your booking has been cancelled. The dates are now available for other users.',
+      [
+        {
+          text: 'Try Again',
+          onPress: () => {
+            // Reset the booking ID so user can create a new booking
+            setCurrentBookingId(null);
+          },
+          style: 'default'
+        },
+        {
+          text: 'Go Back',
+          onPress: () => router.back()
+        }
+      ]
+    );
+  };
+
+  const handlePaymentError = async (error: string) => {
+    setShowPaymentWebView(false);
+    
+    // Delete the booking since payment failed
+    if (currentBookingId) {
+      try {
+        console.log('Deleting failed payment booking:', currentBookingId);
+        
+        const { error: deleteError } = await supabase
+          .from('bookings')
+          .delete()
+          .eq('id', currentBookingId);
+          
+        if (deleteError) {
+          console.error('Error deleting failed payment booking:', deleteError);
+        } else {
+          console.log('Failed payment booking deleted successfully');
+          
+          // Invalidate availability cache to refresh blocked dates
+          const listingIdStr = Array.isArray(listingId) ? listingId[0] : listingId;
+          queryClient.invalidateQueries({ queryKey: ['listing-availability', listingIdStr] });
+          console.log('Availability cache invalidated for listing:', listingIdStr);
+        }
+      } catch (deleteError) {
+        console.error('Failed to delete failed payment booking:', deleteError);
+      }
+    }
+    
+    Alert.alert(
+      'Payment Error',
+      `Payment failed: ${error}. Your booking has been cancelled and the dates are now available.`,
+      [
+        {
+          text: 'Try Again',
+          onPress: () => {
+            // Reset the booking ID so user can create a new booking
+            setCurrentBookingId(null);
+          },
+          style: 'default'
+        },
+        {
+          text: 'Go Back',
+          onPress: () => router.back()
+        }
+      ]
+    );
+  };
 
   // Get main image
   let mainImage = null;
@@ -1153,13 +1425,22 @@ export default function BookingScreen() {
                   fontWeight: typography.weights.semibold,
                   color: colors.white
                 }}>
-                  Book Now
+                  Book & Pay Now - ${pricing.total.toFixed(2)}
                 </Text>
               )}
             </TouchableOpacity>
           </View>
         </ScrollView>
       </SafeAreaView>
+
+      {/* Payment WebView Modal */}
+      <PaymentWebView
+        isVisible={showPaymentWebView}
+        paymentUrl={paymentUrl}
+        onSuccess={handlePaymentSuccess}
+        onCancel={handlePaymentCancel}
+        onError={handlePaymentError}
+      />
     </>
   );
 } 

@@ -69,7 +69,7 @@ export default function HelpSupportScreen() {
     {
       title: 'Renting Items',
       items: [
-        { question: 'How do I book an item?', answer: 'Browse available items, select the dates you need, and tap "Book Now". The owner will review and approve your request.' },
+        { question: 'How do I book an item?', answer: 'Browse available items, select the dates you need, and tap "Book & Pay Now". You\'ll be redirected to complete payment securely through Stripe. Once payment is successful, your booking is confirmed instantly.' },
         { question: 'What if the item is damaged?', answer: 'Report any damage immediately through the app. We have insurance protection and dispute resolution processes in place.' },
         { question: 'How do I cancel a booking?', answer: 'Go to your Bookings tab, select the booking, and tap "Cancel". Cancellation policies vary by owner.' },
       ]

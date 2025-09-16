@@ -63,7 +63,7 @@ export default function FAQScreen() {
       items: [
         {
           question: 'How do I book an item?',
-          answer: 'Browse available items, select the dates you need, and tap "Book Now". The owner will review and approve your request. You\'ll receive a confirmation once approved.'
+          answer: 'Browse available items, select the dates you need, and tap "Book & Pay Now". You\'ll be redirected to complete payment securely through Stripe. Once payment is successful, your booking is confirmed instantly.'
         },
         {
           question: 'What if the item is damaged when I receive it?',
