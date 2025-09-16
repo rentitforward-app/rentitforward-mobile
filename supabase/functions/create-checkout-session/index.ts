@@ -114,19 +114,32 @@ serve(async (req) => {
       expires_at: Math.floor(Date.now() / 1000) + (30 * 60), // 30 minutes from now
     })
 
-    console.log('Stripe session created successfully:', session.id)
+        console.log('Stripe session created successfully:', session.id)
 
-    // Return the checkout session URL
-    return new Response(
-      JSON.stringify({ 
-        url: session.url,
-        sessionId: session.id 
-      }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    )
+        // Store the Stripe session ID in the booking record
+        const { error: updateError } = await supabaseClient
+          .from('bookings')
+          .update({
+            stripe_session_id: session.id
+          })
+          .eq('id', booking.id)
+
+        if (updateError) {
+          console.error('Error updating booking with session ID:', updateError)
+          // Don't fail the request, just log the error
+        }
+
+        // Return the checkout session URL
+        return new Response(
+          JSON.stringify({
+            url: session.url,
+            sessionId: session.id
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
 
   } catch (error) {
     console.error('Error creating checkout session:', error)

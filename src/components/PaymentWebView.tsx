@@ -26,27 +26,71 @@ export function PaymentWebView({
   const handleNavigationStateChange = (navState: any) => {
     const { url } = navState;
     setCurrentUrl(url);
-    
+    console.log('Navigation state changed to:', url);
+
     // Check for success URL patterns (both HTTPS redirect and deep link)
     if (url.includes('rentitforward.com.au/payments/success') || url.includes('payment-success')) {
-      console.log('Payment successful detected');
-      onSuccess();
+      console.log('Payment successful detected in navigation change');
+      console.log('Calling onSuccess from navigation change...');
+      setTimeout(() => {
+        console.log('Executing onSuccess from navigation change');
+        onSuccess();
+      }, 100);
       return;
     }
-    
+
     // Check for cancel URL patterns (both HTTPS redirect and deep link)
     if (url.includes('rentitforward.com.au/payments/cancel') || url.includes('payment-cancel')) {
-      console.log('Payment cancelled detected');
-      onCancel();
+      console.log('Payment cancelled detected in navigation change');
+      setTimeout(() => {
+        onCancel();
+      }, 100);
       return;
     }
     
     // Check for error patterns
     if (url.includes('error') || url.includes('failed')) {
-      console.log('Payment error detected');
-      onError('Payment failed. Please try again.');
+      console.log('Payment error detected in navigation change');
+      setTimeout(() => {
+        onError('Payment failed. Please try again.');
+      }, 100);
       return;
     }
+  };
+
+  const handleShouldStartLoadWithRequest = (request: any) => {
+    const { url } = request;
+    
+    // Handle success URLs
+    if (url.includes('rentitforward.com.au/payments/success') || url.includes('payment-success')) {
+      console.log('Intercepting success URL:', url);
+      console.log('Calling onSuccess callback...');
+      setTimeout(() => {
+        console.log('Executing onSuccess callback now');
+        onSuccess();
+      }, 100);
+      return false; // Don't load these URLs
+    }
+    
+    // Handle cancel URLs
+    if (url.includes('rentitforward.com.au/payments/cancel') || url.includes('payment-cancel')) {
+      console.log('Intercepting cancel URL:', url);
+      setTimeout(() => {
+        onCancel();
+      }, 100);
+      return false; // Don't load these URLs
+    }
+    
+    // Handle error URLs
+    if (url.includes('error') || url.includes('failed')) {
+      console.log('Intercepting error URL:', url);
+      setTimeout(() => {
+        onError('Payment failed. Please try again.');
+      }, 100);
+      return false; // Don't load these URLs
+    }
+    
+    return true; // Allow other URLs to load
   };
 
   const handleError = (syntheticEvent: any) => {
@@ -137,20 +181,21 @@ export function PaymentWebView({
         )}
 
         {/* WebView */}
-        <WebView
-          ref={webViewRef}
-          source={{ uri: paymentUrl }}
-          onNavigationStateChange={handleNavigationStateChange}
-          onError={handleError}
-          onLoadStart={() => setLoading(true)}
-          onLoadEnd={() => setLoading(false)}
-          style={{ flex: 1 }}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          startInLoadingState={true}
-          scalesPageToFit={true}
-          allowsInlineMediaPlayback={true}
-        />
+            <WebView
+              ref={webViewRef}
+              source={{ uri: paymentUrl }}
+              onNavigationStateChange={handleNavigationStateChange}
+              onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
+              onError={handleError}
+              onLoadStart={() => setLoading(true)}
+              onLoadEnd={() => setLoading(false)}
+              style={{ flex: 1 }}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              startInLoadingState={true}
+              scalesPageToFit={true}
+              allowsInlineMediaPlayback={true}
+            />
 
         {/* URL indicator (for debugging) */}
         {__DEV__ && (

@@ -83,7 +83,8 @@ export default function BookingScreen() {
       const today = format(startOfDay(new Date()), 'yyyy-MM-dd');
       const maxDate = format(addDays(new Date(), 365), 'yyyy-MM-dd');
       
-      return await availabilityAPI.getAvailabilitySafe(listingId, today, maxDate);
+      const listingIdStr = Array.isArray(listingId) ? listingId[0] : listingId;
+      return await availabilityAPI.getAvailabilitySafe(listingIdStr, today, maxDate);
     },
     enabled: !!listingId,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -598,26 +599,47 @@ export default function BookingScreen() {
   const pricing = calculatePricing();
 
   // Payment WebView callback functions
-  const handlePaymentSuccess = () => {
+  const handlePaymentSuccess = async () => {
+    console.log('handlePaymentSuccess called with booking ID:', currentBookingId);
     setShowPaymentWebView(false);
+    
+    // Update booking status to confirmed
+    if (currentBookingId) {
+      try {
+        console.log('Updating booking status to confirmed:', currentBookingId);
+        
+        const { error } = await supabase
+          .from('bookings')
+          .update({
+            status: 'confirmed',
+            payment_status: 'succeeded',
+            paid_at: new Date().toISOString(),
+          })
+          .eq('id', currentBookingId);
+          
+        if (error) {
+          console.error('Error updating booking status:', error);
+        } else {
+          console.log('Booking status updated to confirmed successfully');
+          
+          // Invalidate availability cache to update blocked dates
+          const listingIdStr = Array.isArray(listingId) ? listingId[0] : listingId;
+          queryClient.invalidateQueries({ queryKey: ['listing-availability', listingIdStr] });
+          console.log('Availability cache invalidated for listing:', listingIdStr);
+        }
+      } catch (error) {
+        console.error('Failed to update booking status:', error);
+      }
+      
+      // Navigate to payment success page with booking ID
+      router.replace(`/payment/success?booking_id=${currentBookingId}`);
+    } else {
+      // Fallback to bookings page if no booking ID
+      router.replace('/bookings');
+    }
     
     // Clear booking ID since payment was successful
     setCurrentBookingId(null);
-    
-    Alert.alert(
-      'Payment Successful!',
-      'Your booking has been confirmed. You will receive a confirmation email shortly.',
-      [
-        {
-          text: 'View My Bookings',
-          onPress: () => router.replace('/bookings')
-        },
-        {
-          text: 'OK',
-          style: 'default'
-        }
-      ]
-    );
   };
 
   const handlePaymentCancel = async () => {
