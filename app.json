@@ -2,7 +2,7 @@
   "expo": {
     "name": "Rent It Forward",
     "slug": "rentitforward-mobile",
-    "version": "1.0.23",
+    "version": "1.0.24",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/icons/ios-light.png",
@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "au.com.rentitforward.mobile",
-      "buildNumber": "23",
+      "buildNumber": "24",
       "icon": "./assets/icons/ios-light.png",
       "splash": {
         "image": "./assets/icons/splash-icon-dark.png",
@@ -34,7 +34,6 @@
         "NSLocationWhenInUseUsageDescription": "Rent It Forward needs access to your location to show nearby rental items, help you find items in your area, and provide accurate location information for your listings.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Rent It Forward needs access to your location to show nearby rental items, help you find items in your area, and provide accurate location information for your listings.",
         "NSMicrophoneUsageDescription": "Rent It Forward needs access to your microphone to record voice notes for your rental listings and to enable voice search functionality.",
-        "NSUserTrackingUsageDescription": "Rent It Forward uses tracking to provide personalized recommendations, improve your experience, and show relevant rental items in your area. This helps us connect you with the best local rentals and optimize our service."
       }
     },
     "android": {
@@ -43,7 +42,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "au.com.rentitforward.mobile",
-      "versionCode": 23,
+      "versionCode": 24,
       "splash": {
         "image": "./assets/icons/splash-icon-dark.png",
         "resizeMode": "contain",
@@ -80,8 +79,7 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-calendar",
-      "expo-tracking-transparency"
+      "expo-calendar"
     ],
     "scheme": "rentitforward",
     "extra": {

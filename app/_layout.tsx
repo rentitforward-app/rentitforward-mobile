@@ -8,7 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SplashScreenManager } from '../src/components/SplashScreenManager';
 import { initSentry } from '../src/lib/sentry';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
-import { TrackingPermissionProvider } from '../src/components/TrackingPermissionProvider';
+// import { TrackingPermissionProvider } from '../src/components/TrackingPermissionProvider';
 
 // Initialize Sentry as early as possible
 initSentry();
@@ -52,11 +52,11 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <TrackingPermissionProvider>
+            {/* <TrackingPermissionProvider> */}
               <SafeAreaProvider>
                 <RootLayoutNav />
               </SafeAreaProvider>
-            </TrackingPermissionProvider>
+            {/* </TrackingPermissionProvider> */}
           </AuthProvider>
         </QueryClientProvider>
       </GestureHandlerRootView>
