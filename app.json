@@ -34,6 +34,7 @@
         "NSLocationWhenInUseUsageDescription": "Rent It Forward needs access to your location to show nearby rental items, help you find items in your area, and provide accurate location information for your listings.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Rent It Forward needs access to your location to show nearby rental items, help you find items in your area, and provide accurate location information for your listings.",
         "NSMicrophoneUsageDescription": "Rent It Forward needs access to your microphone to record voice notes for your rental listings and to enable voice search functionality.",
+        "NSUserNotificationsUsageDescription": "Rent It Forward needs permission to send you notifications about booking requests, messages, payment updates, and other important information related to your rentals.",
       }
     },
     "android": {
@@ -60,17 +61,9 @@
         "VIBRATE",
         "INTERNET",
         "ACCESS_NETWORK_STATE",
-        "CAMERA",
-        "WRITE_EXTERNAL_STORAGE",
-        "READ_EXTERNAL_STORAGE",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "RECORD_AUDIO",
-        "READ_CALENDAR",
-        "WRITE_CALENDAR",
-        "VIBRATE",
-        "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "RECEIVE_BOOT_COMPLETED",
+        "WAKE_LOCK",
+        "com.google.android.c2dm.permission.RECEIVE"
       ]
     },
     "web": {
@@ -79,7 +72,15 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-calendar"
+      "expo-calendar",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icons/notification-icon.png",
+          "color": "#44D62C",
+          "defaultChannel": "default"
+        }
+      ]
     ],
     "scheme": "rentitforward",
     "extra": {

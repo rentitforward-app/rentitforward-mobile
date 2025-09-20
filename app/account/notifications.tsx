@@ -1,16 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   ScrollView,
   Switch,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography } from '../../src/lib/design-system';
 import { Header } from '../../src/components/Header';
+import { useFCM, useNotificationPermission, useNotificationPreferences } from '../../src/components/FCMProvider';
 
 interface NotificationSettings {
   email_bookings: boolean;
@@ -27,6 +29,11 @@ interface NotificationSettings {
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  
+  // FCM hooks
+  const { hasPermission, isEnabled } = useFCM();
+  const { permission, enabled, loading: permissionLoading, enable, disable } = useNotificationPermission();
+  const { preferences, loading: preferencesLoading, updatePreference } = useNotificationPreferences();
 
   const [notifications, setNotifications] = useState<NotificationSettings>({
     email_bookings: true,
@@ -34,16 +41,90 @@ export default function NotificationsScreen() {
     email_marketing: false,
     sms_bookings: true,
     sms_reminders: true,
-    push_notifications: true,
-    push_bookings: true,
-    push_messages: true,
-    push_reminders: true
+    push_notifications: enabled,
+    push_bookings: preferences.booking_notifications,
+    push_messages: preferences.message_notifications,
+    push_reminders: preferences.system_notifications
   });
 
-  const handleNotificationUpdate = (key: keyof NotificationSettings, value: boolean) => {
-    setNotifications(prev => ({ ...prev, [key]: value }));
-    // Would save to database in real app
-    Alert.alert('Success', 'Notification preferences updated');
+  // Update local state when FCM state changes
+  useEffect(() => {
+    setNotifications(prev => ({
+      ...prev,
+      push_notifications: enabled,
+      push_bookings: preferences.booking_notifications,
+      push_messages: preferences.message_notifications,
+      push_reminders: preferences.system_notifications,
+    }));
+  }, [enabled, preferences]);
+
+  const handleNotificationUpdate = async (key: keyof NotificationSettings, value: boolean) => {
+    try {
+      // Handle push notification main toggle
+      if (key === 'push_notifications') {
+        if (value) {
+          const success = await enable();
+          if (!success) {
+            Alert.alert(
+              'Permission Required',
+              'Please enable notifications in your device settings to receive updates.',
+              [{ text: 'OK' }]
+            );
+            return;
+          }
+        } else {
+          Alert.alert(
+            'Disable Notifications',
+            'Are you sure you want to disable all push notifications? You may miss important updates about your bookings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { 
+                text: 'Disable', 
+                style: 'destructive',
+                onPress: async () => {
+                  await disable();
+                  setNotifications(prev => ({ ...prev, [key]: false }));
+                }
+              }
+            ]
+          );
+          return;
+        }
+      }
+      
+      // Handle push notification category toggles
+      if (key.startsWith('push_') && key !== 'push_notifications') {
+        if (!enabled) {
+          Alert.alert(
+            'Enable Push Notifications First',
+            'Please enable push notifications to customize your preferences.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+        
+        // Map UI keys to FCM preference keys
+        const fcmKey = key === 'push_bookings' ? 'booking_notifications' :
+                      key === 'push_messages' ? 'message_notifications' :
+                      key === 'push_reminders' ? 'system_notifications' : null;
+        
+        if (fcmKey) {
+          await updatePreference(fcmKey as keyof typeof preferences, value);
+        }
+      }
+      
+      // Update local state
+      setNotifications(prev => ({ ...prev, [key]: value }));
+      
+      // Show success message for non-push notifications
+      if (!key.startsWith('push_')) {
+        Alert.alert('Success', 'Notification preferences updated');
+      }
+      
+    } catch (error) {
+      console.error('Failed to update notification setting:', error);
+      Alert.alert('Error', 'Failed to update notification preferences. Please try again.');
+    }
   };
 
   return (
@@ -246,15 +327,27 @@ export default function NotificationsScreen() {
                     color: colors.gray[500],
                     marginTop: spacing.xs / 2,
                   }}>
-                    Receive push notifications on your device
+                    {permissionLoading 
+                      ? 'Checking notification status...'
+                      : !permission 
+                        ? 'Notifications are not allowed in device settings'
+                        : enabled 
+                          ? 'You\'ll receive push notifications'
+                          : 'Enable to receive important updates'
+                    }
                   </Text>
                 </View>
-                <Switch
-                  value={notifications.push_notifications}
-                  onValueChange={(value) => handleNotificationUpdate('push_notifications', value)}
-                  trackColor={{ false: colors.gray[300], true: colors.primary.main + '40' }}
-                  thumbColor={notifications.push_notifications ? colors.primary.main : colors.gray[400]}
-                />
+                {permissionLoading ? (
+                  <ActivityIndicator size="small" color={colors.primary.main} />
+                ) : (
+                  <Switch
+                    value={notifications.push_notifications}
+                    onValueChange={(value) => handleNotificationUpdate('push_notifications', value)}
+                    disabled={permissionLoading}
+                    trackColor={{ false: colors.gray[300], true: colors.primary.main + '40' }}
+                    thumbColor={notifications.push_notifications ? colors.primary.main : colors.gray[400]}
+                  />
+                )}
               </View>
 
               {notifications.push_notifications && (
@@ -288,18 +381,66 @@ export default function NotificationsScreen() {
                           {item.description}
                         </Text>
                       </View>
-                      <Switch
-                        value={notifications[item.key as keyof NotificationSettings]}
-                        onValueChange={(value) => handleNotificationUpdate(item.key as keyof NotificationSettings, value)}
-                        trackColor={{ false: colors.gray[300], true: colors.primary.main + '40' }}
-                        thumbColor={notifications[item.key as keyof NotificationSettings] ? colors.primary.main : colors.gray[400]}
-                      />
+                      {preferencesLoading ? (
+                        <ActivityIndicator size="small" color={colors.primary.main} />
+                      ) : (
+                        <Switch
+                          value={notifications[item.key as keyof NotificationSettings]}
+                          onValueChange={(value) => handleNotificationUpdate(item.key as keyof NotificationSettings, value)}
+                          disabled={preferencesLoading}
+                          trackColor={{ false: colors.gray[300], true: colors.primary.main + '40' }}
+                          thumbColor={notifications[item.key as keyof NotificationSettings] ? colors.primary.main : colors.gray[400]}
+                        />
+                      )}
                     </View>
                   ))}
                 </>
               )}
             </View>
           </View>
+
+          {/* Permission Hint */}
+          {!permission && (
+            <View style={{
+              backgroundColor: colors.semantic.warning + '10',
+              borderRadius: 12,
+              marginBottom: spacing.lg,
+              padding: spacing.lg,
+              borderWidth: 1,
+              borderColor: colors.semantic.warning + '30',
+            }}>
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginBottom: spacing.md,
+              }}>
+                <Ionicons name="warning" size={24} color={colors.semantic.warning} />
+                <Text style={{
+                  fontSize: typography.sizes.lg,
+                  fontWeight: typography.weights.semibold,
+                  color: colors.gray[900],
+                  marginLeft: spacing.sm,
+                }}>
+                  Notifications Disabled
+                </Text>
+              </View>
+              <Text style={{
+                fontSize: typography.sizes.sm,
+                color: colors.gray[600],
+                lineHeight: 18,
+                marginBottom: spacing.sm,
+              }}>
+                💡 To enable notifications, you may need to allow them in your device settings under Settings → Notifications → Rent It Forward
+              </Text>
+              <Text style={{
+                fontSize: typography.sizes.sm,
+                color: colors.gray[600],
+                lineHeight: 18,
+              }}>
+                Push notifications help you stay updated on booking requests, messages, and important updates.
+              </Text>
+            </View>
+          )}
 
           {/* Notification Tips */}
           <View style={{

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Stack } from 'expo-router';
 import { AuthProvider, useAuth } from '../src/components/AuthProvider';
+import { FCMProvider } from '../src/components/FCMProvider';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '../src/lib/query-client';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -52,11 +53,13 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            {/* <TrackingPermissionProvider> */}
-              <SafeAreaProvider>
-                <RootLayoutNav />
-              </SafeAreaProvider>
-            {/* </TrackingPermissionProvider> */}
+            <FCMProvider>
+              {/* <TrackingPermissionProvider> */}
+                <SafeAreaProvider>
+                  <RootLayoutNav />
+                </SafeAreaProvider>
+              {/* </TrackingPermissionProvider> */}
+            </FCMProvider>
           </AuthProvider>
         </QueryClientProvider>
       </GestureHandlerRootView>
