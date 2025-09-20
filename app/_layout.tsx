@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SplashScreenManager } from '../src/components/SplashScreenManager';
 import { initSentry } from '../src/lib/sentry';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
+import { NotificationService } from '../src/components/NotificationService';
 // import { TrackingPermissionProvider } from '../src/components/TrackingPermissionProvider';
 
 // Initialize Sentry as early as possible
@@ -34,6 +35,7 @@ function RootLayoutNav() {
   
   return (
     <SplashScreenManager isReady={!loading}>
+      <NotificationService />
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />

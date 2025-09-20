@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography } from '../lib/design-system';
+import { useNotifications } from './NotificationService';
 
 export interface HeaderProps {
   title: string;
@@ -36,6 +37,7 @@ export function Header({
 }: HeaderProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { unreadCount } = useNotifications();
 
   const handleBackPress = () => {
     if (onBackPress) {
@@ -157,11 +159,37 @@ export function Header({
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 testID="header-notification-button"
               >
-                <Ionicons
-                  name="notifications-outline"
-                  size={24}
-                  color={titleColor}
-                />
+                <View style={{ position: 'relative' }}>
+                  <Ionicons
+                    name="notifications-outline"
+                    size={24}
+                    color={titleColor}
+                  />
+                  {unreadCount > 0 && (
+                    <View style={{
+                      position: 'absolute',
+                      top: -2,
+                      right: -2,
+                      backgroundColor: colors.primary.main,
+                      borderRadius: 10,
+                      minWidth: 20,
+                      height: 20,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      borderWidth: 2,
+                      borderColor: backgroundColor,
+                    }}>
+                      <Text style={{
+                        color: colors.white,
+                        fontSize: 12,
+                        fontWeight: 'bold',
+                        textAlign: 'center',
+                      }}>
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </TouchableOpacity>
             ) : null}
           </View>
