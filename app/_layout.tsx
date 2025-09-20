@@ -41,6 +41,11 @@ function RootLayoutNav() {
         <Stack.Screen name="listing/create" options={{ headerShown: false }} />
         <Stack.Screen name="listing/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="bookings/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="notifications" options={{ 
+          headerShown: true,
+          title: 'Notifications',
+          headerBackTitle: 'Back'
+        }} />
         <Stack.Screen name="account" options={{ headerShown: false }} />
       </Stack>
     </SplashScreenManager>

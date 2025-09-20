@@ -96,28 +96,28 @@ const STEPS = [
   { id: 3, title: 'Location & Delivery', icon: 'location' },
 ];
 
-// Categories (matches your database)
+// Categories (matches web database format)
 const CATEGORIES = [
-  { id: 'tools_diy_equipment', name: 'Tools & DIY Equipment', icon: '🔧' },
-  { id: 'cameras_photography_gear', name: 'Cameras & Photography Gear', icon: '📷' },
-  { id: 'event_party_equipment', name: 'Event & Party Equipment', icon: '🎉' },
-  { id: 'camping_outdoor_gear', name: 'Camping & Outdoor Gear', icon: '🏕️' },
-  { id: 'tech_electronics', name: 'Tech & Electronics', icon: '📱' },
-  { id: 'vehicles_transport', name: 'Vehicles & Transport', icon: '🚗' },
-  { id: 'home_garden_appliances', name: 'Home & Garden Appliances', icon: '🏡' },
-  { id: 'sports_fitness_equipment', name: 'Sports & Fitness Equipment', icon: '🏃' },
-  { id: 'musical_instruments_gear', name: 'Musical Instruments & Gear', icon: '🎸' },
-  { id: 'costumes_props', name: 'Costumes & Props', icon: '🎭' },
-  { id: 'maker_craft_supplies', name: 'Maker & Craft Supplies', icon: '✂️' },
-  { id: 'clothing_shoes_accessories', name: 'Clothing, Shoes and Accessories', icon: '👕' },
+  { id: 'tools-diy-equipment', name: 'Tools & DIY Equipment', icon: '🔧' },
+  { id: 'cameras-photography-gear', name: 'Cameras & Photography Gear', icon: '📷' },
+  { id: 'event-party-equipment', name: 'Event & Party Equipment', icon: '🎉' },
+  { id: 'camping-outdoor-gear', name: 'Camping & Outdoor Gear', icon: '🏕️' },
+  { id: 'tech-electronics', name: 'Tech & Electronics', icon: '📱' },
+  { id: 'vehicles-transport', name: 'Vehicles & Transport', icon: '🚗' },
+  { id: 'home-garden-appliances', name: 'Home & Garden Appliances', icon: '🏡' },
+  { id: 'sports-fitness-equipment', name: 'Sports & Fitness Equipment', icon: '🏃' },
+  { id: 'musical-instruments-gear', name: 'Musical Instruments & Gear', icon: '🎸' },
+  { id: 'costumes-props', name: 'Costumes & Props', icon: '🎭' },
+  { id: 'maker-craft-supplies', name: 'Maker & Craft Supplies', icon: '✂️' },
+  { id: 'clothing-shoes-accessories', name: 'Clothing, Shoes and Accessories', icon: '👕' },
 ];
 
 const CONDITIONS = [
   { id: 'new', name: 'New', description: 'Brand new, unopened' },
-  { id: 'like_new', name: 'Like New', description: 'Used once or twice' },
-  { id: 'excellent', name: 'Excellent', description: 'Minor wear, great condition' },
+  { id: 'like-new', name: 'Like New', description: 'Used once or twice' },
   { id: 'good', name: 'Good', description: 'Normal wear, fully functional' },
   { id: 'fair', name: 'Fair', description: 'Well used, some wear visible' },
+  { id: 'poor', name: 'Poor', description: 'Significant wear, may have issues' },
 ];
 
 export default function CreateScreen() {
@@ -263,17 +263,18 @@ export default function CreateScreen() {
     }));
   };
 
-  const uploadImages = async (listingId) => {
+  const uploadImages = async () => {
     const uploadedUrls = [];
     
     for (let i = 0; i < formData.images.length; i++) {
       const image = formData.images[i];
       const fileExt = image.uri.split('.').pop();
-      const fileName = `${listingId}/${Date.now()}_${i}.${fileExt}`;
+      const fileName = `${user.id}/${Date.now()}_${i}.${fileExt}`;
       
       try {
-        const formData = new FormData();
-        formData.append('file', {
+        // Create FormData for file upload
+        const uploadFormData = new FormData();
+        uploadFormData.append('file', {
           uri: image.uri,
           type: `image/${fileExt}`,
           name: fileName,
@@ -281,7 +282,7 @@ export default function CreateScreen() {
 
         const { data, error } = await supabase.storage
           .from('listing-images')
-          .upload(fileName, formData);
+          .upload(fileName, uploadFormData);
 
         if (error) throw error;
 
@@ -289,18 +290,10 @@ export default function CreateScreen() {
           .from('listing-images')
           .getPublicUrl(fileName);
 
-        // Insert into listing_photos table
-        await supabase
-          .from('listing_photos')
-          .insert({
-            listing_id: listingId,
-            url: publicUrl,
-            order_index: i
-          });
-
         uploadedUrls.push(publicUrl);
       } catch (error) {
         console.error('Error uploading image:', error);
+        throw error; // Re-throw to handle in submitListing
       }
     }
     
@@ -318,11 +311,17 @@ export default function CreateScreen() {
     try {
       // Geocode the address to get coordinates
       const coordinates = await geocodeAddress(formData.address, formData.city, formData.state);
-      const locationPoint = coordinates 
-        ? `POINT(${coordinates.longitude} ${coordinates.latitude})`
-        : 'POINT(151.2093 -33.8688)'; // Default to Sydney coordinates
+      
+      // Upload images first and get URLs
+      let imageUrls: string[] = [];
+      if (formData.images.length > 0) {
+        imageUrls = await uploadImages();
+      }
 
-      // Create listing
+      // Prepare the full address string
+      const fullAddress = `${formData.address}, ${formData.city}, ${formData.state} ${formData.postal_code}, Australia`;
+
+      // Create listing with proper schema alignment
       const { data: listing, error: listingError } = await supabase
         .from('listings')
         .insert({
@@ -335,27 +334,33 @@ export default function CreateScreen() {
           year: formData.year ? parseInt(formData.year) : null,
           price_per_day: parseFloat(formData.price_per_day),
           price_weekly: formData.price_weekly ? parseFloat(formData.price_weekly) : null,
-          deposit: formData.deposit ? parseFloat(formData.deposit) : null,
+          deposit: formData.deposit ? parseFloat(formData.deposit) : 0, // Default to 0, not null
           insurance_enabled: formData.insurance_enabled,
-          address: formData.address,
+          address: fullAddress,
           city: formData.city,
           state: formData.state,
           postal_code: formData.postal_code,
           country: 'Australia',
           currency: 'AUD',
           owner_id: user.id,
-          is_active: true,
-          location: locationPoint,
-          features: formData.features.length > 0 ? formData.features : null,
+          is_active: false, // Set to false initially, will be activated after admin approval
+          approval_status: 'pending',
+          location: coordinates 
+            ? `POINT(${coordinates.longitude} ${coordinates.latitude})`
+            : 'POINT(151.2093 -33.8688)', // Default to Sydney coordinates
+          latitude: coordinates?.latitude || -33.8688,
+          longitude: coordinates?.longitude || 151.2093,
+          images: imageUrls, // Set images array directly
+          features: formData.features.length > 0 ? formData.features : [], // Default to empty array
+          pickup_available: true, // Default to pickup available
+          delivery_available: false, // Default to pickup only
         })
         .select()
         .single();
 
-      if (listingError) throw listingError;
-
-      // Upload images
-      if (formData.images.length > 0) {
-        await uploadImages(listing.id);
+      if (listingError) {
+        console.error('Listing creation error:', listingError);
+        throw listingError;
       }
 
       Alert.alert('Success!', 'Your listing has been created successfully and is awaiting admin approval.', [

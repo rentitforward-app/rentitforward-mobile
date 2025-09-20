@@ -5,14 +5,11 @@ import { useEffect, useState } from 'react';
 import { Keyboard } from 'react-native';
 import { colors, spacing, typography } from '../../src/lib/design-system';
 import { useAuth } from '../../src/components/AuthProvider';
-import { useFCM } from '../../src/components/FCMProvider';
-import { TabIconWithBadge } from '../../src/components/NotificationBadge';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, loading } = useAuth();
-  const { badgeCount } = useFCM();
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   
   // Protect tabs - redirect unauthenticated users
@@ -120,21 +117,6 @@ export default function TabLayout() {
               size={size} 
               color={color} 
             />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="notifications"
-        options={{
-          title: 'Notifications',
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIconWithBadge badgeCount={badgeCount}>
-              <Ionicons 
-                name={focused ? "notifications" : "notifications-outline"} 
-                size={size} 
-                color={color} 
-              />
-            </TabIconWithBadge>
           ),
         }}
       />
