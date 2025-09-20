@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>AIzaSyCZHifHk8tZ_3-RuK3rLzHXK8bS73P19m0</string>
+	<key>GCM_SENDER_ID</key>
+	<string>793254315983</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>au.com.rentitforward.mobile</string>
+	<key>PROJECT_ID</key>
+	<string>rent-it-forward</string>
+	<key>STORAGE_BUCKET</key>
+	<string>rent-it-forward.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:793254315983:ios:4f8ea445b79f39c1b2f4ba</string>
+</dict>
+</plist>

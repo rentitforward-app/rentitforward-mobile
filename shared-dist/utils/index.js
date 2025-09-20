@@ -26,7 +26,7 @@ __exportStar(require("./pricing"), exports);
 __exportStar(require("./platform"), exports);
 // Stripe utilities (platform-aware)
 __exportStar(require("./stripe-platform"), exports);
-// Legacy Stripe utilities (server-only, temporarily disabled for mobile compatibility)
+// Legacy Stripe utilities (server-only, disabled due to TypeScript errors)
 // export * from './stripe';
 // Reviews utilities
 __exportStar(require("./reviews"), exports);
@@ -36,7 +36,6 @@ __exportStar(require("./geolocation"), exports);
 __exportStar(require("./geocoding"), exports);
 // Notification utilities
 __exportStar(require("./notifications"), exports);
-__exportStar(require("./notification-triggers"), exports);
 // Search and predictive text utilities
 __exportStar(require("./search"), exports);
 __exportStar(require("./search-api"), exports);

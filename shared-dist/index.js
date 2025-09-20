@@ -25,10 +25,9 @@ __exportStar(require("./types/search"), exports);
 __exportStar(require("./design-system"), exports);
 __exportStar(require("./utils/formatting"), exports);
 __exportStar(require("./utils/reviews"), exports);
-// export * from './utils/stripe'; // Temporarily disabled for mobile compatibility
+// export * from './utils/stripe'; // Disabled due to TypeScript errors
 __exportStar(require("./utils/pricing"), exports);
 __exportStar(require("./utils/notifications"), exports);
-__exportStar(require("./utils/notification-triggers"), exports);
 __exportStar(require("./utils/search"), exports);
 __exportStar(require("./utils/search-api"), exports);
 __exportStar(require("./constants"), exports);

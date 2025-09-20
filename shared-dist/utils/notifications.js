@@ -41,44 +41,93 @@ function createNotification(type, context, userId, overrides) {
     };
 }
 /**
- * Creates a OneSignal push notification payload
+ * Creates a FCM push notification payload
  */
-function createPushNotification(appId, notification, options) {
+function createPushNotification(notification, options) {
     const template = notification.type
         ? notification_1.NOTIFICATION_TEMPLATES[notification.type]
         : null;
+    const priority = options?.priority || (template?.priority && template.priority > 7 ? 'high' : 'normal');
+    const channelId = options?.android_channel_id || getAndroidChannelId(notification.type);
     return {
-        app_id: appId,
-        headings: { en: notification.title },
-        contents: { en: notification.message },
-        // Targeting - prefer external_user_ids for user targeting
-        include_external_user_ids: options?.external_user_ids || [notification.user_id],
-        include_player_ids: options?.player_ids,
-        included_segments: options?.segments,
-        // Custom data for deep linking and analytics
-        data: {
-            type: notification.type,
-            action_url: notification.action_url,
-            notification_id: notification.id,
-            ...notification.data,
+        // Targeting
+        registration_ids: options?.fcm_tokens,
+        condition: options?.condition,
+        // Notification payload
+        notification: {
+            title: notification.title,
+            body: notification.message,
+            image: options?.image || template?.big_picture,
+            click_action: options?.click_action || getWebUrl(notification.action_url),
+            color: '#44D62C', // Brand color
+            icon: 'notification_icon',
         },
-        // Behavior settings
-        priority: options?.priority || template?.priority || 7,
-        ttl: options?.ttl || template?.ttl || 86400, // 24 hours default
-        // Rich content
-        big_picture: options?.big_picture || template?.big_picture,
-        large_icon: options?.big_picture, // Use same image for large icon
-        // Web specific
-        web_url: options?.web_url || getWebUrl(notification.action_url),
-        web_buttons: options?.web_buttons || template?.web_buttons,
-        // iOS specific - for rich notifications
-        ios_attachments: options?.big_picture ? {
-            image: options.big_picture,
-        } : undefined,
-        // Android specific
-        android_channel_id: getAndroidChannelId(notification.type),
-        // Scheduling
-        send_after: options?.send_after,
+        // Data payload for custom handling
+        data: {
+            type: notification.type || '',
+            action_url: notification.action_url || '',
+            notification_id: notification.id || '',
+            user_id: notification.user_id,
+            ...Object.fromEntries(Object.entries(notification.data || {}).map(([key, value]) => [
+                key,
+                typeof value === 'string' ? value : JSON.stringify(value)
+            ])),
+        },
+        // Android specific configuration
+        android: {
+            priority,
+            ttl: options?.ttl ? `${options.ttl}s` : '86400s', // 24 hours default
+            collapse_key: options?.collapse_key,
+            notification: {
+                title: notification.title,
+                body: notification.message,
+                icon: 'notification_icon',
+                color: '#44D62C',
+                channel_id: channelId,
+                click_action: options?.click_action || getWebUrl(notification.action_url),
+                notification_priority: priority === 'high' ? 'PRIORITY_HIGH' : 'PRIORITY_DEFAULT',
+                default_sound: true,
+                default_vibrate_timings: true,
+            },
+        },
+        // iOS specific configuration (APNS)
+        apns: {
+            headers: {
+                'apns-priority': priority === 'high' ? '10' : '5',
+                ...(options?.ttl && {
+                    'apns-expiration': String(Math.floor(Date.now() / 1000) + options.ttl)
+                }),
+            },
+            payload: {
+                aps: {
+                    alert: {
+                        title: notification.title,
+                        body: notification.message,
+                    },
+                    badge: 1, // Will be updated by the app
+                    sound: 'default',
+                    category: getCategoryId(notification.type),
+                    'mutable-content': 1, // Enable notification service extension
+                },
+            },
+        },
+        // Web specific configuration
+        webpush: {
+            headers: {
+                TTL: options?.ttl ? String(options.ttl) : '86400',
+                Urgency: priority,
+            },
+            notification: {
+                title: notification.title,
+                body: notification.message,
+                icon: '/icons/notification-icon-192.png',
+                image: options?.image || template?.big_picture,
+                badge: '/icons/notification-badge-72.png',
+                tag: notification.type || 'general',
+                click_action: options?.click_action || getWebUrl(notification.action_url),
+                actions: getWebActions(notification.type),
+            },
+        },
     };
 }
 /**
@@ -123,6 +172,46 @@ function getAndroidChannelId(type) {
             return 'system';
         default:
             return 'default';
+    }
+}
+/**
+ * Gets iOS notification category ID for interactive notifications
+ */
+function getCategoryId(type) {
+    if (!type)
+        return 'general';
+    switch (type) {
+        case 'booking_request':
+        case 'booking_confirmed':
+        case 'booking_cancelled':
+        case 'booking_completed':
+            return 'booking';
+        case 'message_received':
+            return 'message';
+        case 'payment_received':
+        case 'payment_failed':
+            return 'payment';
+        default:
+            return 'general';
+    }
+}
+/**
+ * Gets web notification actions based on notification type
+ */
+function getWebActions(type) {
+    switch (type) {
+        case 'booking_request':
+            return [
+                { action: 'accept', title: 'Accept', icon: '/icons/check.png' },
+                { action: 'decline', title: 'Decline', icon: '/icons/close.png' },
+            ];
+        case 'message_received':
+            return [
+                { action: 'reply', title: 'Reply', icon: '/icons/reply.png' },
+                { action: 'view', title: 'View', icon: '/icons/view.png' },
+            ];
+        default:
+            return undefined;
     }
 }
 /**
@@ -269,14 +358,34 @@ function getNotificationPriority(type, context) {
 /**
  * Creates a delayed notification for optimal delivery
  */
-function createDelayedNotification(appId, notification, preferences, urgency = 'normal', options) {
-    const sendAfter = getOptimalSendTime(preferences, urgency);
-    const priority = getNotificationPriority(notification.type, { isUrgent: urgency === 'immediate' });
-    return createPushNotification(appId, notification, {
+function createDelayedNotification(notification, preferences, urgency = 'normal', options) {
+    const priority = urgency === 'immediate' ? 'high' : 'normal';
+    const ttl = getOptimalTTL(preferences, urgency);
+    return createPushNotification(notification, {
         ...options,
         priority,
-        send_after: sendAfter,
-        // Use timezone-based delivery for non-immediate notifications
-        delayed_option: urgency !== 'immediate' ? 'timezone' : undefined,
+        ttl,
     });
+}
+/**
+ * Gets optimal TTL based on urgency and user preferences
+ */
+function getOptimalTTL(preferences, urgency = 'normal') {
+    // For immediate notifications, use shorter TTL
+    if (urgency === 'immediate') {
+        return 3600; // 1 hour
+    }
+    // For normal notifications during quiet hours, extend TTL
+    if (isWithinQuietHours(preferences)) {
+        return 172800; // 48 hours
+    }
+    // Default TTL based on urgency
+    switch (urgency) {
+        case 'normal':
+            return 86400; // 24 hours
+        case 'low':
+            return 604800; // 7 days
+        default:
+            return 86400; // 24 hours
+    }
 }

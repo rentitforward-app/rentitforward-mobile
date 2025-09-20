@@ -18,7 +18,8 @@ const date_fns_1 = require("date-fns");
  * @returns Duration in days
  */
 function calculateDuration(startDate, endDate) {
-    return (0, date_fns_1.differenceInDays)(endDate, startDate);
+    // Inclusive duration: count both pickup (start) and return (end) dates
+    return (0, date_fns_1.differenceInDays)(endDate, startDate) + 1;
 }
 /**
  * Generate array of date strings for a given range

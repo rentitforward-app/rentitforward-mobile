@@ -33,6 +33,7 @@ var ListingCategory;
     ListingCategory["MUSICAL_INSTRUMENTS_GEAR"] = "musical_instruments_gear";
     ListingCategory["COSTUMES_PROPS"] = "costumes_props";
     ListingCategory["MAKER_CRAFT_SUPPLIES"] = "maker_craft_supplies";
+    ListingCategory["CLOTHING_SHOES_ACCESSORIES"] = "clothing_shoes_accessories";
 })(ListingCategory || (exports.ListingCategory = ListingCategory = {}));
 var PricingType;
 (function (PricingType) {

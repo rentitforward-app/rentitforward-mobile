@@ -3,7 +3,7 @@ import {
   NotificationType, 
   createNotification, 
   NotificationContext 
-} from '../../../rentitforward-shared/src/types/notification';
+} from '../../shared-dist/types/notification';
 
 export interface NotificationTrigger {
   userId: string;

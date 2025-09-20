@@ -9,27 +9,22 @@ export declare function replaceTemplate(template: string, context: Record<string
  */
 export declare function createNotification<T extends NotificationType>(type: T, context: NotificationContext[T], userId: string, overrides?: Partial<NotificationTemplate>): Omit<AppNotification, 'id' | 'created_at' | 'updated_at'>;
 /**
- * Creates a OneSignal push notification payload
+ * Creates a FCM push notification payload
  */
-export declare function createPushNotification(appId: string, notification: Partial<AppNotification> & {
+export declare function createPushNotification(notification: Partial<AppNotification> & {
     title: string;
     message: string;
     user_id: string;
 }, options?: {
-    external_user_ids?: string[];
-    player_ids?: string[];
-    segments?: string[];
-    big_picture?: string;
-    web_url?: string;
-    web_buttons?: Array<{
-        id: string;
-        text: string;
-        url?: string;
-    }>;
-    priority?: number;
+    fcm_tokens?: string[];
+    topic?: string;
+    condition?: string;
+    image?: string;
+    click_action?: string;
+    priority?: 'normal' | 'high';
     ttl?: number;
-    send_after?: string;
-    delayed_option?: 'timezone' | 'last-active';
+    collapse_key?: string;
+    android_channel_id?: string;
 }): PushNotification;
 /**
  * Validates notification preferences for a user
@@ -85,7 +80,7 @@ export declare function getNotificationPriority(type: NotificationType, context?
 /**
  * Creates a delayed notification for optimal delivery
  */
-export declare function createDelayedNotification(appId: string, notification: Partial<AppNotification> & {
+export declare function createDelayedNotification(notification: Partial<AppNotification> & {
     title: string;
     message: string;
     user_id: string;
@@ -94,4 +89,4 @@ export declare function createDelayedNotification(appId: string, notification: P
     quiet_hours_start?: string;
     quiet_hours_end?: string;
     timezone?: string;
-}, urgency?: 'immediate' | 'normal' | 'low', options?: Parameters<typeof createPushNotification>[2]): PushNotification;
+}, urgency?: 'immediate' | 'normal' | 'low', options?: Parameters<typeof createPushNotification>[1]): PushNotification;

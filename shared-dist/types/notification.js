@@ -1,8 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.NOTIFICATION_TEMPLATES = exports.OneSignalSubscriptionSchema = exports.NotificationPreferencesSchema = exports.AppNotificationSchema = exports.PushNotificationSchema = exports.NotificationTypeSchema = void 0;
+exports.NOTIFICATION_TEMPLATES = exports.FCMSubscriptionSchema = exports.NotificationPreferencesSchema = exports.AppNotificationSchema = exports.PushNotificationSchema = exports.NotificationTypeSchema = void 0;
 const zod_1 = require("zod");
-// OneSignal notification types
+// FCM notification types
 exports.NotificationTypeSchema = zod_1.z.enum([
     'booking_request',
     'booking_confirmed',
@@ -18,38 +18,115 @@ exports.NotificationTypeSchema = zod_1.z.enum([
     'system_announcement',
     'reminder',
 ]);
-// OneSignal push notification payload
+// FCM push notification payload
 exports.PushNotificationSchema = zod_1.z.object({
-    // OneSignal required fields
-    app_id: zod_1.z.string(),
-    headings: zod_1.z.record(zod_1.z.string(), zod_1.z.string()),
-    contents: zod_1.z.record(zod_1.z.string(), zod_1.z.string()),
-    // Targeting
-    include_external_user_ids: zod_1.z.array(zod_1.z.string()).optional(),
-    include_player_ids: zod_1.z.array(zod_1.z.string()).optional(),
-    included_segments: zod_1.z.array(zod_1.z.string()).optional(),
-    // Custom data
-    data: zod_1.z.record(zod_1.z.string(), zod_1.z.any()).optional(),
-    // Notification behavior
-    priority: zod_1.z.number().optional(),
-    ttl: zod_1.z.number().optional(),
-    // Rich content
-    big_picture: zod_1.z.string().url().optional(),
-    large_icon: zod_1.z.string().url().optional(),
-    small_icon: zod_1.z.string().optional(),
-    // Web specific
-    web_url: zod_1.z.string().url().optional(),
-    web_buttons: zod_1.z.array(zod_1.z.object({
-        id: zod_1.z.string(),
-        text: zod_1.z.string(),
-        url: zod_1.z.string().url().optional(),
-    })).optional(),
-    // Mobile specific
-    ios_attachments: zod_1.z.record(zod_1.z.string(), zod_1.z.string()).optional(),
-    android_channel_id: zod_1.z.string().optional(),
-    // Scheduling
-    send_after: zod_1.z.string().optional(),
-    delayed_option: zod_1.z.enum(['timezone', 'last-active']).optional(),
+    // FCM required fields
+    to: zod_1.z.string().optional(), // FCM token
+    registration_ids: zod_1.z.array(zod_1.z.string()).optional(), // Multiple FCM tokens
+    condition: zod_1.z.string().optional(), // Topic condition
+    // Notification payload
+    notification: zod_1.z.object({
+        title: zod_1.z.string(),
+        body: zod_1.z.string(),
+        image: zod_1.z.string().url().optional(),
+        icon: zod_1.z.string().optional(),
+        color: zod_1.z.string().optional(),
+        sound: zod_1.z.string().optional(),
+        tag: zod_1.z.string().optional(),
+        click_action: zod_1.z.string().optional(),
+        body_loc_key: zod_1.z.string().optional(),
+        body_loc_args: zod_1.z.array(zod_1.z.string()).optional(),
+        title_loc_key: zod_1.z.string().optional(),
+        title_loc_args: zod_1.z.array(zod_1.z.string()).optional(),
+    }).optional(),
+    // Data payload
+    data: zod_1.z.record(zod_1.z.string(), zod_1.z.string()).optional(),
+    // Android specific
+    android: zod_1.z.object({
+        collapse_key: zod_1.z.string().optional(),
+        priority: zod_1.z.enum(['normal', 'high']).optional(),
+        ttl: zod_1.z.string().optional(),
+        restricted_package_name: zod_1.z.string().optional(),
+        data: zod_1.z.record(zod_1.z.string(), zod_1.z.string()).optional(),
+        notification: zod_1.z.object({
+            title: zod_1.z.string().optional(),
+            body: zod_1.z.string().optional(),
+            icon: zod_1.z.string().optional(),
+            color: zod_1.z.string().optional(),
+            sound: zod_1.z.string().optional(),
+            tag: zod_1.z.string().optional(),
+            click_action: zod_1.z.string().optional(),
+            body_loc_key: zod_1.z.string().optional(),
+            body_loc_args: zod_1.z.array(zod_1.z.string()).optional(),
+            title_loc_key: zod_1.z.string().optional(),
+            title_loc_args: zod_1.z.array(zod_1.z.string()).optional(),
+            channel_id: zod_1.z.string().optional(),
+            ticker: zod_1.z.string().optional(),
+            sticky: zod_1.z.boolean().optional(),
+            event_time: zod_1.z.string().optional(),
+            local_only: zod_1.z.boolean().optional(),
+            notification_priority: zod_1.z.enum(['PRIORITY_MIN', 'PRIORITY_LOW', 'PRIORITY_DEFAULT', 'PRIORITY_HIGH', 'PRIORITY_MAX']).optional(),
+            default_sound: zod_1.z.boolean().optional(),
+            default_vibrate_timings: zod_1.z.boolean().optional(),
+            default_light_settings: zod_1.z.boolean().optional(),
+            vibrate_timings: zod_1.z.array(zod_1.z.string()).optional(),
+            visibility: zod_1.z.enum(['PRIVATE', 'PUBLIC', 'SECRET']).optional(),
+            notification_count: zod_1.z.number().optional(),
+        }).optional(),
+    }).optional(),
+    // iOS specific (APNS)
+    apns: zod_1.z.object({
+        headers: zod_1.z.record(zod_1.z.string(), zod_1.z.string()).optional(),
+        payload: zod_1.z.object({
+            aps: zod_1.z.object({
+                alert: zod_1.z.union([
+                    zod_1.z.string(),
+                    zod_1.z.object({
+                        title: zod_1.z.string().optional(),
+                        subtitle: zod_1.z.string().optional(),
+                        body: zod_1.z.string().optional(),
+                        'launch-image': zod_1.z.string().optional(),
+                        'title-loc-key': zod_1.z.string().optional(),
+                        'title-loc-args': zod_1.z.array(zod_1.z.string()).optional(),
+                        'subtitle-loc-key': zod_1.z.string().optional(),
+                        'subtitle-loc-args': zod_1.z.array(zod_1.z.string()).optional(),
+                        'loc-key': zod_1.z.string().optional(),
+                        'loc-args': zod_1.z.array(zod_1.z.string()).optional(),
+                    }),
+                ]).optional(),
+                badge: zod_1.z.number().optional(),
+                sound: zod_1.z.union([zod_1.z.string(), zod_1.z.object({
+                        critical: zod_1.z.boolean().optional(),
+                        name: zod_1.z.string().optional(),
+                        volume: zod_1.z.number().optional(),
+                    })]).optional(),
+                'thread-id': zod_1.z.string().optional(),
+                category: zod_1.z.string().optional(),
+                'content-available': zod_1.z.number().optional(),
+                'mutable-content': zod_1.z.number().optional(),
+            }),
+        }).optional(),
+    }).optional(),
+    // Web specific (WebPush)
+    webpush: zod_1.z.object({
+        headers: zod_1.z.record(zod_1.z.string(), zod_1.z.string()).optional(),
+        data: zod_1.z.record(zod_1.z.string(), zod_1.z.any()).optional(),
+        notification: zod_1.z.object({
+            title: zod_1.z.string().optional(),
+            body: zod_1.z.string().optional(),
+            icon: zod_1.z.string().optional(),
+            image: zod_1.z.string().optional(),
+            badge: zod_1.z.string().optional(),
+            tag: zod_1.z.string().optional(),
+            color: zod_1.z.string().optional(),
+            click_action: zod_1.z.string().optional(),
+            actions: zod_1.z.array(zod_1.z.object({
+                action: zod_1.z.string(),
+                title: zod_1.z.string(),
+                icon: zod_1.z.string().optional(),
+            })).optional(),
+        }).optional(),
+    }).optional(),
 });
 // Application notification data structure
 exports.AppNotificationSchema = zod_1.z.object({
@@ -63,8 +140,8 @@ exports.AppNotificationSchema = zod_1.z.object({
     created_at: zod_1.z.date(),
     updated_at: zod_1.z.date(),
     action_url: zod_1.z.string().optional(),
-    // OneSignal tracking
-    onesignal_id: zod_1.z.string().optional(),
+    // FCM tracking
+    fcm_message_id: zod_1.z.string().optional(),
     sent_at: zod_1.z.date().optional(),
     delivered_at: zod_1.z.date().optional(),
     opened_at: zod_1.z.date().optional(),
@@ -90,13 +167,14 @@ exports.NotificationPreferencesSchema = zod_1.z.object({
     created_at: zod_1.z.date(),
     updated_at: zod_1.z.date(),
 });
-// OneSignal subscription data
-exports.OneSignalSubscriptionSchema = zod_1.z.object({
+// FCM subscription data
+exports.FCMSubscriptionSchema = zod_1.z.object({
     user_id: zod_1.z.string().uuid(),
-    player_id: zod_1.z.string(), // OneSignal player/subscription ID
-    external_user_id: zod_1.z.string(), // Our user ID
+    fcm_token: zod_1.z.string(), // FCM registration token
     platform: zod_1.z.enum(['web', 'ios', 'android']),
     device_type: zod_1.z.enum(['web_push', 'ios', 'android']),
+    device_id: zod_1.z.string().optional(),
+    app_version: zod_1.z.string().optional(),
     is_active: zod_1.z.boolean().default(true),
     subscription_data: zod_1.z.record(zod_1.z.string(), zod_1.z.any()).optional(),
     created_at: zod_1.z.date(),

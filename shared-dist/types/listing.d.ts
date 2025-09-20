@@ -25,7 +25,8 @@ export declare enum ListingCategory {
     SPORTS_FITNESS_EQUIPMENT = "sports_fitness_equipment",
     MUSICAL_INSTRUMENTS_GEAR = "musical_instruments_gear",
     COSTUMES_PROPS = "costumes_props",
-    MAKER_CRAFT_SUPPLIES = "maker_craft_supplies"
+    MAKER_CRAFT_SUPPLIES = "maker_craft_supplies",
+    CLOTHING_SHOES_ACCESSORIES = "clothing_shoes_accessories"
 }
 export declare enum PricingType {
     DAILY = "daily",

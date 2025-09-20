@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "793254315983",
+    "project_id": "rent-it-forward",
+    "storage_bucket": "rent-it-forward.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:793254315983:android:ca7bede09f9387f4b2f4ba",
+        "android_client_info": {
+          "package_name": "au.com.rentitforward.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCLbtvFnFTvm7_d1obz5KDgx9Ifck4uOf4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:793254315983:android:872e7480b60b8acfb2f4ba",
+        "android_client_info": {
+          "package_name": "com.rentitforward.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCLbtvFnFTvm7_d1obz5KDgx9Ifck4uOf4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

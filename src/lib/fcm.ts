@@ -4,6 +4,11 @@ import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Helper to detect if running in Expo Go
+const isExpoGo = (): boolean => {
+  return Constants.appOwnership === 'expo';
+};
+
 export interface FCMConfig {
   projectId: string;
   apiKey: string;
@@ -319,6 +324,13 @@ export class FCMService {
    */
   async requestPermission(): Promise<boolean> {
     try {
+      // Check if running in Expo Go
+      if (isExpoGo()) {
+        console.warn('🚫 Push notifications are not supported in Expo Go. Please use a development build.');
+        console.warn('💡 Run "npx expo run:ios" or "npx expo run:android" to test notifications.');
+        return false;
+      }
+
       if (!Device.isDevice) {
         console.warn('Push notifications only work on physical devices');
         return false;
@@ -351,7 +363,13 @@ export class FCMService {
 
       return true;
     } catch (error) {
-      console.error('Failed to request notification permission:', error);
+      console.error('Failed to get FCM token:', error);
+      
+      // If it's an Expo Go related error, provide helpful message
+      if (error.message && (error.message.includes('Expo Go') || error.message.includes('Invalid uuid'))) {
+        console.warn('💡 Push notifications require a development build. Use EAS Build or "npx expo run" commands.');
+      }
+      
       return false;
     }
   }
@@ -388,6 +406,12 @@ export class FCMService {
    */
   async getToken(): Promise<string | null> {
     try {
+      // Check if running in Expo Go
+      if (isExpoGo()) {
+        console.warn('🚫 FCM tokens are not available in Expo Go. Use a development build.');
+        return null;
+      }
+
       if (this.currentToken) {
         return this.currentToken;
       }
@@ -414,6 +438,12 @@ export class FCMService {
       return this.currentToken;
     } catch (error) {
       console.error('Failed to get FCM token:', error);
+      
+      // Provide helpful message for Expo Go users
+      if (error.message && (error.message.includes('Expo Go') || error.message.includes('Invalid uuid'))) {
+        console.warn('💡 FCM tokens require a development build. Use "npx expo run:ios" or "npx expo run:android".');
+      }
+      
       return null;
     }
   }
@@ -756,11 +786,15 @@ let fcmService: FCMService | null = null;
 
 export function getFCMService(): FCMService {
   if (!fcmService) {
-    // Get config from Expo config
-    const projectId = Constants.expoConfig?.extra?.firebaseProjectId || '';
-    const apiKey = Constants.expoConfig?.extra?.firebaseApiKey || '';
-    const appId = Constants.expoConfig?.extra?.firebaseAppId || '';
-    const messagingSenderId = Constants.expoConfig?.extra?.firebaseMessagingSenderId || '';
+    // Get config from environment variables or Expo config
+    const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || 
+                     Constants.expoConfig?.extra?.firebaseProjectId || '';
+    const apiKey = process.env.EXPO_PUBLIC_FIREBASE_API_KEY || 
+                  Constants.expoConfig?.extra?.firebaseApiKey || '';
+    const appId = process.env.EXPO_PUBLIC_FIREBASE_APP_ID || 
+                 Constants.expoConfig?.extra?.firebaseAppId || '';
+    const messagingSenderId = process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || 
+                             Constants.expoConfig?.extra?.firebaseMessagingSenderId || '';
     
     fcmService = new FCMService({
       ...defaultFCMConfig,

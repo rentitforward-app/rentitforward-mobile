@@ -10,7 +10,6 @@ export * from './reviews';
 export * from './geolocation';
 export * from './geocoding';
 export * from './notifications';
-export * from './notification-triggers';
 export * from './search';
 export * from './search-api';
 export * from './calendar';
