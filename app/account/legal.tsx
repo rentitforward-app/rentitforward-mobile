@@ -10,8 +10,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, typography } from '../../../src/lib/design-system';
-import { Header } from '../../../src/components/Header';
+import { colors, spacing, typography } from '../../src/lib/design-system';
+import { Header } from '../../src/components/Header';
 
 export default function LegalScreen() {
   const insets = useSafeAreaInsets();

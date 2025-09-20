@@ -10,8 +10,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, typography } from '../../../src/lib/design-system';
-import { Header } from '../../../src/components/Header';
+import { colors, spacing, typography } from '../../src/lib/design-system';
+import { Header } from '../../src/components/Header';
 
 export default function InsuranceProtectionScreen() {
   const insets = useSafeAreaInsets();
@@ -23,7 +23,7 @@ export default function InsuranceProtectionScreen() {
   };
 
   const handleFileClaim = () => {
-    const email = 'claims@rentitforward.com';
+    const email = 'support@rentitforward.com.au';
     const subject = 'Insurance Claim - Item Damage/Loss';
     const body = 'Hi Rent It Forward Claims Team,\n\nI need to file an insurance claim:\n\nBooking ID: \nItem: \nDescription of incident: \nDate of incident: \nPhotos attached: [Please attach photos]\n\nAdditional details: \n\n';
     
@@ -39,7 +39,7 @@ export default function InsuranceProtectionScreen() {
   };
 
   const handleContactClaims = () => {
-    const email = 'claims@rentitforward.com';
+    const email = 'support@rentitforward.com.au';
     const subject = 'Insurance Inquiry';
     const body = 'Hi Rent It Forward Claims Team,\n\nI have a question about insurance coverage:\n\n';
     
@@ -557,7 +557,7 @@ export default function InsuranceProtectionScreen() {
                   fontSize: typography.sizes.base,
                   color: colors.gray[900],
                 }}>
-                  claims@rentitforward.com
+                  support@rentitforward.com.au
                 </Text>
               </View>
 

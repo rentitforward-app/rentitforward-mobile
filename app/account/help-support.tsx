@@ -213,7 +213,7 @@ export default function HelpSupportScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => router.push('/account/safety')}
+                onPress={() => router.push('/account/insurance-protection')}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -239,14 +239,54 @@ export default function HelpSupportScreen() {
                     fontWeight: typography.weights.semibold,
                     color: colors.gray[900],
                   }}>
-                    Safety & Legal
+                    Insurance Protection
                   </Text>
                   <Text style={{
                     fontSize: typography.sizes.sm,
                     color: colors.gray[600],
                     marginTop: spacing.xs / 2,
                   }}>
-                    Insurance protection and legal information
+                    Comprehensive coverage and claims information
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.gray[400]} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => router.push('/account/legal')}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: spacing.md,
+                  borderBottomWidth: 1,
+                  borderBottomColor: colors.gray[100],
+                }}
+              >
+                <View style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
+                  backgroundColor: colors.semantic.info + '20',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: spacing.md,
+                }}>
+                  <Ionicons name="document-text" size={24} color={colors.semantic.info} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{
+                    fontSize: typography.sizes.base,
+                    fontWeight: typography.weights.semibold,
+                    color: colors.gray[900],
+                  }}>
+                    Legal Information
+                  </Text>
+                  <Text style={{
+                    fontSize: typography.sizes.sm,
+                    color: colors.gray[600],
+                    marginTop: spacing.xs / 2,
+                  }}>
+                    Terms of service, privacy policy, and legal terms
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={colors.gray[400]} />

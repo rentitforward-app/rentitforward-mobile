@@ -18,7 +18,7 @@ export default function CommunityGuidelinesScreen() {
   const router = useRouter();
 
   const handleReportViolation = () => {
-    const email = 'safety@rentitforward.com';
+    const email = 'support@rentitforward.com.au';
     const subject = 'Community Guidelines Violation Report';
     const body = 'Hi Rent It Forward Safety Team,\n\nI would like to report a violation of the Community Guidelines:\n\nUser/Listing ID: \nDescription of violation: \nAdditional details: \n\n';
     

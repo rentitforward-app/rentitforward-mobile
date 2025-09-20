@@ -347,28 +347,6 @@ export default function AccountScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => router.push('/account/personal-info')}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingVertical: spacing.md,
-                  borderBottomWidth: 1,
-                  borderBottomColor: colors.gray[100],
-                }}
-              >
-                <Ionicons name="lock-closed-outline" size={24} color={colors.gray[600]} />
-                <Text style={{
-                  fontSize: typography.sizes.base,
-                  color: colors.gray[900],
-                  marginLeft: spacing.md,
-                  flex: 1,
-                }}>
-                  Personal information
-                </Text>
-                <Ionicons name="chevron-forward" size={20} color={colors.gray[400]} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
                 onPress={() => router.push('/account/verification')}
                 style={{
                   flexDirection: 'row',
@@ -635,7 +613,7 @@ export default function AccountScreen() {
             
             <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
               <TouchableOpacity
-                onPress={() => router.push('/account/insurance')}
+                onPress={() => router.push('/account/insurance-protection')}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
