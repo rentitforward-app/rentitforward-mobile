@@ -10,7 +10,6 @@ import {
   ScrollView
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { mobileTokens } from '../../src/lib/design-system';
 import { addSentryBreadcrumb, captureSentryException } from '../../src/lib/sentry';
 import { ErrorBoundary } from '../../src/components/ErrorBoundary';
@@ -19,7 +18,6 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
 
   // Add Sentry breadcrumb when welcome screen loads
   useEffect(() => {
@@ -62,9 +60,41 @@ export default function WelcomeScreen() {
     }
   };
 
+  const handleTermsPress = () => {
+    try {
+      addSentryBreadcrumb('Terms of Service link pressed', 'user_action', {
+        screen: 'welcome',
+        action: 'terms_link',
+      });
+      router.push('/(auth)/terms');
+    } catch (error) {
+      captureSentryException(error as Error, {
+        screen: 'welcome',
+        action: 'terms_navigation',
+        error_type: 'navigation_error',
+      });
+    }
+  };
+
+  const handlePrivacyPress = () => {
+    try {
+      addSentryBreadcrumb('Privacy Policy link pressed', 'user_action', {
+        screen: 'welcome',
+        action: 'privacy_link',
+      });
+      router.push('/(auth)/privacy');
+    } catch (error) {
+      captureSentryException(error as Error, {
+        screen: 'welcome',
+        action: 'privacy_navigation',
+        error_type: 'navigation_error',
+      });
+    }
+  };
+
   return (
     <ErrorBoundary>
-      <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
         
         <ScrollView 
@@ -72,29 +102,25 @@ export default function WelcomeScreen() {
           contentContainerStyle={styles.scrollViewContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Hero Section with Overlaid Text */}
+          {/* Hero Image Section */}
           <View style={styles.heroSection}>
-            <Image 
+            <Image
               source={require('../../assets/images/RIF_Onboarding_Image.png')}
               style={styles.heroImage}
               resizeMode="cover"
             />
-            
-            {/* PNG Logo in Top Right */}
             <View style={styles.logoContainer}>
-              <Image 
+              {/* Logo */}
+              <Image
                 source={require('../../assets/images/RentitForwardInvertedColorTransparentbg.png')}
                 style={styles.logoImage}
                 resizeMode="contain"
               />
             </View>
             
-            {/* Overlay Content */}
-            <View style={styles.overlay}>
-              <View style={styles.overlayContent}>
-                <Text style={styles.heroTitle}>Rent What You Need</Text>
-                <Text style={styles.heroSubtitle}>Share What You Have</Text>
-              </View>
+            {/* Hero Text Overlay */}
+            <View style={styles.heroTextOverlay}>
+              <Text style={styles.heroHeading}>Share More, Buy Less</Text>
             </View>
           </View>
 
@@ -105,7 +131,7 @@ export default function WelcomeScreen() {
             </Text>
             
             <Text style={styles.subDescription}>
-              Save money, live sustainably, and make sharing second nature.
+            Building communities, one rental at a time.
             </Text>
             
             {/* Action Buttons */}
@@ -124,7 +150,14 @@ export default function WelcomeScreen() {
             </TouchableOpacity>
             
             <Text style={styles.termsText}>
-              By continuing, you agree to our <Text style={styles.linkText}>Terms of Service</Text> and <Text style={styles.linkText}>Privacy Policy</Text>
+              By continuing, you agree to our{' '}
+              <Text style={styles.linkText} onPress={handleTermsPress}>
+                Terms of Service
+              </Text>
+              {' '}and{' '}
+              <Text style={styles.linkText} onPress={handlePrivacyPress}>
+                Privacy Policy
+              </Text>
             </Text>
           </View>
         </ScrollView>
@@ -136,7 +169,7 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: '#f8fafc',
   },
   scrollView: {
     flex: 1,
@@ -145,64 +178,82 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   heroSection: {
-    height: Math.min(screenHeight * 0.5, 400),
+    height: screenHeight * 0.4,
     position: 'relative',
-    minHeight: 300,
   },
   heroImage: {
-    width: '100%',
+    width: screenWidth,
     height: '100%',
   } as const,
   logoContainer: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-    zIndex: 10,
-  },
-  logoImage: {
-    width: Math.min(100, screenWidth * 0.25),
-    height: Math.min(46, screenWidth * 0.12),
-  } as const,
-  overlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 60,
+    paddingRight: 20,
+  },
+  logoImage: {
+    width: 120,
+    height: 40,
+  },
+  heroTextOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  overlayContent: {
-    alignItems: 'center',
     paddingHorizontal: 24,
+    paddingTop: 120,
+    paddingBottom: 40,
+    zIndex: 5,
   },
-  heroTitle: {
-    fontSize: Math.min(28, screenWidth * 0.07),
+  heroHeading: {
+    fontSize: Math.min(32, screenWidth * 0.08),
     fontWeight: 'bold',
     color: 'white',
     textAlign: 'center',
-    marginBottom: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    marginBottom: 16,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
-    lineHeight: Math.min(36, screenWidth * 0.09),
+    lineHeight: Math.min(40, screenWidth * 0.1),
   },
-  heroSubtitle: {
-    fontSize: Math.min(28, screenWidth * 0.07),
-    fontWeight: 'bold',
+  heroSubheading: {
+    fontSize: Math.min(18, screenWidth * 0.045),
+    fontWeight: '500',
     color: 'white',
     textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-    lineHeight: Math.min(36, screenWidth * 0.09),
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+    lineHeight: Math.min(24, screenWidth * 0.06),
+    opacity: 0.95,
+    marginBottom: 20,
   },
   contentSection: {
+    flex: 1,
+    backgroundColor: 'white',
     paddingHorizontal: 24,
-    paddingTop: 32,
+    paddingTop: 40,
     paddingBottom: 40,
-    minHeight: screenHeight * 0.4,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    marginTop: -20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
   description: {
     fontSize: Math.min(16, screenWidth * 0.04),

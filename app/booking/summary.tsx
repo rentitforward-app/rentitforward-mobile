@@ -141,6 +141,14 @@ export default function BookingSummaryScreen() {
     },
   });
 
+  const handleTermsPress = () => {
+    try {
+      router.push('/(auth)/terms');
+    } catch (error) {
+      console.error('Terms navigation error:', error);
+    }
+  };
+
   const handleConfirmBooking = () => {
     if (!acceptedTerms) {
       Alert.alert('Terms Required', 'Please accept the terms and conditions to continue.');
@@ -356,9 +364,11 @@ export default function BookingSummaryScreen() {
               thumbColor={acceptedTerms ? '#ffffff' : '#f3f4f6'}
             />
             <Text style={styles.termsText}>
-              I agree to the 
-              <Text style={styles.termsLink}>Terms of Service</Text>
- and 
+              I agree to the{' '}
+              <Text style={styles.termsLink} onPress={handleTermsPress}>
+                Terms of Service
+              </Text>
+              {' '}and{' '}
               <Text style={styles.termsLink}>Rental Agreement</Text>
             </Text>
           </View>

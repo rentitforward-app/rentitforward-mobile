@@ -173,6 +173,86 @@ export default function HelpSupportScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
+                onPress={() => router.push('/account/community-guidelines')}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: spacing.md,
+                  borderBottomWidth: 1,
+                  borderBottomColor: colors.gray[100],
+                }}
+              >
+                <View style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
+                  backgroundColor: colors.semantic.info + '20',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: spacing.md,
+                }}>
+                  <Ionicons name="people" size={24} color={colors.semantic.info} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{
+                    fontSize: typography.sizes.base,
+                    fontWeight: typography.weights.semibold,
+                    color: colors.gray[900],
+                  }}>
+                    Community Guidelines
+                  </Text>
+                  <Text style={{
+                    fontSize: typography.sizes.sm,
+                    color: colors.gray[600],
+                    marginTop: spacing.xs / 2,
+                  }}>
+                    Learn about our community rules and policies
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.gray[400]} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => router.push('/account/safety')}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: spacing.md,
+                  borderBottomWidth: 1,
+                  borderBottomColor: colors.gray[100],
+                }}
+              >
+                <View style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
+                  backgroundColor: colors.semantic.success + '20',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: spacing.md,
+                }}>
+                  <Ionicons name="shield-checkmark" size={24} color={colors.semantic.success} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{
+                    fontSize: typography.sizes.base,
+                    fontWeight: typography.weights.semibold,
+                    color: colors.gray[900],
+                  }}>
+                    Safety & Legal
+                  </Text>
+                  <Text style={{
+                    fontSize: typography.sizes.sm,
+                    color: colors.gray[600],
+                    marginTop: spacing.xs / 2,
+                  }}>
+                    Insurance protection and legal information
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.gray[400]} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
                 onPress={handleEmailSupport}
                 style={{
                   flexDirection: 'row',

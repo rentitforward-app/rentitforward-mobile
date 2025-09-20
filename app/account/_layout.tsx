@@ -13,6 +13,8 @@ export default function AccountLayout() {
       <Stack.Screen name="payment-options" />
       <Stack.Screen name="notifications" />
       <Stack.Screen name="help-support" />
+      <Stack.Screen name="community-guidelines" />
+      <Stack.Screen name="safety" />
       <Stack.Screen name="faq" />
       <Stack.Screen name="contact-us" />
     </Stack>

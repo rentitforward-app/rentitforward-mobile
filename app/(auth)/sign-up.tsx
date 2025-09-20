@@ -108,6 +108,22 @@ export default function SignUpScreen() {
     handleSignUp();
   };
 
+  const handleTermsPress = () => {
+    try {
+      router.push('/(auth)/terms');
+    } catch (error) {
+      console.error('Terms navigation error:', error);
+    }
+  };
+
+  const handlePrivacyPress = () => {
+    try {
+      router.push('/(auth)/privacy');
+    } catch (error) {
+      console.error('Privacy navigation error:', error);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -280,8 +296,13 @@ export default function SignUpScreen() {
 
             <Text style={styles.termsText}>
               By creating an account, you agree to our{'\n'}
-              <Text style={styles.linkText}>Terms of Service</Text> and 
-              <Text style={styles.linkText}>Privacy Policy</Text>
+              <Text style={styles.linkText} onPress={handleTermsPress}>
+                Terms of Service
+              </Text>
+              {' '}and{' '}
+              <Text style={styles.linkText} onPress={handlePrivacyPress}>
+                Privacy Policy
+              </Text>
             </Text>
           </View>
 
