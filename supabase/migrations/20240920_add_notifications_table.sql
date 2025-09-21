@@ -89,3 +89,4 @@ CREATE TRIGGER listing_status_notification
     AFTER UPDATE ON public.listings
     FOR EACH ROW
     EXECUTE FUNCTION notify_listing_status_change();
+

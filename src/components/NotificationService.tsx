@@ -155,3 +155,4 @@ export const useNotifications = () => {
 
   return { unreadCount };
 };
+

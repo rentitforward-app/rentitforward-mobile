@@ -264,3 +264,4 @@ The mobile address search now provides:
 - Result: Professional, fast, accurate address entry
 
 The mobile app now has **100% feature parity** with the web version's Google Places integration! 🚀
+

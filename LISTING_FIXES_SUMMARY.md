@@ -95,3 +95,4 @@
 2. **Notification History**: Add a full notifications screen to view all notifications
 3. **Notification Settings**: Allow users to customize notification preferences
 4. **Batch Operations**: Support for bulk photo operations and batch notifications
+
