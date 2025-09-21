@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../src/components/AuthProvider';
 import { supabase } from '../../src/lib/supabase';
+import { Header, HeaderPresets } from '../../src/components/Header';
 
-interface Conversation {
+interface Message {
   id: string;
   bookingId?: string;
   otherUserId: string;
@@ -42,19 +44,20 @@ interface Conversation {
   };
 }
 
-export default function ConversationsScreen() {
+export default function MessagesTab() {
   const router = useRouter();
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
-  // Fetch user conversations from real conversations table
-  const { data: conversations = [], isLoading, refetch } = useQuery({
-    queryKey: ['conversations', user?.id],
+  // Fetch user messages from real conversations table
+  const { data: messages = [], isLoading, refetch } = useQuery({
+    queryKey: ['messages', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
       
       // Fetch conversations where user is a participant
+      console.log('🔍 Fetching conversations for user:', user.id);
       const { data: conversationsData, error } = await supabase
         .from('conversations')
         .select(`
@@ -77,10 +80,13 @@ export default function ConversationsScreen() {
         .not('booking_id', 'is', null)
         .order('updated_at', { ascending: false });
       
+      console.log('📊 Found conversations:', conversationsData?.length || 0);
+      console.log('📋 Conversations data:', conversationsData);
+      
       if (error) throw error;
 
       // Transform conversations and fetch other user data
-      const conversationsWithUsers = await Promise.all(
+      const messagesWithUsers = await Promise.all(
         (conversationsData || []).map(async (conv) => {
           // Find the other participant
           const otherUserId = conv.participants.find(id => id !== user.id);
@@ -94,13 +100,46 @@ export default function ConversationsScreen() {
             .eq('id', otherUserId)
             .single();
 
-          // Count unread messages
-          const { count: unreadCount } = await supabase
-            .from('messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('conversation_id', conv.id)
-            .eq('receiver_id', user.id)
-            .eq('is_read', false);
+          // Get the last viewed timestamp for this conversation
+          const lastViewedKey = `conversation_viewed_${conv.id}`;
+          let lastViewedTimestamp: string | null = null;
+          
+          try {
+            lastViewedTimestamp = await AsyncStorage.getItem(lastViewedKey);
+          } catch (error) {
+            console.warn('Error getting last viewed timestamp:', error);
+          }
+          
+          let unreadCount = 0;
+          
+          if (lastViewedTimestamp) {
+            // Count messages created after the last viewed timestamp (excluding user's own messages)
+            const { count, error: countError } = await supabase
+              .from('messages')
+              .select('*', { count: 'exact', head: true })
+              .eq('conversation_id', conv.id)
+              .neq('sender_id', user.id)
+              .gt('created_at', lastViewedTimestamp);
+
+            if (countError) {
+              console.warn('Error fetching unread count:', countError);
+            } else {
+              unreadCount = count || 0;
+            }
+          } else {
+            // If no timestamp exists, count all messages from other users
+            const { count, error: countError } = await supabase
+              .from('messages')
+              .select('*', { count: 'exact', head: true })
+              .eq('conversation_id', conv.id)
+              .neq('sender_id', user.id);
+
+            if (countError) {
+              console.warn('Error fetching unread count:', countError);
+            } else {
+              unreadCount = count || 0;
+            }
+          }
 
           return {
             id: conv.id,
@@ -119,45 +158,109 @@ export default function ConversationsScreen() {
               sender_id: 'system',
               message_type: 'text' as const,
             },
-            unreadCount: unreadCount || 0,
+            unreadCount: unreadCount,
             updatedAt: conv.updated_at,
-            booking: conv.booking ? {
-              id: conv.booking.id,
-              status: conv.booking.status,
-              listing: Array.isArray(conv.booking.listing) ? conv.booking.listing[0] : conv.booking.listing,
-            } : null,
+            booking: conv.booking ? (() => {
+              const bookingData = Array.isArray(conv.booking) ? conv.booking[0] : conv.booking;
+              return bookingData ? {
+                id: bookingData.id,
+                status: bookingData.status,
+                listing: Array.isArray(bookingData.listing) ? bookingData.listing[0] : bookingData.listing,
+              } : null;
+            })() : null,
           };
         })
       );
 
       // Filter out null values and return
-      return conversationsWithUsers.filter(conv => conv !== null);
+      return messagesWithUsers.filter(msg => msg !== null);
     },
     enabled: !!user?.id,
   });
 
-  // Generate last message based on booking status
-  const getLastMessageForBooking = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'Booking request submitted, awaiting approval';
-      case 'confirmed':
-        return 'Booking confirmed! Please coordinate pickup/delivery';
-      case 'active':
-        return 'Booking is currently active';
-      case 'completed':
-        return 'Booking completed successfully';
-      case 'cancelled':
-        return 'Booking has been cancelled';
-      default:
-        return 'No recent messages';
-    }
-  };
+  // Set up real-time subscription for conversation updates
+  useEffect(() => {
+    if (!user?.id) return;
 
-  // Filter conversations based on search
-  const filteredConversations = conversations.filter(conv =>
-    conv.otherUser.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (Array.isArray(conv.booking?.listing) ? conv.booking?.listing[0]?.title : conv.booking?.listing?.title)?.toLowerCase().includes(searchQuery.toLowerCase())
+    console.log('🔔 Setting up real-time subscription for conversations, user:', user.id);
+    console.log('🔔 Current messages count:', messages.length);
+    
+    const channel = supabase
+      .channel('conversations:updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations',
+        },
+        (payload) => {
+          console.log('🔄 Conversation updated (raw):', payload.new);
+          
+          // Check if user is a participant
+          const participants = payload.new.participants || [];
+          if (!participants.includes(user.id)) {
+            console.log('❌ Conversation update not for user, ignoring');
+            return;
+          }
+          
+          console.log('✅ Processing conversation update for user');
+          // Refetch conversations to get updated data
+          refetch();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'conversations',
+        },
+        (payload) => {
+          console.log('🆕 New conversation created (raw):', payload.new);
+          
+          // Check if user is a participant
+          const participants = payload.new.participants || [];
+          if (!participants.includes(user.id)) {
+            console.log('❌ New conversation not for user, ignoring');
+            return;
+          }
+          
+          console.log('✅ New conversation for user, refetching');
+          // Refetch conversations to get updated data
+          refetch();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+        },
+        (payload) => {
+          console.log('🔥 New message received (raw):', payload.new);
+          
+          // Always refetch to update last message and unread counts
+          // This is simpler and more reliable than trying to filter client-side
+          console.log('🔄 Refetching conversations due to new message');
+          refetch();
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 Conversations subscription status:', status);
+      });
+
+    return () => {
+      console.log('🔕 Cleaning up conversations real-time subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, refetch]);
+
+  // Filter messages based on search
+  const filteredMessages = messages.filter(msg =>
+    msg.otherUser.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (Array.isArray(msg.booking?.listing) ? msg.booking?.listing[0]?.title : msg.booking?.listing?.title)?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Handle refresh
@@ -201,13 +304,30 @@ export default function ConversationsScreen() {
     }
   };
 
-  // Render conversation item
-  const renderConversation = ({ item }: { item: Conversation }) => (
+  // Mark conversation as read when opened
+  const markConversationAsRead = async (conversationId: string) => {
+    try {
+      const viewedAt = new Date().toISOString();
+      await AsyncStorage.setItem(`conversation_viewed_${conversationId}`, viewedAt);
+      
+      // Refetch to update the UI
+      refetch();
+    } catch (error) {
+      console.warn('Error marking conversation as read:', error);
+    }
+  };
+
+  // Render message item
+  const renderMessage = ({ item }: { item: Message }) => (
     <TouchableOpacity
-      style={styles.conversationCard}
-      onPress={() => router.push(`/conversations/${item.bookingId}`)}
+      style={styles.messageCard}
+      onPress={() => {
+        // Mark as read before navigating
+        markConversationAsRead(item.id);
+        router.push(`/messages/${item.bookingId}`);
+      }}
     >
-      <View style={styles.conversationHeader}>
+      <View style={styles.messageHeader}>
         {/* Avatar placeholder */}
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
@@ -216,8 +336,8 @@ export default function ConversationsScreen() {
         </View>
 
         {/* User info and message */}
-        <View style={styles.conversationContent}>
-          <View style={styles.conversationTop}>
+        <View style={styles.messageContent}>
+          <View style={styles.messageTop}>
             <View style={styles.userInfo}>
               <Text style={styles.userName}>
                 {item.otherUser.full_name}
@@ -227,7 +347,7 @@ export default function ConversationsScreen() {
               )}
             </View>
             
-            <View style={styles.conversationMeta}>
+            <View style={styles.messageMeta}>
               <Text style={styles.timeText}>{formatTime(item.lastMessage.sent_at)}</Text>
               {item.unreadCount > 0 && (
                 <View style={styles.unreadBadge}>
@@ -259,7 +379,7 @@ export default function ConversationsScreen() {
   // Render empty state
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Text style={styles.emptyTitle}>No conversations yet</Text>
+      <Text style={styles.emptyTitle}>No messages yet</Text>
       <Text style={styles.emptyDescription}>
         Your messages with other users will appear here when you start booking items or receive inquiries about your listings.
       </Text>
@@ -275,8 +395,9 @@ export default function ConversationsScreen() {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
+        <Header {...HeaderPresets.main('Messages')} />
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading conversations...</Text>
+          <Text style={styles.loadingText}>Loading messages...</Text>
         </View>
       </SafeAreaView>
     );
@@ -285,32 +406,30 @@ export default function ConversationsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Messages</Text>
-      </View>
+      <Header {...HeaderPresets.main('Messages')} />
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search conversations..."
+          placeholder="Search messages..."
           value={searchQuery}
           onChangeText={setSearchQuery}
           returnKeyType="search"
         />
       </View>
 
-      {/* Conversations List */}
+      {/* Messages List */}
       <FlatList
-        data={filteredConversations}
-        renderItem={renderConversation}
+        data={filteredMessages}
+        renderItem={renderMessage}
         keyExtractor={(item) => item.id}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         contentContainerStyle={[
           styles.listContainer,
-          filteredConversations.length === 0 && styles.emptyListContainer,
+          filteredMessages.length === 0 && styles.emptyListContainer,
         ]}
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
@@ -333,17 +452,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6b7280',
   },
-  header: {
-    backgroundColor: '#ffffff',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#111827',
-  },
   searchContainer: {
     backgroundColor: '#ffffff',
     paddingHorizontal: 16,
@@ -365,14 +473,15 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  conversationCard: {
+  messageCard: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
     marginBottom: 8,
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
-  conversationHeader: {
+  messageHeader: {
+    flexDirection: 'row',
     padding: 16,
   },
   avatar: {
@@ -389,10 +498,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ffffff',
   },
-  conversationContent: {
+  messageContent: {
     flex: 1,
   },
-  conversationTop: {
+  messageTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
@@ -414,7 +523,7 @@ const styles = StyleSheet.create({
     color: '#10b981',
     fontWeight: '600',
   },
-  conversationMeta: {
+  messageMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -487,4 +596,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ffffff',
   },
-}); 
+});

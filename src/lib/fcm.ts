@@ -82,11 +82,15 @@ export class FCMService {
         // Check if we should show the notification in foreground
         const shouldShow = await this.shouldShowInForeground(notification);
         
+        // SDK 54 adds shouldShowBanner/shouldShowList on iOS
         return {
           shouldShowAlert: shouldShow,
           shouldPlaySound: shouldShow,
           shouldSetBadge: true,
-        };
+          // These are ignored on Android but satisfy the updated type
+          shouldShowBanner: shouldShow,
+          shouldShowList: shouldShow,
+        } as Notifications.NotificationBehavior;
       },
     });
 
@@ -759,14 +763,29 @@ export class FCMService {
    * Cleanup listeners
    */
   cleanup(): void {
-    if (this.notificationListener) {
-      Notifications.removeNotificationSubscription(this.notificationListener);
+    try {
+      const safeRemove = (sub: any) => {
+        if (!sub) return;
+        // Prefer the subscription.remove() API if available
+        if (typeof sub.remove === 'function') {
+          sub.remove();
+          return;
+        }
+        // Fallback for older expo-notifications API
+        const maybeRemove = (Notifications as any)?.removeNotificationSubscription;
+        if (typeof maybeRemove === 'function') {
+          maybeRemove(sub);
+        }
+      };
+
+      safeRemove(this.notificationListener);
       this.notificationListener = null;
-    }
-    
-    if (this.responseListener) {
-      Notifications.removeNotificationSubscription(this.responseListener);
+
+      safeRemove(this.responseListener);
       this.responseListener = null;
+    } catch (error) {
+      // Do not crash the app on cleanup in Expo Go / SDK limitations
+      console.warn('FCM cleanup warning:', error);
     }
   }
 }

@@ -13,3 +13,4 @@ export * from './notifications';
 export * from './search';
 export * from './search-api';
 export * from './calendar';
+export * from './booking';

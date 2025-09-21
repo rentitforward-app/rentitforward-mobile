@@ -99,9 +99,6 @@
     "owner": "rentitforward",
     "runtimeVersion": {
       "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/c79578fa-7070-423e-a29e-64877b598b60"
     }
   }
 }

@@ -9,12 +9,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../src/components/AuthProvider';
 import { supabase } from '../../src/lib/supabase';
+import { Header, HeaderPresets } from '../../src/components/Header';
 
 interface Message {
   id: string;
@@ -49,7 +52,102 @@ interface ConversationData {
   };
 }
 
-export default function ConversationScreen() {
+// Shimmer Loading Component
+const ShimmerView = ({ width, height, style }: { width: number | string; height: number; style?: any }) => {
+  const shimmerValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const shimmerAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmerValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmerValue, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    shimmerAnimation.start();
+
+    return () => shimmerAnimation.stop();
+  }, [shimmerValue]);
+
+  const opacity = shimmerValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.7],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        {
+          width,
+          height,
+          backgroundColor: '#e5e7eb',
+          borderRadius: 8,
+          opacity,
+        },
+        style,
+      ]}
+    />
+  );
+};
+
+// Chat Loading Skeleton Component
+const ChatLoadingSkeleton = () => {
+  return (
+    <View style={styles.chatContainer}>
+      {/* Messages area */}
+      <View style={styles.messagesContainer}>
+        {/* Simulate incoming message */}
+        <View style={styles.incomingMessageSkeleton}>
+          <ShimmerView width={40} height={40} style={styles.avatarSkeleton} />
+          <View style={styles.messageBubbleSkeleton}>
+            <ShimmerView width="80%" height={16} style={{ marginBottom: 4 }} />
+            <ShimmerView width="60%" height={16} />
+          </View>
+        </View>
+
+        {/* Simulate outgoing message */}
+        <View style={styles.outgoingMessageSkeleton}>
+          <View style={styles.messageBubbleSkeletonOutgoing}>
+            <ShimmerView width="70%" height={16} style={{ marginBottom: 4 }} />
+            <ShimmerView width="50%" height={16} />
+          </View>
+        </View>
+
+        {/* Simulate another incoming message */}
+        <View style={styles.incomingMessageSkeleton}>
+          <ShimmerView width={40} height={40} style={styles.avatarSkeleton} />
+          <View style={styles.messageBubbleSkeleton}>
+            <ShimmerView width="90%" height={16} style={{ marginBottom: 4 }} />
+            <ShimmerView width="70%" height={16} style={{ marginBottom: 4 }} />
+            <ShimmerView width="40%" height={16} />
+          </View>
+        </View>
+
+        {/* Simulate outgoing message */}
+        <View style={styles.outgoingMessageSkeleton}>
+          <View style={styles.messageBubbleSkeletonOutgoing}>
+            <ShimmerView width="85%" height={16} />
+          </View>
+        </View>
+      </View>
+
+      {/* Input area skeleton */}
+      <View style={styles.inputContainerSkeleton}>
+        <ShimmerView width="85%" height={44} style={styles.inputSkeleton} />
+        <ShimmerView width={44} height={44} style={styles.sendButtonSkeleton} />
+      </View>
+    </View>
+  );
+};
+
+export default function MessageScreen() {
   const { id: bookingId } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { user } = useAuth();
@@ -60,7 +158,7 @@ export default function ConversationScreen() {
   const [isSending, setIsSending] = useState(false);
 
   // Debug: Log the route parameters
-  console.log('🚀 ConversationScreen loaded with:', { bookingId, userId: user?.id });
+  console.log('🚀 MessageScreen loaded with:', { bookingId, userId: user?.id });
 
   // Early return for debugging - show basic screen first
   if (!bookingId) {
@@ -241,6 +339,165 @@ export default function ConversationScreen() {
     enabled: !!conversation && !!bookingId,
   });
 
+  // Mark conversation as read when opened
+  useEffect(() => {
+    if (!conversation?.id) return;
+
+    const markAsRead = async () => {
+      try {
+        const viewedAt = new Date().toISOString();
+        await AsyncStorage.setItem(`conversation_viewed_${conversation.id}`, viewedAt);
+        console.log('✅ Marked conversation as read:', conversation.id);
+        
+        // Invalidate messages query to update unread counts
+        queryClient.invalidateQueries({ queryKey: ['messages'] });
+      } catch (error) {
+        console.warn('Error marking conversation as read:', error);
+      }
+    };
+
+    markAsRead();
+  }, [conversation?.id, queryClient]);
+
+  // Set up real-time subscription for new messages
+  useEffect(() => {
+    if (!bookingId || !user?.id) return;
+
+    console.log('🔔 Setting up real-time subscription for booking:', bookingId, 'user:', user.id);
+    
+    // Subscribe to ALL messages and filter for this conversation
+    const channel = supabase
+      .channel(`messages:${bookingId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+        },
+        async (payload) => {
+          console.log('🔥 New message received (raw):', payload.new);
+          
+          // Get conversation ID to check if this message belongs to our conversation
+          try {
+            const { data: conversationData, error: convError } = await supabase
+              .from('conversations')
+              .select('id')
+              .eq('booking_id', bookingId)
+              .maybeSingle();
+
+            if (convError || !conversationData) {
+              console.warn('Could not verify conversation for message:', convError);
+              return;
+            }
+
+            // Check if this message belongs to our conversation
+            if (payload.new.conversation_id !== conversationData.id) {
+              console.log('❌ Message not for this conversation, ignoring');
+              return;
+            }
+
+            console.log('✅ Processing message for this conversation');
+
+            // Mark conversation as read since user is viewing it
+            try {
+              const viewedAt = new Date().toISOString();
+              await AsyncStorage.setItem(`conversation_viewed_${conversationData.id}`, viewedAt);
+            } catch (error) {
+              console.warn('Error updating read timestamp:', error);
+            }
+            
+            const newMessage: Message = {
+              id: payload.new.id,
+              content: payload.new.content,
+              senderId: payload.new.sender_id,
+              messageType: payload.new.message_type as 'text' | 'image' | 'system',
+              sentAt: payload.new.created_at,
+            };
+
+            // Add new message to the query cache
+            queryClient.setQueryData(['messages', bookingId], (old: Message[] = []) => {
+              // Check if message already exists to avoid duplicates
+              if (old.some(msg => msg.id === newMessage.id)) {
+                console.log('⚠️ Duplicate message, skipping');
+                return old;
+              }
+              console.log('✅ Adding new message to chat');
+              return [...old, newMessage];
+            });
+
+            // Scroll to bottom when new message arrives
+            setTimeout(() => {
+              flatListRef.current?.scrollToEnd({ animated: true });
+            }, 100);
+            
+            // Invalidate messages list to update unread counts
+            queryClient.invalidateQueries({ queryKey: ['messages'] });
+          } catch (error) {
+            console.error('Error processing new message:', error);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+        },
+        async (payload) => {
+          console.log('🔄 Message updated (raw):', payload.new);
+          
+          // Get conversation ID to check if this message belongs to our conversation
+          try {
+            const { data: conversationData, error: convError } = await supabase
+              .from('conversations')
+              .select('id')
+              .eq('booking_id', bookingId)
+              .maybeSingle();
+
+            if (convError || !conversationData) {
+              console.warn('Could not verify conversation for message update:', convError);
+              return;
+            }
+
+            // Check if this message belongs to our conversation
+            if (payload.new.conversation_id !== conversationData.id) {
+              console.log('❌ Message update not for this conversation, ignoring');
+              return;
+            }
+
+            console.log('✅ Processing message update for this conversation');
+            
+            const updatedMessage: Message = {
+              id: payload.new.id,
+              content: payload.new.content,
+              senderId: payload.new.sender_id,
+              messageType: payload.new.message_type as 'text' | 'image' | 'system',
+              sentAt: payload.new.created_at,
+            };
+
+            // Update message in the query cache
+            queryClient.setQueryData(['messages', bookingId], (old: Message[] = []) => {
+              return old.map(msg => 
+                msg.id === updatedMessage.id ? updatedMessage : msg
+              );
+            });
+          } catch (error) {
+            console.error('Error processing message update:', error);
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 Messages subscription status:', status);
+      });
+
+    return () => {
+      console.log('🔕 Cleaning up real-time subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [bookingId, queryClient, user?.id]);
+
   // Send message mutation
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
@@ -335,25 +592,75 @@ export default function ConversationScreen() {
     sendMessageMutation.mutate(trimmedText);
   };
 
-  // Format message time
+  // Format message time (only time, no date)
   const formatMessageTime = (timestamp: string) => {
     const date = new Date(timestamp);
-    const now = new Date();
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+    return date.toLocaleTimeString('en-AU', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
 
-    if (diffInHours < 24) {
-      return date.toLocaleTimeString('en-AU', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
+  // Format date separator
+  const formatDateSeparator = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+    const messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+    if (messageDate.getTime() === today.getTime()) {
+      return 'Today';
+    } else if (messageDate.getTime() === yesterday.getTime()) {
+      return 'Yesterday';
     } else {
       return date.toLocaleDateString('en-AU', {
-        month: 'short',
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
         day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
       });
     }
+  };
+
+  // Group messages by date
+  const groupMessagesByDate = (messages: Message[]) => {
+    const grouped: Array<{ type: 'date' | 'message'; data: any; id: string }> = [];
+    let currentDate = '';
+
+    messages.forEach((message, index) => {
+      const messageDate = new Date(message.sentAt).toDateString();
+      
+      if (messageDate !== currentDate) {
+        currentDate = messageDate;
+        grouped.push({
+          type: 'date',
+          data: { date: message.sentAt },
+          id: `date-${messageDate}`,
+        });
+      }
+      
+      grouped.push({
+        type: 'message',
+        data: message,
+        id: message.id,
+      });
+    });
+
+    return grouped;
+  };
+
+  const groupedMessages = groupMessagesByDate(messages || []);
+
+  // Render date separator
+  const renderDateSeparator = (date: string) => {
+    return (
+      <View style={styles.dateSeparatorContainer}>
+        <Text style={styles.dateSeparatorText}>
+          {formatDateSeparator(date)}
+        </Text>
+      </View>
+    );
   };
 
   // Render message bubble
@@ -365,9 +672,6 @@ export default function ConversationScreen() {
       return (
         <View style={styles.systemMessageContainer}>
           <Text style={styles.systemMessage}>{message.content}</Text>
-          <Text style={styles.systemMessageTime}>
-            {formatMessageTime(message.sentAt)}
-          </Text>
         </View>
       );
     }
@@ -398,6 +702,15 @@ export default function ConversationScreen() {
     );
   };
 
+  // Render grouped item (date separator or message)
+  const renderGroupedItem = ({ item }: { item: { type: 'date' | 'message'; data: any; id: string } }) => {
+    if (item.type === 'date') {
+      return renderDateSeparator(item.data.date);
+    } else {
+      return renderMessage({ item: item.data });
+    }
+  };
+
   // Get status color
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -418,11 +731,8 @@ export default function ConversationScreen() {
   if (conversationLoading || messagesLoading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading conversation...</Text>
-          <Text style={styles.loadingText}>Booking ID: {bookingId}</Text>
-          <Text style={styles.loadingText}>User ID: {user?.id}</Text>
-        </View>
+        <Header {...HeaderPresets.detail('Messages')} />
+        <ChatLoadingSkeleton />
       </SafeAreaView>
     );
   }
@@ -430,6 +740,7 @@ export default function ConversationScreen() {
   if (conversationError) {
     return (
       <SafeAreaView style={styles.container}>
+        <Header {...HeaderPresets.detail('Error')} />
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Error loading conversation</Text>
           <Text style={styles.errorText}>{conversationError.message}</Text>
@@ -444,6 +755,7 @@ export default function ConversationScreen() {
   if (!conversation) {
     return (
       <SafeAreaView style={styles.container}>
+        <Header {...HeaderPresets.detail('Not Found')} />
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Conversation not found</Text>
           <Text style={styles.errorText}>Booking ID: {bookingId}</Text>
@@ -458,27 +770,15 @@ export default function ConversationScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← Back</Text>
-        </TouchableOpacity>
-        
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>
-            {conversation.otherUser.full_name}
-          </Text>
-          {conversation.otherUser.verified && (
-            <Text style={styles.verifiedBadge}>✓ Verified</Text>
-          )}
-        </View>
-
-        <TouchableOpacity 
-          style={styles.detailsButton}
-          onPress={() => router.push(`/bookings/${conversation.bookingId}`)}
-        >
-          <Text style={styles.detailsButtonText}>Details</Text>
-        </TouchableOpacity>
-      </View>
+      <Header 
+        {...HeaderPresets.detail(
+          conversation.otherUser.full_name + (conversation.otherUser.verified ? ' ✓' : '')
+        )}
+        rightAction={{
+          icon: 'information-circle-outline',
+          onPress: () => router.push(`/bookings/${conversation.bookingId}`),
+        }}
+      />
 
       {/* Booking Context */}
       <View style={styles.bookingContext}>
@@ -496,8 +796,8 @@ export default function ConversationScreen() {
       {/* Messages */}
       <FlatList
         ref={flatListRef}
-        data={messages}
-        renderItem={renderMessage}
+        data={groupedMessages}
+        renderItem={renderGroupedItem}
         keyExtractor={(item) => item.id}
         style={styles.messagesList}
         contentContainerStyle={styles.messagesContent}
@@ -551,6 +851,62 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f9fafb',
   },
+  // Chat Loading Skeleton Styles
+  chatContainer: {
+    flex: 1,
+    backgroundColor: '#f9fafb',
+  },
+  messagesContainer: {
+    flex: 1,
+    padding: 16,
+    paddingBottom: 0,
+  },
+  incomingMessageSkeleton: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  outgoingMessageSkeleton: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-end',
+    marginBottom: 16,
+  },
+  avatarSkeleton: {
+    borderRadius: 20,
+    marginRight: 8,
+  },
+  messageBubbleSkeleton: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderBottomLeftRadius: 4,
+    padding: 12,
+    maxWidth: '70%',
+    minWidth: '40%',
+  },
+  messageBubbleSkeletonOutgoing: {
+    backgroundColor: '#44d62c',
+    borderRadius: 16,
+    borderBottomRightRadius: 4,
+    padding: 12,
+    maxWidth: '70%',
+    minWidth: '30%',
+  },
+  inputContainerSkeleton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    gap: 12,
+  },
+  inputSkeleton: {
+    borderRadius: 22,
+  },
+  sendButtonSkeleton: {
+    borderRadius: 22,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -571,45 +927,6 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     marginBottom: 20,
     textAlign: 'center',
-  },
-  header: {
-    backgroundColor: '#ffffff',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  backButton: {
-    padding: 8,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#44d62c',
-    fontWeight: '500',
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  verifiedBadge: {
-    fontSize: 12,
-    color: '#10b981',
-    marginTop: 2,
-  },
-  detailsButton: {
-    padding: 8,
-  },
-  detailsButtonText: {
-    fontSize: 16,
-    color: '#44d62c',
-    fontWeight: '500',
   },
   bookingContext: {
     backgroundColor: '#ffffff',
@@ -710,6 +1027,20 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     marginTop: 4,
   },
+  dateSeparatorContainer: {
+    alignSelf: 'center',
+    marginVertical: 16,
+  },
+  dateSeparatorText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6b7280',
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    textAlign: 'center',
+  },
   inputContainer: {
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
@@ -759,4 +1090,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ffffff',
   },
-}); 
+});

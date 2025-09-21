@@ -30,6 +30,7 @@ __exportStar(require("./utils/pricing"), exports);
 __exportStar(require("./utils/notifications"), exports);
 __exportStar(require("./utils/search"), exports);
 __exportStar(require("./utils/search-api"), exports);
+__exportStar(require("./utils/booking"), exports);
 __exportStar(require("./constants"), exports);
 __exportStar(require("./graphql"), exports);
 var location_1 = require("./types/location");

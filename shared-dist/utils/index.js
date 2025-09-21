@@ -41,3 +41,5 @@ __exportStar(require("./search"), exports);
 __exportStar(require("./search-api"), exports);
 // Calendar and availability utilities
 __exportStar(require("./calendar"), exports);
+// Booking utilities
+__exportStar(require("./booking"), exports);

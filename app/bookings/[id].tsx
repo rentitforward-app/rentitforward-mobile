@@ -18,6 +18,7 @@ import { useAuth } from '../../src/components/AuthProvider';
 import { colors, spacing, typography } from '../../src/lib/design-system';
 import { Header } from '../../src/components/Header';
 import { CancelBookingModal } from '../../src/components/booking/CancelBookingModal';
+import { IssueReportsSection } from '../../src/components/booking/IssueReportsSection';
 
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -114,7 +115,7 @@ export default function BookingDetailScreen() {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
-      month: 'long',
+      month: 'short',
       day: 'numeric',
     });
   };
@@ -131,7 +132,8 @@ export default function BookingDetailScreen() {
     const end = new Date(endDate);
     const diffTime = Math.abs(end.getTime() - start.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+    // Add 1 to include both start and end dates in the count
+    return diffDays + 1;
   };
 
   // Cancel booking mutation - Direct database operation
@@ -185,6 +187,90 @@ export default function BookingDetailScreen() {
     },
   });
 
+  // Calculate pickup date info with new timing (start date 00:00 to end date 23:59)
+  const pickupInfo = booking ? (() => {
+    const today = new Date();
+    const startDate = new Date(booking.start_date);
+    const endDate = new Date(booking.end_date);
+    
+    // Set start date to beginning of day (00:00)
+    const startOfPickupPeriod = new Date(startDate);
+    startOfPickupPeriod.setHours(0, 0, 0, 0);
+    
+    // Set end date to end of day (23:59:59)
+    const endOfPickupPeriod = new Date(endDate);
+    endOfPickupPeriod.setHours(23, 59, 59, 999);
+    
+    const isWithinPickupPeriod = today >= startOfPickupPeriod && today <= endOfPickupPeriod;
+    const isBeforePickupPeriod = today < startOfPickupPeriod;
+    const isAfterPickupPeriod = today > endOfPickupPeriod;
+    
+    const hasBeenPickedUp = booking.status === 'active' || booking.status === 'picked_up';
+    const showPickupButton = booking.status === 'confirmed' || booking.status === 'payment_required';
+    
+    const canConfirmPickup = isWithinPickupPeriod && booking.status === 'confirmed' && !hasBeenPickedUp;
+    const canReturn = isAfterPickupPeriod && hasBeenPickedUp;
+    
+    // Generate button text
+    let pickupButtonText: string;
+    if (hasBeenPickedUp && canReturn) {
+      pickupButtonText = 'Confirm Return';
+    } else if (isBeforePickupPeriod) {
+      pickupButtonText = 'Confirm Pickup (Not Available Yet)';
+    } else if (isAfterPickupPeriod && !hasBeenPickedUp) {
+      pickupButtonText = 'Pickup Date Passed';
+    } else if (isWithinPickupPeriod && booking.status !== 'confirmed') {
+      pickupButtonText = 'Complete Payment First';
+    } else {
+      pickupButtonText = 'Confirm Pickup';
+    }
+    
+    // Generate button note
+    let pickupButtonNote: string | null = null;
+    if (isBeforePickupPeriod) {
+      const daysUntil = Math.ceil((startOfPickupPeriod.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      pickupButtonNote = `Pickup button will be active starting ${startDate.toLocaleDateString()} at 12:00 AM (${daysUntil} day${daysUntil !== 1 ? 's' : ''} from now)`;
+    } else if (isAfterPickupPeriod && !hasBeenPickedUp) {
+      pickupButtonNote = 'Pickup date has passed. Contact support if you need assistance.';
+    } else if (isWithinPickupPeriod && booking.status !== 'confirmed') {
+      pickupButtonNote = 'Complete payment first to enable pickup confirmation.';
+    }
+    
+    return {
+      canConfirmPickup,
+      canReturn,
+      hasBeenPickedUp,
+      showPickupButton,
+      isPickupAvailable: canConfirmPickup,
+      isReturnAvailable: canReturn,
+      pickupButtonText,
+      pickupButtonNote,
+      daysUntilPickup: isBeforePickupPeriod ? Math.ceil((startOfPickupPeriod.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null,
+      daysUntilReturn: isWithinPickupPeriod ? Math.ceil((endOfPickupPeriod.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null
+    };
+  })() : {
+    canConfirmPickup: false,
+    canReturn: false,
+    hasBeenPickedUp: false,
+    showPickupButton: false,
+    isPickupAvailable: false,
+    isReturnAvailable: false,
+    pickupButtonText: 'Loading...',
+    pickupButtonNote: null,
+    daysUntilPickup: null,
+    daysUntilReturn: null
+  };
+  
+  // Extract values for backward compatibility
+  const { 
+    canConfirmPickup, 
+    canReturn, 
+    hasBeenPickedUp, 
+    showPickupButton,
+    pickupButtonText: sharedPickupButtonText,
+    pickupButtonNote: sharedPickupButtonNote
+  } = pickupInfo;
+
   // Check if booking can be cancelled
   const canCancel = booking && 
     user && 
@@ -192,8 +278,113 @@ export default function BookingDetailScreen() {
     (booking.status === 'confirmed' || booking.status === 'pending' || booking.status === 'payment_required');
 
 
+  // Pickup confirmation mutation
+  const pickupConfirmationMutation = useMutation({
+    mutationFn: async () => {
+      if (!booking) {
+        throw new Error('Booking not found');
+      }
+
+      const { data, error } = await supabase
+        .from('bookings')
+        .update({
+          status: 'active',
+          pickup_confirmed_by_renter: true,
+          pickup_confirmed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error(error.message || 'Failed to confirm pickup');
+      }
+
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['booking-details', id] });
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      Alert.alert('Success', 'Pickup confirmed! Booking is now active.');
+    },
+    onError: (error) => {
+      Alert.alert('Error', error.message || 'Failed to confirm pickup');
+    },
+  });
+
+  // Return confirmation mutation
+  const returnConfirmationMutation = useMutation({
+    mutationFn: async () => {
+      if (!booking) {
+        throw new Error('Booking not found');
+      }
+
+      const { data, error } = await supabase
+        .from('bookings')
+        .update({
+          status: 'completed',
+          return_confirmed_by_renter: true,
+          return_confirmed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error(error.message || 'Failed to confirm return');
+      }
+
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['booking-details', id] });
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      Alert.alert('Success', 'Return confirmed! Booking is now completed.');
+    },
+    onError: (error) => {
+      Alert.alert('Error', error.message || 'Failed to confirm return');
+    },
+  });
+
   const handleCancelBooking = async (reason: string, note: string) => {
     await cancelBookingMutation.mutateAsync({ reason, note });
+  };
+
+  const handleConfirmPickup = async () => {
+    await pickupConfirmationMutation.mutateAsync();
+  };
+
+  const handleConfirmReturn = async () => {
+    await returnConfirmationMutation.mutateAsync();
+  };
+
+  // Helper functions for button text and states (using shared utility)
+  const getPickupButtonText = () => {
+    if (pickupConfirmationMutation.isPending) return 'Confirming...';
+    if (returnConfirmationMutation.isPending) return 'Confirming...';
+    return sharedPickupButtonText;
+  };
+
+  const getPickupButtonNote = () => {
+    return sharedPickupButtonNote;
+  };
+
+  const getPickupButtonAction = () => {
+    if (hasBeenPickedUp && canReturn) {
+      return handleConfirmReturn;
+    }
+    if (canConfirmPickup) {
+      return handleConfirmPickup;
+    }
+    return undefined;
+  };
+
+  const isPickupButtonDisabled = () => {
+    if (pickupConfirmationMutation.isPending || returnConfirmationMutation.isPending) return true;
+    if (hasBeenPickedUp) return !canReturn;
+    return !canConfirmPickup;
   };
 
   if (isLoading) {
@@ -307,54 +498,65 @@ export default function BookingDetailScreen() {
           </View>
         </View>
 
-        {/* Pickup Confirmation */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Pickup Confirmation</Text>
-          <View style={styles.pickupConfirmationCard}>
-            <View style={styles.pickupHeader}>
-              <Ionicons name="cube-outline" size={24} color={colors.primary.main} />
-              <Text style={styles.pickupTitle}>Pickup Confirmation</Text>
-            </View>
-            
-            {booking.pickup_location && (
-              <View style={styles.locationSection}>
-                <View style={styles.locationRow}>
-                  <Ionicons name="location-outline" size={20} color={colors.text.secondary} />
-                  <Text style={styles.locationText}>{booking.pickup_location}</Text>
-                </View>
-                {booking.pickup_instructions && (
-                  <Text style={styles.pickupInstructions}>{booking.pickup_instructions}</Text>
-                )}
+        {/* Pickup/Return Confirmation */}
+        {showPickupButton && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              {hasBeenPickedUp ? 'Return Confirmation' : 'Pickup Confirmation'}
+            </Text>
+            <View style={styles.pickupConfirmationCard}>
+              <View style={styles.pickupHeader}>
+                <Ionicons 
+                  name={hasBeenPickedUp ? "flag-outline" : "cube-outline"} 
+                  size={24} 
+                  color={colors.primary.main} 
+                />
+                <Text style={styles.pickupTitle}>
+                  {hasBeenPickedUp ? 'Return Confirmation' : 'Pickup Confirmation'}
+                </Text>
               </View>
-            )}
-            
-            <TouchableOpacity 
-              style={[
-                styles.pickupButton, 
-                booking.status === 'confirmed' ? styles.pickupButtonActive : styles.pickupButtonDisabled
-              ]}
-              disabled={booking.status !== 'confirmed'}
-            >
-              <Ionicons 
-                name="checkmark-circle" 
-                size={20} 
-                color={booking.status === 'confirmed' ? colors.white : colors.gray[400]} 
-              />
-              <Text style={[
-                styles.pickupButtonText,
-                booking.status === 'confirmed' ? styles.pickupButtonTextActive : styles.pickupButtonTextDisabled
-              ]}>
-                {booking.status === 'confirmed' ? 'Confirm Pickup' : 'Confirm Pickup (Not Available Yet)'}
-              </Text>
-            </TouchableOpacity>
-            
-            {booking.status !== 'confirmed' && (
-              <Text style={styles.pickupNote}>
-                Pickup button will be active on {formatDate(booking.start_date)} ({Math.ceil((new Date(booking.start_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days from now)
-              </Text>
-            )}
+              
+              {booking.pickup_location && (
+                <View style={styles.locationSection}>
+                  <View style={styles.locationRow}>
+                    <Ionicons name="location-outline" size={20} color={colors.text.secondary} />
+                    <Text style={styles.locationText}>{booking.pickup_location}</Text>
+                  </View>
+                  {booking.pickup_instructions && (
+                    <Text style={styles.pickupInstructions}>{booking.pickup_instructions}</Text>
+                  )}
+                </View>
+              )}
+              
+              <TouchableOpacity 
+                style={[
+                  styles.pickupButton, 
+                  !isPickupButtonDisabled() ? styles.pickupButtonActive : styles.pickupButtonDisabled
+                ]}
+                disabled={isPickupButtonDisabled()}
+                onPress={getPickupButtonAction()}
+              >
+                <Ionicons 
+                  name={hasBeenPickedUp ? "flag" : "checkmark-circle"} 
+                  size={20} 
+                  color={!isPickupButtonDisabled() ? colors.white : colors.gray[400]} 
+                />
+                <Text style={[
+                  styles.pickupButtonText,
+                  !isPickupButtonDisabled() ? styles.pickupButtonTextActive : styles.pickupButtonTextDisabled
+                ]}>
+                  {getPickupButtonText()}
+                </Text>
+              </TouchableOpacity>
+              
+              {getPickupButtonNote() && (
+                <Text style={styles.pickupNote}>
+                  {getPickupButtonNote()}
+                </Text>
+              )}
+            </View>
           </View>
-        </View>
+        )}
 
 
         {/* Your Host */}
@@ -455,14 +657,7 @@ export default function BookingDetailScreen() {
             <TouchableOpacity 
               style={[styles.actionButton, styles.reportButton]}
               onPress={() => {
-                Alert.alert(
-                  'Report Issue',
-                  'What issue would you like to report?',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Report', onPress: () => {} }
-                  ]
-                );
+                router.push(`/bookings/${booking.id}/report-issue`);
               }}
             >
               <Ionicons name="warning" size={20} color={colors.semantic.error} />
@@ -472,7 +667,7 @@ export default function BookingDetailScreen() {
             <TouchableOpacity 
               style={[styles.actionButton, styles.messageButton]}
               onPress={() => {
-                // Navigate to messages
+                router.push(`/messages/${booking.id}`);
               }}
             >
               <Ionicons name="chatbubble-outline" size={20} color={colors.primary.main} />
@@ -482,7 +677,7 @@ export default function BookingDetailScreen() {
             <TouchableOpacity 
               style={[styles.actionButton, styles.viewButton]}
               onPress={() => {
-                // Navigate to listing
+                router.push(`/listing/${booking.listing_id}`);
               }}
             >
               <Ionicons name="document-text-outline" size={20} color={colors.text.primary} />
@@ -531,6 +726,15 @@ export default function BookingDetailScreen() {
             </View>
           </View>
         )}
+
+        {/* Issue Reports Section */}
+        <IssueReportsSection 
+          bookingId={booking.id}
+          onViewReports={() => {
+            // TODO: Navigate to full issue reports list
+            Alert.alert('Coming Soon', 'Full issue reports view will be available soon.');
+          }}
+        />
 
         {/* Additional Information */}
         <View style={styles.section}>
