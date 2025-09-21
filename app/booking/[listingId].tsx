@@ -12,6 +12,7 @@ import { availabilityAPI } from '../../src/lib/api/availability';
 import { CalendarAvailability } from '../../shared-dist/utils/calendar';
 import { format, addDays, startOfDay } from 'date-fns';
 import { PaymentWebView } from '../../src/components/PaymentWebView';
+import { emailService } from '../../src/lib/email-service';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -626,6 +627,53 @@ export default function BookingScreen() {
           const listingIdStr = Array.isArray(listingId) ? listingId[0] : listingId;
           queryClient.invalidateQueries({ queryKey: ['listing-availability', listingIdStr] });
           console.log('Availability cache invalidated for listing:', listingIdStr);
+
+          // Send booking confirmation emails
+          try {
+            console.log('📧 Fetching booking data for email notifications...');
+            
+            // Fetch complete booking data with all related information for email
+            const { data: bookingData, error: fetchError } = await supabase
+              .from('bookings')
+              .select(`
+                *,
+                listings!listing_id (
+                  title,
+                  images,
+                  city,
+                  state
+                ),
+                owner_profile:owner_id (
+                  full_name,
+                  email
+                ),
+                renter_profile:renter_id (
+                  full_name,
+                  email
+                )
+              `)
+              .eq('id', currentBookingId)
+              .single();
+
+            if (fetchError || !bookingData) {
+              console.error('❌ Failed to fetch booking data for emails:', fetchError);
+            } else {
+              console.log('✅ Booking data fetched for emails:', bookingData.id);
+              
+              // Send confirmation emails using the email service
+              const emailResult = await emailService.sendBookingConfirmationEmails(bookingData);
+              
+              if (emailResult.success) {
+                console.log('✅ Booking confirmation emails sent successfully');
+              } else {
+                console.warn('⚠️ Some confirmation emails failed to send:', emailResult.error);
+                // Don't fail the payment success flow if emails fail
+              }
+            }
+          } catch (emailError) {
+            console.error('❌ Failed to send booking confirmation emails:', emailError);
+            // Don't fail the payment success flow if emails fail
+          }
         }
       } catch (error) {
         console.error('Failed to update booking status:', error);

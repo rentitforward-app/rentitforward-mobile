@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRealSearchSuggestions } from '../../hooks/useRealSearchSuggestions';
@@ -25,19 +26,39 @@ interface RealAPIPredictiveSearchInputProps {
   placeholder?: string;
   style?: any;
   useRealAPI?: boolean;
+  onSuggestionsVisibilityChange?: (visible: boolean) => void;
 }
 
-export function RealAPIPredictiveSearchInput({
+export interface RealAPIPredictiveSearchInputRef {
+  closeSuggestions: () => void;
+}
+
+export const RealAPIPredictiveSearchInput = forwardRef<RealAPIPredictiveSearchInputRef, RealAPIPredictiveSearchInputProps>(({
   value,
   onChangeText,
   onSearch,
   placeholder = "Search for items...",
   style,
-  useRealAPI = false
-}: RealAPIPredictiveSearchInputProps) {
+  useRealAPI = false,
+  onSuggestionsVisibilityChange
+}, ref) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const inputRef = useRef<TextInput>(null);
+
+  // Function to update suggestions visibility and notify parent
+  const updateSuggestionsVisibility = (visible: boolean) => {
+    setShowSuggestions(visible);
+    onSuggestionsVisibilityChange?.(visible);
+  };
+
+  // Expose methods to parent component
+  useImperativeHandle(ref, () => ({
+    closeSuggestions: () => {
+      updateSuggestionsVisibility(false);
+      inputRef.current?.blur();
+    }
+  }));
 
   // Use real API or mock data based on prop
   const { suggestions: realSuggestions, loading, error } = useRealSearchSuggestions(
@@ -82,14 +103,15 @@ export function RealAPIPredictiveSearchInput({
 
   const handleInputChange = (text: string) => {
     onChangeText(text);
-    setShowSuggestions(true);
+    updateSuggestionsVisibility(true);
     setSelectedIndex(-1);
   };
 
   const handleSuggestionPress = (suggestion: SearchSuggestion) => {
     console.log('Suggestion pressed:', suggestion.text);
     onChangeText(suggestion.text);
-    setShowSuggestions(false);
+    updateSuggestionsVisibility(false);
+    inputRef.current?.blur(); // Dismiss keyboard
     // Trigger search immediately when suggestion is clicked
     if (onSearch) {
       onSearch(suggestion.text);
@@ -97,18 +119,19 @@ export function RealAPIPredictiveSearchInput({
   };
 
   const handleInputFocus = () => {
-    setShowSuggestions(true);
+    updateSuggestionsVisibility(true);
   };
 
   const handleInputBlur = () => {
     // Delay hiding suggestions to allow clicking
-    setTimeout(() => setShowSuggestions(false), 150);
+    setTimeout(() => updateSuggestionsVisibility(false), 150);
   };
 
   const handleSearch = () => {
     console.log('Search button pressed:', value);
     if (value.trim()) {
-      setShowSuggestions(false);
+      updateSuggestionsVisibility(false);
+      inputRef.current?.blur(); // Dismiss keyboard
       if (onSearch) {
         onSearch(value.trim());
       }
@@ -117,8 +140,20 @@ export function RealAPIPredictiveSearchInput({
 
   const handleOutsidePress = () => {
     console.log('Outside press detected');
-    setShowSuggestions(false);
+    updateSuggestionsVisibility(false);
+    inputRef.current?.blur(); // Dismiss keyboard
   };
+
+  // Close suggestions when keyboard is dismissed
+  useEffect(() => {
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      updateSuggestionsVisibility(false);
+    });
+
+    return () => {
+      keyboardDidHideListener?.remove();
+    };
+  }, []);
 
   const getSuggestionTypeLabel = (type: string) => {
     switch (type) {
@@ -131,76 +166,76 @@ export function RealAPIPredictiveSearchInput({
   };
 
   return (
-    <TouchableWithoutFeedback onPress={handleOutsidePress}>
-      <View style={{ position: 'relative', zIndex: 99999 }}>
-        {/* Search Input with Button */}
-        <View style={{ position: 'relative' }}>
-          <TextInput
-            ref={inputRef}
-            value={value}
-            onChangeText={handleInputChange}
-            onFocus={handleInputFocus}
-            onBlur={handleInputBlur}
-            onSubmitEditing={handleSearch}
-            placeholder={placeholder}
-            returnKeyType="search"
-            style={[
-              {
-                backgroundColor: colors.white,
-                borderRadius: 12,
-                paddingHorizontal: 16,
-                paddingVertical: 12,
-                paddingRight: 50, // Make space for search button
-                fontSize: 16,
-                borderWidth: 1,
-                borderColor: showSuggestions ? colors.primary.main : colors.gray[300],
-                color: colors.text.primary,
-              },
-              style
-            ]}
-            placeholderTextColor={colors.text.tertiary}
-          />
-          
-          {/* Search Button - Always visible */}
-          <TouchableOpacity
-            onPress={handleSearch}
-            style={{
-              position: 'absolute',
-              right: 4,
-              top: 4,
-              bottom: 4,
-              width: 40,
-              backgroundColor: colors.primary.main,
-              borderRadius: 8,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            <Ionicons name="search" size={18} color={colors.white} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Dropdown Suggestions */}
-        {showSuggestions && filteredSuggestions.length > 0 && (
-          <View
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
+    <View style={{ position: 'relative', zIndex: 99999 }}>
+      {/* Search Input with Button */}
+      <View style={{ position: 'relative' }}>
+        <TextInput
+          ref={inputRef}
+          value={value}
+          onChangeText={handleInputChange}
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
+          onSubmitEditing={handleSearch}
+          placeholder={placeholder}
+          returnKeyType="search"
+          style={[
+            {
               backgroundColor: colors.white,
               borderRadius: 12,
-              marginTop: 4,
-              shadowColor: colors.black,
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.15,
-              shadowRadius: 8,
-              elevation: 8,
-              zIndex: 100000,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              paddingRight: 50, // Make space for search button
+              fontSize: 16,
               borderWidth: 1,
-              borderColor: colors.gray[200],
-            }}
-          >
+              borderColor: showSuggestions ? colors.primary.main : colors.gray[300],
+              color: colors.text.primary,
+            },
+            style
+          ]}
+          placeholderTextColor={colors.text.tertiary}
+        />
+        
+        {/* Search Button - Always visible */}
+        <TouchableOpacity
+          onPress={handleSearch}
+          style={{
+            position: 'absolute',
+            right: 4,
+            top: 4,
+            bottom: 4,
+            width: 40,
+            backgroundColor: colors.primary.main,
+            borderRadius: 8,
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <Ionicons name="search" size={18} color={colors.white} />
+        </TouchableOpacity>
+      </View>
+
+
+      {/* Dropdown Suggestions */}
+      {showSuggestions && filteredSuggestions.length > 0 && (
+        <View
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            backgroundColor: colors.white,
+            borderRadius: 12,
+            marginTop: 4,
+            shadowColor: colors.black,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.15,
+            shadowRadius: 8,
+            elevation: 8,
+            zIndex: 100000,
+            borderWidth: 1,
+            borderColor: colors.gray[200],
+          }}
+        >
             {/* Header */}
             <View style={{
               paddingHorizontal: 16,
@@ -334,12 +369,11 @@ export function RealAPIPredictiveSearchInput({
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
-        )}
-      </View>
-    </TouchableWithoutFeedback>
+        </View>
+      )}
+    </View>
   );
-}
+});
 
 
 

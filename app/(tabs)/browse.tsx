@@ -11,7 +11,8 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
-  Platform
+  Platform,
+  TouchableWithoutFeedback
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
@@ -21,7 +22,7 @@ import * as Location from 'expo-location';
 import { supabase } from '../../src/lib/supabase';
 import { captureSentryException } from '../../src/lib/sentry';
 import { colors, spacing, typography, componentStyles } from '../../src/lib/design-system';
-import { RealAPIPredictiveSearchInput } from '../../src/components/search/RealAPIPredictiveSearchInput';
+import { RealAPIPredictiveSearchInput, RealAPIPredictiveSearchInputRef } from '../../src/components/search/RealAPIPredictiveSearchInput';
 import { Header } from '../../src/components/Header';
 
 // Categories - matching web version
@@ -77,6 +78,7 @@ export default function BrowseScreen() {
   } | null>(null);
   const [distanceLimit, setDistanceLimit] = useState(50); // Default 50km
   const locationSearchTimeout = useRef<NodeJS.Timeout | null>(null);
+  const searchInputRef = useRef<RealAPIPredictiveSearchInputRef>(null);
 
   useEffect(() => {
     loadListings();
@@ -1036,26 +1038,33 @@ export default function BrowseScreen() {
     );
   }
 
-  return (
-    <View style={styles.container}>
-      <Header 
-        title="Browse Items" 
-        showBackButton={false}
-        showNotificationIcon={true}
-      />
+  const handleOutsidePress = () => {
+    // Close search suggestions when clicking outside
+    searchInputRef.current?.closeSuggestions();
+  };
 
-      {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <RealAPIPredictiveSearchInput
-            placeholder="Search for items, categories, brands..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onSearch={(query) => {
-              setSearchQuery(query);
-            }}
-            useRealAPI={true}
-          />
-        </View>
+  return (
+    <TouchableWithoutFeedback onPress={handleOutsidePress}>
+      <View style={styles.container}>
+        <Header 
+          title="Browse Items" 
+          showBackButton={false}
+          showNotificationIcon={true}
+        />
+
+        {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <RealAPIPredictiveSearchInput
+              ref={searchInputRef}
+              placeholder="Search for items, categories, brands..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onSearch={(query) => {
+                setSearchQuery(query);
+              }}
+              useRealAPI={true}
+            />
+          </View>
 
       {/* Filter Controls */}
       <View style={styles.filterControls}>
@@ -1329,7 +1338,8 @@ export default function BrowseScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+      </View>
+    </TouchableWithoutFeedback>
   );
 }
 
