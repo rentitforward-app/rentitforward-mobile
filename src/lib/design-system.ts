@@ -49,6 +49,16 @@ const lightColors = {
   accent: {
     yellow: '#F59E0B',
   },
+  background: {
+    main: '#FFFFFF',
+    secondary: '#F9FAFB',
+    tertiary: '#F3F4F6',
+  },
+  text: {
+    primary: '#111827',
+    secondary: '#6B7280',
+    tertiary: '#9CA3AF',
+  },
 } as const;
 
 // Local typography definitions
