@@ -254,3 +254,4 @@ class IssueReportService {
 }
 
 export const issueReportService = IssueReportService.getInstance();
+
