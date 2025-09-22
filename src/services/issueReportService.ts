@@ -11,7 +11,7 @@ export interface IssueReportData {
   occurred_at: string;
   financial_impact: boolean;
   estimated_cost: number;
-  resolution_request?: string;
+  resolution_requested?: string;
   contact_preference: 'email' | 'phone' | 'message';
   photos: string[];
 }
@@ -114,7 +114,7 @@ class IssueReportService {
           occurred_at: reportData.occurred_at,
           financial_impact: reportData.financial_impact,
           estimated_cost: reportData.estimated_cost,
-          resolution_request: reportData.resolution_request || null,
+          resolution_requested: reportData.resolution_requested || null,
           contact_preference: reportData.contact_preference,
           photos: photoUrls,
           status: 'open',

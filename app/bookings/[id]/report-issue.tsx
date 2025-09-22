@@ -33,8 +33,7 @@ interface ReportFormData {
   occurred_at: string;
   financial_impact: boolean;
   estimated_cost: number;
-  resolution_request: string;
-  contact_preference: string;
+  resolution_requested: string;
   photos: string[];
 }
 
@@ -57,11 +56,6 @@ const SEVERITY_LEVELS = [
   { value: 'critical', label: 'Critical', color: colors.semantic.error, description: 'Critical issue, immediate action required' },
 ];
 
-const CONTACT_PREFERENCES = [
-  { value: 'email', label: 'Email', icon: 'mail-outline' },
-  { value: 'phone', label: 'Phone', icon: 'call-outline' },
-  { value: 'message', label: 'In-App Message', icon: 'chatbubble-outline' },
-];
 
 export default function ReportIssueScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -82,8 +76,7 @@ export default function ReportIssueScreen() {
     occurred_at: new Date().toISOString().split('T')[0],
     financial_impact: false,
     estimated_cost: 0,
-    resolution_request: '',
-    contact_preference: 'email',
+    resolution_requested: '',
     photos: [],
   });
 
@@ -295,8 +288,8 @@ export default function ReportIssueScreen() {
         occurred_at: formData.occurred_at,
         financial_impact: formData.financial_impact,
         estimated_cost: formData.estimated_cost,
-        resolution_request: formData.resolution_request || undefined,
-        contact_preference: formData.contact_preference as 'email' | 'phone' | 'message',
+        resolution_requested: formData.resolution_requested || undefined,
+        contact_preference: 'email',
         photos: formData.photos,
       };
 
@@ -578,44 +571,16 @@ export default function ReportIssueScreen() {
           <TextInput
             style={[styles.textInput, styles.textArea]}
             placeholder="What would you like to see happen to resolve this issue?"
-            value={formData.resolution_request}
-            onChangeText={(text) => updateFormData('resolution_request', text)}
+            value={formData.resolution_requested}
+            onChangeText={(text) => updateFormData('resolution_requested', text)}
             multiline
             numberOfLines={4}
             maxLength={500}
             textAlignVertical="top"
           />
-          <Text style={styles.characterCount}>{formData.resolution_request.length}/500</Text>
+          <Text style={styles.characterCount}>{formData.resolution_requested.length}/500</Text>
         </View>
 
-        {/* Contact Preference */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Preferred Contact Method</Text>
-          <View style={styles.contactContainer}>
-            {CONTACT_PREFERENCES.map((pref) => (
-              <TouchableOpacity
-                key={pref.value}
-                style={[
-                  styles.contactOption,
-                  formData.contact_preference === pref.value && styles.contactOptionSelected
-                ]}
-                onPress={() => updateFormData('contact_preference', pref.value)}
-              >
-                <Ionicons 
-                  name={pref.icon as any} 
-                  size={20} 
-                  color={formData.contact_preference === pref.value ? colors.primary.main : colors.text.secondary} 
-                />
-                <Text style={[
-                  styles.contactLabel,
-                  formData.contact_preference === pref.value && styles.contactLabelSelected
-                ]}>
-                  {pref.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
 
         {/* Submit Button */}
         <View style={styles.submitContainer}>
@@ -996,34 +961,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.base,
     color: colors.text.primary,
     marginHorizontal: spacing.md,
-  },
-  contactContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.md,
-  },
-  contactOption: {
-    flex: 1,
-    backgroundColor: colors.white,
-    borderWidth: 2,
-    borderColor: colors.gray[200],
-    borderRadius: 8,
-    padding: spacing.md,
-    marginRight: spacing.sm,
-    alignItems: 'center',
-  },
-  contactOptionSelected: {
-    borderColor: colors.primary.main,
-    backgroundColor: `${colors.primary.main}10`,
-  },
-  contactLabel: {
-    fontSize: typography.sizes.sm,
-    color: colors.text.primary,
-    marginTop: spacing.xs,
-    textAlign: 'center',
-  },
-  contactLabelSelected: {
-    color: colors.primary.main,
-    fontWeight: typography.weights.medium,
   },
   submitContainer: {
     paddingHorizontal: spacing.md,

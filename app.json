@@ -2,7 +2,7 @@
   "expo": {
     "name": "Rent It Forward",
     "slug": "rentitforward-mobile",
-    "version": "1.0.29",
+    "version": "1.0.30",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/icons/ios-light.png",
@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "au.com.rentitforward.mobile",
-      "buildNumber": "29",
+      "buildNumber": "30",
       "icon": "./assets/icons/ios-light.png",
       "splash": {
         "image": "./assets/icons/splash-icon-dark.png",
@@ -43,7 +43,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "au.com.rentitforward.mobile",
-      "versionCode": 29,
+      "versionCode": 30,
       "splash": {
         "image": "./assets/icons/splash-icon-dark.png",
         "resizeMode": "contain",
