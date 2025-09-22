@@ -18,6 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../src/components/AuthProvider';
 import { supabase } from '../../src/lib/supabase';
 import { Header, HeaderPresets } from '../../src/components/Header';
+import { mobileNotificationApi } from '../../src/lib/notification-api';
 
 interface Message {
   id: string;
@@ -561,7 +562,7 @@ export default function MessageScreen() {
       
       return newMessage;
     },
-    onSuccess: (newMessage) => {
+    onSuccess: async (newMessage) => {
       // Add message to local state
       queryClient.setQueryData(['messages', bookingId], (old: Message[] = []) => [
         ...old,
@@ -575,6 +576,25 @@ export default function MessageScreen() {
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
+
+      // Trigger notification to the other user
+      try {
+        const receiverId = conversation?.booking.ownerId === user?.id 
+          ? conversation?.booking.renterId 
+          : conversation?.booking.ownerId;
+
+        if (receiverId && conversation?.id) {
+          await mobileNotificationApi.notifyNewMessage(
+            newMessage.id,
+            conversation.id,
+            receiverId
+          );
+          console.log('Message notification sent successfully');
+        }
+      } catch (notificationError) {
+        console.error('Failed to send message notification:', notificationError);
+        // Don't show error to user as message was sent successfully
+      }
     },
     onError: (error) => {
       console.error('Send message error:', error);

@@ -12,7 +12,8 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, spacing, typography } from '../src/lib/design-system';
-import { useFCM, useNotificationBadge } from '../src/components/FCMProvider';
+import { useFCM } from '../src/components/FCMProvider';
+import { useNotificationBadge } from '../src/hooks/useNotificationBadge';
 import { useTestNotifications } from '../src/hooks/useNotifications';
 
 interface StoredNotification {
@@ -34,7 +35,7 @@ export default function NotificationsScreen() {
   
   // FCM hooks
   const { hasPermission, isEnabled } = useFCM();
-  const { count, clear } = useNotificationBadge();
+  const { count, markAsViewed, clearBadge } = useNotificationBadge();
   const { testAllNotifications } = useTestNotifications();
 
   const [notifications, setNotifications] = useState<StoredNotification[]>([]);
@@ -57,7 +58,10 @@ export default function NotificationsScreen() {
   useEffect(() => {
     loadNotifications();
     setLoading(false);
-  }, []);
+    
+    // Mark notifications as viewed when screen loads
+    markAsViewed().catch(console.error);
+  }, [markAsViewed]);
 
   // Refresh notifications
   const onRefresh = async () => {
@@ -80,7 +84,7 @@ export default function NotificationsScreen() {
 
       // Update badge count
       const unreadCount = updatedNotifications.filter(n => !n.isRead).length;
-      if (unreadCount === 0) clear();
+      if (unreadCount === 0) clearBadge();
     } catch (error) {
       console.error('Failed to mark notification as read:', error);
     }

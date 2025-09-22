@@ -699,22 +699,37 @@ export class FCMService {
    */
   private async registerTokenWithBackend(token: string, userId: string): Promise<void> {
     try {
-      // TODO: Implement API call to register token with your backend
       console.log('Registering FCM token with backend:', { token, userId });
       
-      // Example API call:
-      // await fetch('/api/notifications/register-token', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     token,
-      //     userId,
-      //     platform: Platform.OS,
-      //     deviceId: Constants.deviceId,
-      //   }),
-      // });
+      // Get base URL from environment or use default
+      const baseUrl = process.env.EXPO_PUBLIC_BASE_URL || 'https://rentitforward.com.au';
+      
+      const response = await fetch(`${baseUrl}/api/notifications/fcm-token`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          // Add auth header if available
+          ...(await this.getAuthHeaders()),
+        },
+        body: JSON.stringify({
+          fcm_token: token,
+          user_id: userId,
+          platform: Platform.OS,
+          device_type: Device.deviceType ? Device.DeviceType[Device.deviceType] : 'unknown',
+          device_id: Constants.deviceId || 'unknown',
+          is_active: true,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('FCM token registered successfully:', result);
     } catch (error) {
       console.error('Failed to register token with backend:', error);
+      // Don't throw error to prevent app crashes
     }
   }
 
@@ -723,17 +738,33 @@ export class FCMService {
    */
   private async unregisterTokenFromBackend(token: string, userId: string): Promise<void> {
     try {
-      // TODO: Implement API call to unregister token from your backend
       console.log('Unregistering FCM token from backend:', { token, userId });
       
-      // Example API call:
-      // await fetch('/api/notifications/unregister-token', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ token, userId }),
-      // });
+      // Get base URL from environment or use default
+      const baseUrl = process.env.EXPO_PUBLIC_BASE_URL || 'https://rentitforward.com.au';
+      
+      const response = await fetch(`${baseUrl}/api/notifications/fcm-token`, {
+        method: 'DELETE',
+        headers: { 
+          'Content-Type': 'application/json',
+          // Add auth header if available
+          ...(await this.getAuthHeaders()),
+        },
+        body: JSON.stringify({
+          fcm_token: token,
+          user_id: userId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('FCM token unregistered successfully:', result);
     } catch (error) {
       console.error('Failed to unregister token from backend:', error);
+      // Don't throw error to prevent app crashes
     }
   }
 
@@ -745,17 +776,52 @@ export class FCMService {
     preferences: Record<string, boolean>
   ): Promise<void> {
     try {
-      // TODO: Implement API call to update preferences on your backend
       console.log('Updating FCM preferences on backend:', { userId, preferences });
       
-      // Example API call:
-      // await fetch('/api/notifications/preferences', {
-      //   method: 'PUT',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ userId, preferences }),
-      // });
+      // Get base URL from environment or use default
+      const baseUrl = process.env.EXPO_PUBLIC_BASE_URL || 'https://rentitforward.com.au';
+      
+      const response = await fetch(`${baseUrl}/api/notifications/preferences`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          // Add auth header if available
+          ...(await this.getAuthHeaders()),
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          preferences,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('FCM preferences updated successfully:', result);
     } catch (error) {
       console.error('Failed to update preferences on backend:', error);
+      // Don't throw error to prevent app crashes
+    }
+  }
+
+  /**
+   * Get authentication headers for API requests
+   */
+  private async getAuthHeaders(): Promise<Record<string, string>> {
+    try {
+      // Try to get auth token from AsyncStorage or your auth provider
+      const token = await AsyncStorage.getItem('auth_token');
+      if (token) {
+        return {
+          'Authorization': `Bearer ${token}`,
+        };
+      }
+      return {};
+    } catch (error) {
+      console.error('Failed to get auth headers:', error);
+      return {};
     }
   }
 

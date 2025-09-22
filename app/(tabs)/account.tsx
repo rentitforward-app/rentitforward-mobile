@@ -16,6 +16,8 @@ import { useAuth } from '../../src/components/AuthProvider';
 import { supabase } from '../../src/lib/supabase';
 import { colors, spacing, typography } from '../../src/lib/design-system';
 import { Header } from '../../src/components/Header';
+import { useNotificationCount } from '../../src/hooks/useNotificationBadge';
+import { NotificationBadge } from '../../src/components/NotificationBadge';
 
 interface UserProfile {
   id: string;
@@ -38,6 +40,7 @@ export default function AccountScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user: currentUser, profile: existingProfile, signOut } = useAuth();
+  const { count: notificationCount } = useNotificationCount();
 
   // Use existing profile from auth context or fetch if needed
   const { data: profile, isLoading } = useQuery({
@@ -334,7 +337,19 @@ export default function AccountScreen() {
                   borderBottomColor: colors.gray[100],
                 }}
               >
-                <Ionicons name="notifications-outline" size={24} color={colors.gray[600]} />
+                <View style={{ position: 'relative' }}>
+                  <Ionicons name="notifications-outline" size={24} color={colors.gray[600]} />
+                  {notificationCount > 0 && (
+                    <View style={{
+                      position: 'absolute',
+                      top: -4,
+                      right: -8,
+                      zIndex: 1,
+                    }}>
+                      <NotificationBadge count={notificationCount} size="small" />
+                    </View>
+                  )}
+                </View>
                 <Text style={{
                   fontSize: typography.sizes.base,
                   color: colors.gray[900],
