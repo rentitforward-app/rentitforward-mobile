@@ -85,6 +85,15 @@ export class MobileNotificationApiService {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
+        // Handle 401 errors more gracefully - user might be deleted
+        if (response.status === 401) {
+          console.warn(`Authentication failed for ${endpoint} - user may be deleted`);
+          return {
+            success: false,
+            error: 'Authentication failed - user may no longer exist',
+          };
+        }
+        
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
@@ -238,6 +247,20 @@ export class MobileNotificationApiService {
   }
 
   /**
+   * Get user notification preferences
+   */
+  async getNotificationPreferences(): Promise<NotificationApiResponse> {
+    return this.makeRequest('/api/notifications/preferences', 'GET');
+  }
+
+  /**
+   * Update user notification preferences
+   */
+  async updateNotificationPreferences(preferences: Record<string, boolean>): Promise<NotificationApiResponse> {
+    return this.makeRequest('/api/notifications/preferences', 'PUT', { preferences });
+  }
+
+  /**
    * Test notification system
    * Useful for development and debugging
    */
@@ -293,6 +316,14 @@ export const mobileNotificationApi = {
   markAsViewed: async () => {
     const service = getNotificationApiService();
     return service.markNotificationsAsViewed();
+  },
+
+  /**
+   * Get notification preferences
+   */
+  getPreferences: async () => {
+    const service = getNotificationApiService();
+    return service.getNotificationPreferences();
   },
 
   /**

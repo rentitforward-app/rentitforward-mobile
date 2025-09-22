@@ -62,7 +62,7 @@ export function useNotificationBadge(options: UseNotificationBadgeOptions = {}) 
    */
   const fetchUnreadCount = useCallback(async (): Promise<number> => {
     try {
-      const result = await mobileNotificationApi.getUnreadNotificationCount();
+        const result = await mobileNotificationApi.getUnreadCount();
       
       if (result.success) {
         return result.unreadCount || 0;
@@ -129,7 +129,7 @@ export function useNotificationBadge(options: UseNotificationBadgeOptions = {}) 
       updateState({ isLoading: true });
 
       // Call backend API to update last viewed timestamp
-      const result = await mobileNotificationApi.markNotificationsAsViewed();
+      const result = await mobileNotificationApi.markAsViewed();
       
       if (result.success) {
         updateState({

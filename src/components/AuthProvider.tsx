@@ -32,6 +32,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error('Error fetching profile:', error);
+        
+        // If profile not found, it means the user was deleted
+        // We should sign them out automatically
+        if (error.code === 'PGRST116' || error.message.includes('No rows returned')) {
+          console.log('Profile not found - user may have been deleted. Signing out...');
+          addSentryBreadcrumb('Profile not found - auto signing out deleted user', 'auth', {
+            userId,
+            error: error.message,
+          });
+          
+          // Sign out the user since their profile no longer exists
+          await handleDeletedUserSignOut();
+          return null;
+        }
+        
         return null;
       }
 
@@ -39,6 +54,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Profile fetch error:', error);
       return null;
+    }
+  };
+
+  // Handle sign out for deleted users
+  const handleDeletedUserSignOut = async () => {
+    try {
+      console.log('Handling deleted user sign out...');
+      
+      // Clear the auth session
+      await supabase.auth.signOut();
+      
+      // Clear local state immediately
+      setState({
+        user: null,
+        profile: null,
+        loading: false,
+        error: null,
+      });
+      
+      // Clear Sentry user context
+      clearSentryUser();
+      addSentryBreadcrumb('Deleted user signed out automatically', 'auth');
+      
+      // Show alert to user
+      Alert.alert(
+        'Account Not Found',
+        'Your account appears to have been deleted. You have been signed out.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Navigate to welcome screen
+              router.replace('/(auth)/welcome');
+            }
+          }
+        ]
+      );
+      
+    } catch (error) {
+      console.error('Error during deleted user sign out:', error);
+      captureSentryException(error, { action: 'handleDeletedUserSignOut' });
     }
   };
 
@@ -54,6 +110,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (mounted) {
           if (session?.user) {
             const profile = await fetchProfile(session.user.id);
+            
+            // If profile is null, the user might have been deleted
+            // The fetchProfile function will handle the sign out automatically
+            if (profile === null) {
+              // Don't update state here, let handleDeletedUserSignOut handle it
+              return;
+            }
+            
             setState({
               user: session.user,
               profile,
@@ -118,6 +182,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (session?.user) {
           const profile = await fetchProfile(session.user.id);
+          
+          // If profile is null, the user might have been deleted
+          // The fetchProfile function will handle the sign out automatically
+          if (profile === null) {
+            // Don't update state here, let handleDeletedUserSignOut handle it
+            return;
+          }
+          
           setState({
             user: session.user,
             profile,
@@ -374,6 +446,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!state.user) return;
 
       const profile = await fetchProfile(state.user.id);
+      
+      // If profile is null, the user might have been deleted
+      // The fetchProfile function will handle the sign out automatically
+      if (profile === null) {
+        return;
+      }
+      
       setState(prev => ({
         ...prev,
         profile,

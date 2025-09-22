@@ -54,20 +54,131 @@ serve(async (req) => {
     const userId = user.id
 
     // Delete all user-related data in the correct order to respect foreign key constraints
+    // Using try-catch for each deletion to handle cases where tables might not exist
     
-    // 1. Delete bookings where user is the renter
+    // 1. Delete FCM subscriptions (references auth.users)
+    try {
+      await supabaseAdmin
+        .from('fcm_subscriptions')
+        .delete()
+        .eq('user_id', userId)
+    } catch (error) {
+      console.warn('Failed to delete FCM subscriptions:', error)
+    }
+
+    // 2. Delete notification history (references auth.users)
+    try {
+      await supabaseAdmin
+        .from('notification_history')
+        .delete()
+        .eq('user_id', userId)
+    } catch (error) {
+      console.warn('Failed to delete notification history:', error)
+    }
+
+    // 3. Delete app notifications (references auth.users)
+    try {
+      await supabaseAdmin
+        .from('app_notifications')
+        .delete()
+        .eq('user_id', userId)
+    } catch (error) {
+      console.warn('Failed to delete app notifications:', error)
+    }
+
+    // 4. Delete notification preferences (references auth.users)
+    try {
+      await supabaseAdmin
+        .from('notification_preferences')
+        .delete()
+        .eq('user_id', userId)
+    } catch (error) {
+      console.warn('Failed to delete notification preferences:', error)
+    }
+
+    // 5. Delete notifications (references auth.users)
+    try {
+      await supabaseAdmin
+        .from('notifications')
+        .delete()
+        .eq('user_id', userId)
+    } catch (error) {
+      console.warn('Failed to delete notifications:', error)
+    }
+
+    // 6. Delete favorites (references auth.users)
+    try {
+      await supabaseAdmin
+        .from('favorites')
+        .delete()
+        .eq('user_id', userId)
+    } catch (error) {
+      console.warn('Failed to delete favorites:', error)
+    }
+
+    // 7. Delete points transactions (references profiles)
+    try {
+      await supabaseAdmin
+        .from('points_transactions')
+        .delete()
+        .eq('user_id', userId)
+    } catch (error) {
+      console.warn('Failed to delete points transactions:', error)
+    }
+
+    // 8. Delete user points (references profiles)
+    try {
+      await supabaseAdmin
+        .from('user_points')
+        .delete()
+        .eq('user_id', userId)
+    } catch (error) {
+      console.warn('Failed to delete user points:', error)
+    }
+
+    // 9. Delete issue reports where user is the reporter (references profiles)
+    try {
+      await supabaseAdmin
+        .from('issue_reports')
+        .delete()
+        .eq('reporter_id', userId)
+    } catch (error) {
+      console.warn('Failed to delete issue reports:', error)
+    }
+
+    // 10. Delete identity verifications (references profiles)
+    try {
+      await supabaseAdmin
+        .from('identity_verifications')
+        .delete()
+        .eq('user_id', userId)
+    } catch (error) {
+      console.warn('Failed to delete identity verifications:', error)
+    }
+
+    // 11. Delete user notification preferences (references profiles)
+    try {
+      await supabaseAdmin
+        .from('user_notification_preferences')
+        .delete()
+        .eq('user_id', userId)
+    } catch (error) {
+      console.warn('Failed to delete user notification preferences:', error)
+    }
+
+    // 12. Delete bookings where user is the renter
     await supabaseAdmin
       .from('bookings')
       .delete()
       .eq('renter_id', userId)
 
-    // 2. Get user's listings to delete related bookings
+    // 13. Get user's listings to delete related bookings
     const { data: userListings } = await supabaseAdmin
       .from('listings')
       .select('id')
       .eq('owner_id', userId)
 
-    // 3. Delete bookings for user's listings
+    // 14. Delete bookings for user's listings
     if (userListings && userListings.length > 0) {
       const listingIds = userListings.map(listing => listing.id)
       await supabaseAdmin
@@ -76,37 +187,37 @@ serve(async (req) => {
         .in('listing_id', listingIds)
     }
 
-    // 4. Delete messages
+    // 15. Delete messages
     await supabaseAdmin
       .from('messages')
       .delete()
       .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
 
-    // 5. Delete reviews
+    // 16. Delete reviews
     await supabaseAdmin
       .from('reviews')
       .delete()
       .or(`reviewer_id.eq.${userId},reviewee_id.eq.${userId}`)
 
-    // 6. Delete saved items
+    // 17. Delete incentives
     await supabaseAdmin
-      .from('saved_items')
+      .from('incentives')
       .delete()
       .eq('user_id', userId)
 
-    // 7. Delete listings
+    // 18. Delete listings
     await supabaseAdmin
       .from('listings')
       .delete()
       .eq('owner_id', userId)
 
-    // 8. Delete profile
+    // 19. Delete profile
     await supabaseAdmin
       .from('profiles')
       .delete()
       .eq('id', userId)
 
-    // 9. Finally, delete the auth user
+    // 20. Finally, delete the auth user
     const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId)
     
     if (deleteError) {

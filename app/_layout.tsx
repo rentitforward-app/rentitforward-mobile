@@ -42,6 +42,7 @@ function RootLayoutNav() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="listing/create" options={{ headerShown: false }} />
         <Stack.Screen name="listing/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="profile/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="bookings/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="bookings/[id]/report-issue" options={{ headerShown: false }} />
         <Stack.Screen name="messages/[id]" options={{ headerShown: false }} />

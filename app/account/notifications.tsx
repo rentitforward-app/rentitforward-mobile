@@ -13,13 +13,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography } from '../../src/lib/design-system';
 import { Header } from '../../src/components/Header';
 import { useFCM, useNotificationPermission, useNotificationPreferences } from '../../src/components/FCMProvider';
+import { mobileNotificationApi } from '../../src/lib/notification-api';
 
 interface NotificationSettings {
   email_bookings: boolean;
   email_messages: boolean;
   email_marketing: boolean;
-  sms_bookings: boolean;
-  sms_reminders: boolean;
   push_notifications: boolean;
   push_bookings: boolean;
   push_messages: boolean;
@@ -39,13 +38,16 @@ export default function NotificationsScreen() {
     email_bookings: true,
     email_messages: true,
     email_marketing: false,
-    sms_bookings: true,
-    sms_reminders: true,
     push_notifications: enabled,
     push_bookings: preferences.booking_notifications,
     push_messages: preferences.message_notifications,
     push_reminders: preferences.system_notifications
   });
+
+  // Load preferences from backend on mount
+  useEffect(() => {
+    loadPreferencesFromBackend();
+  }, []);
 
   // Update local state when FCM state changes
   useEffect(() => {
@@ -57,6 +59,20 @@ export default function NotificationsScreen() {
       push_reminders: preferences.system_notifications,
     }));
   }, [enabled, preferences]);
+
+  const loadPreferencesFromBackend = async () => {
+    try {
+      const response = await mobileNotificationApi.getPreferences();
+      if (response.success && response.preferences) {
+        setNotifications(prev => ({
+          ...prev,
+          ...response.preferences
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to load notification preferences:', error);
+    }
+  };
 
   const handleNotificationUpdate = async (key: keyof NotificationSettings, value: boolean) => {
     try {
@@ -116,9 +132,17 @@ export default function NotificationsScreen() {
       // Update local state
       setNotifications(prev => ({ ...prev, [key]: value }));
       
-      // Show success message for non-push notifications
+      // Save to backend for non-push notifications
       if (!key.startsWith('push_')) {
-        Alert.alert('Success', 'Notification preferences updated');
+        try {
+          await mobileNotificationApi.updatePreferences({ [key]: value });
+          Alert.alert('Success', 'Notification preferences updated');
+        } catch (error) {
+          console.error('Failed to save notification preferences:', error);
+          // Revert local state on error
+          setNotifications(prev => ({ ...prev, [key]: !value }));
+          Alert.alert('Error', 'Failed to update notification preferences. Please try again.');
+        }
       }
       
     } catch (error) {
@@ -207,74 +231,6 @@ export default function NotificationsScreen() {
             </View>
           </View>
 
-          {/* SMS Notifications */}
-          <View style={{
-            backgroundColor: colors.white,
-            borderRadius: 12,
-            marginBottom: spacing.lg,
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 4,
-            elevation: 3,
-          }}>
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingHorizontal: spacing.lg,
-              paddingTop: spacing.lg,
-              paddingBottom: spacing.md,
-            }}>
-              <Ionicons name="chatbubble" size={24} color={colors.semantic.success} />
-              <Text style={{
-                fontSize: typography.sizes.lg,
-                fontWeight: typography.weights.semibold,
-                color: colors.gray[900],
-                marginLeft: spacing.sm,
-              }}>
-                SMS Notifications
-              </Text>
-            </View>
-            
-            <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
-              {[
-                { key: 'sms_bookings', label: 'Urgent booking alerts', description: 'Time-sensitive booking notifications' },
-                { key: 'sms_reminders', label: 'Rental reminders', description: 'Reminders about upcoming pickups and returns' }
-              ].map((item) => (
-                <View key={item.key} style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingVertical: spacing.sm,
-                  borderBottomWidth: 1,
-                  borderBottomColor: colors.gray[100],
-                }}>
-                  <View style={{ flex: 1, marginRight: spacing.md }}>
-                    <Text style={{
-                      fontSize: typography.sizes.base,
-                      fontWeight: typography.weights.medium,
-                      color: colors.gray[900],
-                    }}>
-                      {item.label}
-                    </Text>
-                    <Text style={{
-                      fontSize: typography.sizes.sm,
-                      color: colors.gray[500],
-                      marginTop: spacing.xs / 2,
-                    }}>
-                      {item.description}
-                    </Text>
-                  </View>
-                  <Switch
-                    value={notifications[item.key as keyof NotificationSettings]}
-                    onValueChange={(value) => handleNotificationUpdate(item.key as keyof NotificationSettings, value)}
-                    trackColor={{ false: colors.gray[300], true: colors.primary.main + '40' }}
-                    thumbColor={notifications[item.key as keyof NotificationSettings] ? colors.primary.main : colors.gray[400]}
-                  />
-                </View>
-              ))}
-            </View>
-          </View>
 
           {/* Push Notifications */}
           <View style={{
@@ -498,7 +454,7 @@ export default function NotificationsScreen() {
                   color: colors.gray[600],
                   lineHeight: 18,
                 }}>
-                  • SMS notifications are great for urgent alerts when you're away from your phone
+                  • Push notifications help you stay updated on booking requests, messages, and important updates
                 </Text>
               </View>
 
