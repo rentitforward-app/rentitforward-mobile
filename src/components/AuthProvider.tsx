@@ -393,10 +393,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const resetPassword = async (email: string) => {
     try {
+      // Use the same redirect URL construction as the web app
+      // Determine the correct base URL for the redirect (same logic as web)
+      let baseUrl = process.env.EXPO_PUBLIC_APP_URL || process.env.EXPO_PUBLIC_BASE_URL;
+      
+      // Fallback to hardcoded URL if no environment variable is set
+      if (!baseUrl) {
+        baseUrl = 'https://rentitforward.com.au';
+      }
+      
+      // Use the correct callback format for password reset
+      const redirectUrl = `${baseUrl}/auth/callback?type=recovery`;
+      
+      console.log('Mobile password reset configuration:', {
+        email: email.toLowerCase().trim(),
+        redirectUrl,
+        baseUrl
+      });
+      
       const { error } = await supabase.auth.resetPasswordForEmail(
         email.toLowerCase().trim(),
         {
-          redirectTo: 'rentitforward://reset-password',
+          redirectTo: redirectUrl,
         }
       );
 

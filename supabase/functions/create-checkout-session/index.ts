@@ -85,6 +85,14 @@ serve(async (req) => {
     })
 
     console.log('Creating Stripe Checkout session for booking:', booking.id)
+    console.log('Booking amounts:', {
+      subtotal: booking.subtotal,
+      service_fee: booking.service_fee,
+      insurance_fee: booking.insurance_fee,
+      delivery_fee: booking.delivery_fee,
+      deposit_amount: booking.deposit_amount,
+      total_amount: booking.total_amount
+    })
 
     // Create Stripe Checkout Session (using HTTPS URLs - Stripe requires HTTPS)
     const session = await stripe.checkout.sessions.create({
@@ -93,17 +101,66 @@ serve(async (req) => {
       success_url: `https://rentitforward.com.au/payments/success?booking_id=${booking.id}&session_id={CHECKOUT_SESSION_ID}&source=mobile`,
       cancel_url: `https://rentitforward.com.au/payments/cancel?booking_id=${booking.id}&source=mobile`,
       line_items: [
+        // Base rental fee
         {
           price_data: {
             currency: 'aud',
             product_data: {
-              name: 'Rental booking',
+              name: 'Rental Fee',
               description: `${booking.start_date} to ${booking.end_date}`,
             },
-            unit_amount: Math.round(booking.total_amount * 100), // Convert to cents
+            unit_amount: Math.round(booking.subtotal * 100), // Convert to cents
           },
           quantity: 1,
         },
+        // Service fee
+        {
+          price_data: {
+            currency: 'aud',
+            product_data: {
+              name: 'Service Fee',
+              description: 'Platform service fee (15%)',
+            },
+            unit_amount: Math.round(booking.service_fee * 100), // Convert to cents
+          },
+          quantity: 1,
+        },
+        // Insurance fee (if applicable)
+        ...(booking.insurance_fee > 0 ? [{
+          price_data: {
+            currency: 'aud',
+            product_data: {
+              name: 'Damage Protection',
+              description: 'Optional damage protection coverage (10%)',
+            },
+            unit_amount: Math.round(booking.insurance_fee * 100), // Convert to cents
+          },
+          quantity: 1,
+        }] : []),
+        // Delivery fee (if applicable)
+        ...(booking.delivery_fee > 0 ? [{
+          price_data: {
+            currency: 'aud',
+            product_data: {
+              name: 'Delivery Fee',
+              description: 'Delivery service fee',
+            },
+            unit_amount: Math.round(booking.delivery_fee * 100), // Convert to cents
+          },
+          quantity: 1,
+        }] : []),
+        // Security deposit (if applicable)
+        ...(booking.deposit_amount > 0 ? [{
+          price_data: {
+            currency: 'aud',
+            product_data: {
+              name: 'Security Deposit',
+              description: 'Refundable security deposit (held until return)',
+            },
+            unit_amount: Math.round(booking.deposit_amount * 100), // Convert to cents
+          },
+          quantity: 1,
+        }] : []),
       ],
       metadata: {
         bookingId: booking.id,

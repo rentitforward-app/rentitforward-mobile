@@ -185,7 +185,9 @@ export default function BookingSuccessScreen() {
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Total Amount:</Text>
-            <Text style={styles.totalAmount}>${booking.pricing?.total || 0}</Text>
+            <Text style={styles.totalAmount}>
+              ${(booking.total_amount || (booking.subtotal + (booking.service_fee || 0) + (booking.insurance_fee || 0) + (booking.delivery_fee || 0) + (booking.deposit_amount || 0))).toFixed(2)}
+            </Text>
           </View>
           
           <View style={styles.detailRow}>

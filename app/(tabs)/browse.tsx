@@ -121,7 +121,9 @@ export default function BrowseScreen() {
             rating
           )
         `)
-        .eq('is_active', true)
+        .eq('approval_status', 'approved')  // Only show admin-approved listings
+        .eq('is_active', true)              // Only show active listings (not paused by owner)
+        .not('location', 'is', null)       // Must have location data
         .order('created_at', { ascending: false });
 
       if (error) {

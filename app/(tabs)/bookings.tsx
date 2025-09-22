@@ -236,7 +236,7 @@ export default function BookingsScreen() {
           </Text>
 
           <Text style={styles.bookingPrice}>
-            ${booking.total_amount?.toFixed(2) || booking.subtotal?.toFixed(2) || '0.00'}
+            ${(booking.total_amount || (booking.subtotal || 0) + (booking.service_fee || 0) + (booking.insurance_fee || 0) + (booking.delivery_fee || 0) + (booking.deposit_amount || 0)).toFixed(2)}
           </Text>
         </View>
       </TouchableOpacity>

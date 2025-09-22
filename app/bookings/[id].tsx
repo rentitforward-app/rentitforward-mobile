@@ -604,7 +604,9 @@ export default function BookingDetailScreen() {
               
               <View style={[styles.pricingRow, styles.totalRow]}>
                 <Text style={styles.totalLabel}>Total</Text>
-                <Text style={styles.totalValue}>{formatPrice(booking.total_amount)}</Text>
+                <Text style={styles.totalValue}>
+                  {formatPrice(booking.total_amount || (booking.subtotal + (booking.service_fee || 0) + (booking.insurance_fee || 0) + (booking.delivery_fee || 0) + (booking.deposit_amount || 0)))}
+                </Text>
               </View>
             </View>
             

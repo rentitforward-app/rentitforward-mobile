@@ -24,7 +24,7 @@ interface ListingData {
   price_per_day: number;
   price_weekly: number | null;
   price_hourly: number | null;
-  deposit_amount: number | null;
+  deposit: number | null;
   category: string;
   city: string;
   state: string;
@@ -336,6 +336,7 @@ export default function BookingScreen() {
         serviceFee: 0,
         insuranceFee: 0,
         deliveryFee: deliveryMethod === 'delivery' ? 20 : 0,
+        securityDeposit: listing?.deposit || 0,
         total: 0,
       };
     }
@@ -345,13 +346,16 @@ export default function BookingScreen() {
     const serviceFee = subtotal * 0.15; // 15% service fee
     const insuranceFee = includeInsurance ? subtotal * 0.10 : 0; // 10% insurance (optional)
     const deliveryFee = deliveryMethod === 'delivery' ? 20 : 0;
-    const total = subtotal + serviceFee + insuranceFee + deliveryFee;
+    const securityDeposit = listing.deposit || 0;
+    const total = subtotal + serviceFee + insuranceFee + deliveryFee + securityDeposit;
+
 
     return {
       subtotal,
       serviceFee,
       insuranceFee,
       deliveryFee,
+      securityDeposit,
       total,
     };
   };
@@ -400,6 +404,7 @@ export default function BookingScreen() {
       const expirationTime = new Date();
       expirationTime.setMinutes(expirationTime.getMinutes() + 30); // 30 minutes from now
 
+
       const { data: booking, error } = await supabase
         .from('bookings')
         .insert({
@@ -413,7 +418,7 @@ export default function BookingScreen() {
           service_fee: pricing.serviceFee,
           insurance_fee: pricing.insuranceFee,
           delivery_fee: pricing.deliveryFee,
-          deposit_amount: 0, // Security deposit (can be configured later)
+          deposit_amount: pricing.securityDeposit, // Security deposit from listing
           total_amount: pricing.total,
           delivery_method: deliveryMethod,
           delivery_address: deliveryMethod === 'delivery' ? deliveryAddress.trim() : null,
@@ -1265,6 +1270,37 @@ export default function BookingScreen() {
                       color: colors.text.primary
                     }}>
                       ${pricing.deliveryFee.toFixed(2)}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Security Deposit */}
+                {pricing.securityDeposit > 0 && (
+                  <View style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <View>
+                      <Text style={{
+                        fontSize: typography.sizes.base,
+                        color: colors.text.primary
+                      }}>
+                        Security deposit
+                      </Text>
+                      <Text style={{
+                        fontSize: typography.sizes.sm,
+                        color: colors.text.secondary
+                      }}>
+                        Refundable after return
+                      </Text>
+                    </View>
+                    <Text style={{
+                      fontSize: typography.sizes.base,
+                      fontWeight: typography.weights.medium,
+                      color: colors.primary.main
+                    }}>
+                      ${pricing.securityDeposit.toFixed(2)}
                     </Text>
                   </View>
                 )}
