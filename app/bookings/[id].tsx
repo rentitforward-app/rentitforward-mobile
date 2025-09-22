@@ -19,6 +19,7 @@ import { colors, spacing, typography } from '../../src/lib/design-system';
 import { Header } from '../../src/components/Header';
 import { CancelBookingModal } from '../../src/components/booking/CancelBookingModal';
 import { IssueReportsSection } from '../../src/components/booking/IssueReportsSection';
+import { getNotificationApiService } from '../../src/lib/notification-api';
 
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -136,44 +137,30 @@ export default function BookingDetailScreen() {
     return diffDays + 1;
   };
 
-  // Cancel booking mutation - Direct database operation
+  // Cancel booking mutation - Call web API for email notifications
   const cancelBookingMutation = useMutation({
     mutationFn: async ({ reason, note }: { reason: string; note: string }) => {
-      if (!booking) {
-        throw new Error('Booking not found');
+      if (!booking || !user?.id) {
+        throw new Error('Booking or user not found');
       }
 
-      // Calculate cancellation fee and refund amount
-      const now = new Date();
-      const startDate = new Date(booking.start_date);
-      const hoursUntilStart = (startDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-      const isLessThan24Hours = hoursUntilStart < 24;
-      
-      const totalAmount = booking.total_amount || 0;
-      const cancellationFee = isLessThan24Hours ? totalAmount * 0.5 : 0;
-      const refundAmount = totalAmount - cancellationFee;
+      // Call web API to cancel booking (includes email notifications)
+      const notificationApi = getNotificationApiService();
+      const response = await notificationApi.notifyBookingAction({
+        bookingId: booking.id,
+        action: 'cancel',
+        userId: user.id,
+        additionalData: {
+          reason,
+          note
+        }
+      });
 
-      // Update booking in database
-      const { data, error } = await supabase
-        .from('bookings')
-        .update({
-          status: 'cancelled',
-          cancelled_at: new Date().toISOString(),
-          cancellation_reason: reason,
-          cancellation_note: note,
-          cancellation_fee: cancellationFee,
-          refund_amount: refundAmount,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) {
-        throw new Error(error.message || 'Failed to cancel booking');
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to cancel booking');
       }
 
-      return data;
+      return response;
     },
     onSuccess: (data) => {
       // Invalidate and refetch booking details
@@ -278,30 +265,26 @@ export default function BookingDetailScreen() {
     (booking.status === 'confirmed' || booking.status === 'pending' || booking.status === 'payment_required');
 
 
-  // Pickup confirmation mutation
+  // Pickup confirmation mutation - Call web API for email notifications
   const pickupConfirmationMutation = useMutation({
     mutationFn: async () => {
-      if (!booking) {
-        throw new Error('Booking not found');
+      if (!booking || !user?.id) {
+        throw new Error('Booking or user not found');
       }
 
-      const { data, error } = await supabase
-        .from('bookings')
-        .update({
-          status: 'active',
-          pickup_confirmed_by_renter: true,
-          pickup_confirmed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .select()
-        .single();
+      // Call web API to confirm pickup (includes email notifications)
+      const notificationApi = getNotificationApiService();
+      const response = await notificationApi.notifyBookingAction({
+        bookingId: booking.id,
+        action: 'pickup',
+        userId: user.id
+      });
 
-      if (error) {
-        throw new Error(error.message || 'Failed to confirm pickup');
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to confirm pickup');
       }
 
-      return data;
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['booking-details', id] });
@@ -313,30 +296,26 @@ export default function BookingDetailScreen() {
     },
   });
 
-  // Return confirmation mutation
+  // Return confirmation mutation - Call web API for email notifications
   const returnConfirmationMutation = useMutation({
     mutationFn: async () => {
-      if (!booking) {
-        throw new Error('Booking not found');
+      if (!booking || !user?.id) {
+        throw new Error('Booking or user not found');
       }
 
-      const { data, error } = await supabase
-        .from('bookings')
-        .update({
-          status: 'completed',
-          return_confirmed_by_renter: true,
-          return_confirmed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .select()
-        .single();
+      // Call web API to confirm return (includes email notifications)
+      const notificationApi = getNotificationApiService();
+      const response = await notificationApi.notifyBookingAction({
+        bookingId: booking.id,
+        action: 'return',
+        userId: user.id
+      });
 
-      if (error) {
-        throw new Error(error.message || 'Failed to confirm return');
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to confirm return');
       }
 
-      return data;
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['booking-details', id] });
@@ -699,7 +678,29 @@ export default function BookingDetailScreen() {
                     'Are you sure you want to approve this booking?',
                     [
                       { text: 'Cancel', style: 'cancel' },
-                      { text: 'Approve', onPress: () => {} }
+                      { 
+                        text: 'Approve', 
+                        onPress: async () => {
+                          try {
+                            const notificationApi = getNotificationApiService();
+                            const response = await notificationApi.notifyBookingAction({
+                              bookingId: booking.id,
+                              action: 'approve',
+                              userId: user.id
+                            });
+                            
+                            if (response.success) {
+                              queryClient.invalidateQueries({ queryKey: ['booking-details', id] });
+                              queryClient.invalidateQueries({ queryKey: ['bookings'] });
+                              Alert.alert('Success', 'Booking has been approved!');
+                            } else {
+                              Alert.alert('Error', response.error || 'Failed to approve booking');
+                            }
+                          } catch (error) {
+                            Alert.alert('Error', 'Failed to approve booking');
+                          }
+                        }
+                      }
                     ]
                   );
                 }}
@@ -715,7 +716,29 @@ export default function BookingDetailScreen() {
                     'Are you sure you want to decline this booking?',
                     [
                       { text: 'Cancel', style: 'cancel' },
-                      { text: 'Decline', onPress: () => {} }
+                      { 
+                        text: 'Decline', 
+                        onPress: async () => {
+                          try {
+                            const notificationApi = getNotificationApiService();
+                            const response = await notificationApi.notifyBookingAction({
+                              bookingId: booking.id,
+                              action: 'reject',
+                              userId: user.id
+                            });
+                            
+                            if (response.success) {
+                              queryClient.invalidateQueries({ queryKey: ['booking-details', id] });
+                              queryClient.invalidateQueries({ queryKey: ['bookings'] });
+                              Alert.alert('Success', 'Booking has been declined.');
+                            } else {
+                              Alert.alert('Error', response.error || 'Failed to decline booking');
+                            }
+                          } catch (error) {
+                            Alert.alert('Error', 'Failed to decline booking');
+                          }
+                        }
+                      }
                     ]
                   );
                 }}

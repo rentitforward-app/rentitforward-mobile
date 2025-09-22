@@ -13,6 +13,7 @@ import { CalendarAvailability } from '../../shared-dist/utils/calendar';
 import { format, addDays, startOfDay } from 'date-fns';
 import { PaymentWebView } from '../../src/components/PaymentWebView';
 import { emailService } from '../../src/lib/email-service';
+import { getNotificationApiService } from '../../src/lib/notification-api';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -433,6 +434,20 @@ export default function BookingScreen() {
       
       // Store booking ID for potential cancellation
       setCurrentBookingId(booking.id);
+
+      // Send booking request notification to owner (email, push, in-app)
+      try {
+        const notificationApi = getNotificationApiService();
+        await notificationApi.notifyBookingAction({
+          bookingId: booking.id,
+          action: 'request',
+          userId: user.id
+        });
+        console.log('Booking request notifications sent successfully');
+      } catch (notificationError) {
+        console.error('Failed to send booking request notifications:', notificationError);
+        // Don't fail the booking process if notifications fail
+      }
 
       // Small delay to ensure booking is committed to database (handle replica lag)
       await new Promise(resolve => setTimeout(resolve, 1200));
