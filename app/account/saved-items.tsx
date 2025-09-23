@@ -18,22 +18,23 @@ import { colors, spacing, typography } from '../../src/lib/design-system';
 import { Header } from '../../src/components/Header';
 
 interface SavedItem {
-  id: string;
   listing_id: string;
   user_id: string;
   created_at: string;
-  listing: {
+  listings: {
     id: string;
     title: string;
     description: string;
-    price: number;
+    price_per_day: number;
     images: string[];
     category: string;
-    status: string;
+    is_active: boolean;
     owner_id: string;
-    location: {
-      city: string;
-      state: string;
+    city: string;
+    state: string;
+    profiles: {
+      full_name: string;
+      avatar_url: string | null;
     };
   };
 }
@@ -51,37 +52,57 @@ export default function SavedItemsScreen() {
       if (!user?.id) return [];
 
       const { data, error } = await supabase
-        .from('saved_items')
+        .from('favorites')
         .select(`
-          *,
-          listing:listings (
+          listing_id,
+          user_id,
+          created_at,
+          listings (
             id,
             title,
             description,
-            price,
+            price_per_day,
             images,
             category,
-            status,
+            is_active,
             owner_id,
-            location
+            city,
+            state,
+            profiles!listings_owner_id_fkey (
+              full_name,
+              avatar_url
+            )
           )
         `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as SavedItem[];
+      
+      // Filter out inactive listings and extract the listings data
+      const activeListings = (data || [])
+        .filter(fav => fav.listings && fav.listings.is_active)
+        .map(fav => ({
+          ...fav,
+          listings: {
+            ...fav.listings,
+            profiles: Array.isArray(fav.listings.profiles) ? fav.listings.profiles[0] : fav.listings.profiles
+          }
+        }));
+      
+      return activeListings as SavedItem[];
     },
     enabled: !!user?.id,
   });
 
   // Remove saved item mutation
   const removeSavedItemMutation = useMutation({
-    mutationFn: async (savedItemId: string) => {
+    mutationFn: async (listingId: string) => {
       const { error } = await supabase
-        .from('saved_items')
+        .from('favorites')
         .delete()
-        .eq('id', savedItemId);
+        .eq('user_id', user?.id)
+        .eq('listing_id', listingId);
 
       if (error) throw error;
     },
@@ -95,7 +116,7 @@ export default function SavedItemsScreen() {
     },
   });
 
-  const handleRemoveSavedItem = (savedItemId: string) => {
+  const handleRemoveSavedItem = (listingId: string) => {
     Alert.alert(
       'Remove Item',
       'Are you sure you want to remove this item from your saved items?',
@@ -104,7 +125,7 @@ export default function SavedItemsScreen() {
         { 
           text: 'Remove', 
           style: 'destructive',
-          onPress: () => removeSavedItemMutation.mutate(savedItemId)
+          onPress: () => removeSavedItemMutation.mutate(listingId)
         },
       ]
     );
@@ -116,7 +137,7 @@ export default function SavedItemsScreen() {
 
   const renderSavedItem = ({ item }: { item: SavedItem }) => (
     <TouchableOpacity
-      onPress={() => handleItemPress(item.listing.id)}
+      onPress={() => handleItemPress(item.listings.id)}
       style={{
         backgroundColor: colors.white,
         borderRadius: 12,
@@ -132,9 +153,9 @@ export default function SavedItemsScreen() {
       <View style={{ flexDirection: 'row' }}>
         {/* Image */}
         <View style={{ width: 120, height: 120 }}>
-          {item.listing.images && item.listing.images.length > 0 ? (
+          {item.listings.images && item.listings.images.length > 0 ? (
             <Image
-              source={{ uri: item.listing.images[0] }}
+              source={{ uri: item.listings.images[0] }}
               style={{
                 width: '100%',
                 height: '100%',
@@ -165,7 +186,7 @@ export default function SavedItemsScreen() {
                 color: colors.gray[900],
                 marginBottom: spacing.xs / 2,
               }} numberOfLines={2}>
-                {item.listing.title}
+                {item.listings.title}
               </Text>
               
               <Text style={{
@@ -173,7 +194,7 @@ export default function SavedItemsScreen() {
                 color: colors.gray[600],
                 marginBottom: spacing.xs,
               }} numberOfLines={2}>
-                {item.listing.description}
+                {item.listings.description}
               </Text>
 
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xs }}>
@@ -183,7 +204,7 @@ export default function SavedItemsScreen() {
                   color: colors.gray[500],
                   marginLeft: spacing.xs / 2,
                 }}>
-                  {item.listing.location?.city}, {item.listing.location?.state}
+                  {item.listings.city}, {item.listings.state}
                 </Text>
               </View>
 
@@ -192,13 +213,13 @@ export default function SavedItemsScreen() {
                 fontWeight: typography.weights.bold,
                 color: colors.primary.main,
               }}>
-                ${item.listing.price}/day
+                ${item.listings.price_per_day}/day
               </Text>
             </View>
 
             {/* Remove button */}
             <TouchableOpacity
-              onPress={() => handleRemoveSavedItem(item.id)}
+              onPress={() => handleRemoveSavedItem(item.listings.id)}
               style={{
                 padding: spacing.sm,
                 borderRadius: 20,
@@ -278,7 +299,7 @@ export default function SavedItemsScreen() {
         <FlatList
           data={savedItems}
           renderItem={renderSavedItem}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.listing_id}
           contentContainerStyle={{ padding: spacing.lg }}
           showsVerticalScrollIndicator={false}
         />

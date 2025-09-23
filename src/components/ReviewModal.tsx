@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { mobileTokens } from '../lib/design-system';
+import { supabase } from '../lib/supabase';
+import { useAuth } from './AuthProvider';
 
 interface ReviewModalProps {
   visible: boolean;
@@ -22,6 +24,8 @@ interface ReviewModalProps {
   itemTitle: string;
   recipientName: string;
   isRenter: boolean; // true if reviewing as renter, false if reviewing as owner
+  ownerId: string; // owner user ID
+  renterId: string; // renter user ID
 }
 
 export function ReviewModal({ 
@@ -30,11 +34,14 @@ export function ReviewModal({
   bookingId, 
   itemTitle, 
   recipientName, 
-  isRenter 
+  isRenter,
+  ownerId,
+  renterId
 }: ReviewModalProps) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const { user } = useAuth();
 
   const handleSubmitReview = async () => {
     if (rating === 0) {
@@ -42,36 +49,50 @@ export function ReviewModal({
       return;
     }
 
+    if (!user?.id) {
+      Alert.alert('Error', 'You must be logged in to submit a review.');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const response = await fetch(`/api/bookings/${bookingId}/submit-review`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          rating,
-          comment: comment.trim() || undefined,
-        }),
-      });
+      // Determine reviewer_id, reviewee_id, and type based on user role
+      const reviewerId = user.id;
+      const revieweeId = isRenter ? ownerId : renterId;
+      const reviewType = isRenter ? 'renter_to_owner' : 'owner_to_renter';
 
-      if (response.ok) {
-        Alert.alert(
-          'Review Submitted!',
-          'Thank you for your feedback. Your review helps build trust in our community.',
-          [
-            {
-              text: 'Done',
-              onPress: () => {
-                setRating(0);
-                setComment('');
-                onClose();
-              },
-            },
-          ]
-        );
-      } else {
-        const error = await response.json();
+      // Insert review into Supabase
+      const { error } = await supabase
+        .from('reviews')
+        .insert({
+          booking_id: bookingId,
+          reviewer_id: reviewerId,
+          reviewee_id: revieweeId,
+          rating,
+          comment: comment.trim() || null,
+          type: reviewType,
+        });
+
+      if (error) {
+        console.error('Supabase error:', error);
         Alert.alert('Error', error.message || 'Failed to submit review');
+        return;
       }
+
+      Alert.alert(
+        'Review Submitted!',
+        'Thank you for your feedback. Your review helps build trust in our community.',
+        [
+          {
+            text: 'Done',
+            onPress: () => {
+              setRating(0);
+              setComment('');
+              onClose();
+            },
+          },
+        ]
+      );
     } catch (error) {
       console.error('Error submitting review:', error);
       Alert.alert('Error', 'Failed to submit review. Please try again.');

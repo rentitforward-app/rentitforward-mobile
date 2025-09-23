@@ -1,6 +1,7 @@
-// Temporarily simplified for quick deployment
 import React from 'react';
-import { View, Text, FlatList } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator } from 'react-native';
+import { colors, spacing, typography } from '../../lib/design-system';
+import ReviewCard from './ReviewCard';
 
 interface ReviewListProps {
   reviews?: any[];
@@ -9,32 +10,76 @@ interface ReviewListProps {
 }
 
 export default function ReviewList({ reviews = [], loading, onLoadMore }: ReviewListProps) {
-  const renderPlaceholder = () => (
+  const renderEmptyState = () => (
     <View style={{ 
-      backgroundColor: 'white', 
-      padding: 24, 
-      margin: 16,
-      borderRadius: 8,
+      backgroundColor: colors.gray[50], 
+      padding: spacing.xl, 
+      margin: spacing.md,
+      borderRadius: 12,
       alignItems: 'center'
     }}>
-      <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 8 }}>
-        ⭐ Reviews Coming Soon
+      <Text style={{ 
+        fontSize: typography.sizes.lg, 
+        fontWeight: typography.weights.semibold,
+        marginBottom: spacing.sm,
+        color: colors.text.primary
+      }}>
+        No Reviews Yet
       </Text>
-      <Text style={{ fontSize: 14, color: '#666', textAlign: 'center' }}>
-        We're building a comprehensive review system with ratings, photos, and detailed feedback.
+      <Text style={{ 
+        fontSize: typography.sizes.base, 
+        color: colors.text.secondary, 
+        textAlign: 'center',
+        lineHeight: 22
+      }}>
+        This user hasn't received any reviews yet. Be the first to share your experience!
       </Text>
     </View>
   );
 
+  const renderLoadingState = () => (
+    <View style={{ 
+      flex: 1, 
+      justifyContent: 'center', 
+      alignItems: 'center',
+      padding: spacing.xl
+    }}>
+      <ActivityIndicator size="large" color={colors.primary.main} />
+      <Text style={{
+        marginTop: spacing.md,
+        fontSize: typography.sizes.base,
+        color: colors.text.secondary
+      }}>
+        Loading reviews...
+      </Text>
+    </View>
+  );
+
+  if (loading) {
+    return renderLoadingState();
+  }
+
   if (reviews.length === 0) {
-    return renderPlaceholder();
+    return renderEmptyState();
   }
 
   return (
     <FlatList
       data={reviews}
-      renderItem={() => renderPlaceholder()}
-      keyExtractor={(item, index) => index.toString()}
+      renderItem={({ item }) => (
+        <ReviewCard 
+          review={item}
+          onPress={() => {
+            // Optional: Handle review card press
+            console.log('Review pressed:', item.id);
+          }}
+        />
+      )}
+      keyExtractor={(item) => item.id}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ padding: spacing.md }}
+      onEndReached={onLoadMore}
+      onEndReachedThreshold={0.1}
     />
   );
 }

@@ -255,13 +255,22 @@ export default function BrowseScreen() {
         filtered.sort((a: any, b: any) => b.price_per_day - a.price_per_day);
         break;
       case 'popular':
-        // Sort by review count if available, otherwise by created date
+        // Sort by listing rating/review count if available, otherwise by created date
         filtered.sort((a: any, b: any) => {
-          const aRating = a.profiles?.rating || 0;
-          const bRating = b.profiles?.rating || 0;
+          const aRating = a.rating ? parseFloat(a.rating) : 0;
+          const bRating = b.rating ? parseFloat(b.rating) : 0;
+          const aReviewCount = a.review_count || 0;
+          const bReviewCount = b.review_count || 0;
+          
+          // Primary sort: by rating
           if (aRating !== bRating) {
             return bRating - aRating;
           }
+          // Secondary sort: by review count
+          if (aReviewCount !== bReviewCount) {
+            return bReviewCount - aReviewCount;
+          }
+          // Tertiary sort: by created date
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         });
         break;
@@ -303,7 +312,7 @@ export default function BrowseScreen() {
     const categoryName = category?.name || item.category || 'Other';
     const price = Math.floor(parseFloat(item.price_per_day || 0));
     const ownerName = item.profiles?.full_name || 'Unknown';
-    const rating = item.profiles?.rating ? parseFloat(item.profiles.rating) : null;
+    const rating = item.rating && parseFloat(item.rating) > 0 ? parseFloat(item.rating) : null;
     
     const handleListingPress = () => {
       // Navigate to listing details page

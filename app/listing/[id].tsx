@@ -61,10 +61,17 @@ export default function ListingDetailScreen() {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [showAllFeatures, setShowAllFeatures] = useState(false);
+  const [reviews, setReviews] = useState<any[]>([]);
 
   useEffect(() => {
     fetchListingDetails();
   }, [id]);
+
+  useEffect(() => {
+    if (listing?.id) {
+      fetchOwnerReviews();
+    }
+  }, [listing]);
 
   useEffect(() => {
     if (user && listing) {
@@ -215,6 +222,60 @@ export default function ListingDetailScreen() {
       return null; // Will show placeholder
     }
     return images[index] || null;
+  };
+
+  const fetchOwnerReviews = async () => {
+    if (!listing?.id) return;
+
+    try {
+      console.log('Fetching reviews for listing:', listing.id);
+      
+      // Use a direct approach with a custom database function to bypass RLS issues
+      const { data, error } = await supabase.rpc('get_listing_reviews_public', {
+        p_listing_id: listing.id
+      });
+
+      if (error) {
+        console.log('RPC not available, trying fallback approach...');
+        
+        // Fallback: Try to get reviews through the reviewee (owner) and filter by context
+        if (listing?.profiles?.id) {
+          const { data: reviewData, error: reviewError } = await supabase
+            .from('reviews')
+            .select(`
+              id,
+              rating,
+              comment,
+              created_at,
+              reviewer_id,
+              type,
+              booking_id,
+              profiles:reviewer_id (
+                full_name,
+                avatar_url
+              )
+            `)
+            .eq('reviewee_id', listing.profiles.id) // Reviews about this owner
+            .eq('type', 'renter_to_owner') // Only renter reviews
+            .order('created_at', { ascending: false });
+
+          if (reviewError) {
+            console.error('Error fetching fallback reviews:', reviewError);
+            return;
+          }
+
+          // For now, show the most recent reviews (we'll improve this later)
+          console.log('Reviews found via fallback:', reviewData?.length || 0);
+          setReviews((reviewData || []).slice(0, 3)); // Limit to 3
+        }
+        return;
+      }
+
+      console.log('Reviews found for this listing:', data?.length || 0);
+      setReviews(data || []);
+    } catch (error) {
+      console.error('Error fetching listing reviews:', error);
+    }
   };
 
   const renderImageCarousel = () => {
@@ -402,6 +463,42 @@ export default function ListingDetailScreen() {
               }}>
                 {listing.title}
               </Text>
+              
+              {/* Rating Display */}
+              {listing.rating && listing.review_count && listing.review_count > 0 && (
+                <View style={{ 
+                  flexDirection: 'row', 
+                  alignItems: 'center', 
+                  marginBottom: spacing.sm 
+                }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Ionicons
+                        key={star}
+                        name={star <= Math.round(Number(listing.rating)) ? 'star' : 'star-outline'}
+                        size={16}
+                        color={star <= Math.round(Number(listing.rating)) ? colors.semantic.warning : colors.gray[300]}
+                        style={{ marginRight: 2 }}
+                      />
+                    ))}
+                    <Text style={{
+                      fontSize: typography.sizes.sm,
+                      fontWeight: typography.weights.semibold,
+                      color: colors.text.primary,
+                      marginLeft: spacing.xs
+                    }}>
+                      {Number(listing.rating) % 1 === 0 ? Number(listing.rating).toFixed(0) : Number(listing.rating).toFixed(1)}
+                    </Text>
+                    <Text style={{
+                      fontSize: typography.sizes.sm,
+                      color: colors.text.secondary,
+                      marginLeft: 4
+                    }}>
+                      ({listing.review_count} review{listing.review_count !== 1 ? 's' : ''})
+                    </Text>
+                  </View>
+                </View>
+              )}
               
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
                 <Text style={{
@@ -677,6 +774,133 @@ export default function ListingDetailScreen() {
                 )}
               </View>
             </View>
+
+            {/* Reviews Section */}
+            {reviews.length > 0 && (
+              <View style={{ marginBottom: spacing.lg }}>
+                <View style={{ 
+                  flexDirection: 'row', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  marginBottom: spacing.md 
+                }}>
+                  <Text style={{
+                    fontSize: typography.sizes.lg,
+                    fontWeight: typography.weights.semibold,
+                    color: colors.text.primary
+                  }}>
+                    Reviews
+                  </Text>
+                </View>
+
+                {/* Review Cards */}
+                <View style={{ gap: spacing.md }}>
+                  {reviews.map((review) => (
+                    <View 
+                      key={review.id}
+                      style={{
+                        backgroundColor: colors.gray[50],
+                        borderRadius: 12,
+                        padding: spacing.md
+                      }}
+                    >
+                      {/* Reviewer Header */}
+                      <View style={{ 
+                        flexDirection: 'row', 
+                        alignItems: 'flex-start',
+                        marginBottom: spacing.sm 
+                      }}>
+                        {/* Profile Image */}
+                        {review.profiles?.avatar_url ? (
+                          <Image
+                            source={{ uri: review.profiles.avatar_url }}
+                            style={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: 20,
+                              marginRight: spacing.sm
+                            }}
+                          />
+                        ) : (
+                          <View style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: 20,
+                            backgroundColor: colors.gray[100],
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            marginRight: spacing.sm
+                          }}>
+                            <Ionicons name="person" size={20} color={colors.gray[600]} />
+                          </View>
+                        )}
+                        
+                        <View style={{ flex: 1 }}>
+                          {/* Reviewer Name */}
+                          <Text style={{
+                            fontSize: typography.sizes.base,
+                            fontWeight: typography.weights.semibold,
+                            color: colors.text.primary,
+                            marginBottom: 4
+                          }}>
+                            {review.profiles?.full_name || review.full_name || 'Anonymous'}
+                          </Text>
+                          
+                          {/* Rating Stars */}
+                          <View style={{ 
+                            flexDirection: 'row', 
+                            alignItems: 'center',
+                            marginBottom: 4
+                          }}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Ionicons
+                                key={star}
+                                name={star <= review.rating ? 'star' : 'star-outline'}
+                                size={14}
+                                color={star <= review.rating ? colors.semantic.warning : colors.gray[300]}
+                                style={{ marginRight: 2 }}
+                              />
+                            ))}
+                            <Text style={{
+                              fontSize: typography.sizes.sm,
+                              fontWeight: typography.weights.medium,
+                              color: colors.text.primary,
+                              marginLeft: spacing.xs
+                            }}>
+                              {review.rating}/5
+                            </Text>
+                          </View>
+                          
+                          {/* Review Date */}
+                          <Text style={{
+                            fontSize: typography.sizes.xs,
+                            color: colors.text.secondary
+                          }}>
+                            {new Date(review.created_at).toLocaleDateString('en-AU', { 
+                              year: 'numeric', 
+                              month: 'short', 
+                              day: 'numeric' 
+                            })}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Review Comment */}
+                      {review.comment && (
+                        <Text style={{
+                          fontSize: typography.sizes.sm,
+                          color: colors.text.primary,
+                          lineHeight: 20
+                        }}>
+                          {review.comment}
+                        </Text>
+                      )}
+                    </View>
+                  ))}
+                </View>
+
+              </View>
+            )}
           </View>
         </ScrollView>
 

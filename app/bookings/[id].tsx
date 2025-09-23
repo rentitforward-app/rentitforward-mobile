@@ -848,6 +848,8 @@ export default function BookingDetailScreen() {
               : booking.renter?.full_name || 'Renter'
           }
           isRenter={user?.id === booking.renter_id}
+          ownerId={booking.owner_id}
+          renterId={booking.renter_id}
         />
       )}
     </View>

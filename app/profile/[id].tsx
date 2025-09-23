@@ -136,20 +136,13 @@ export default function OwnerProfileScreen() {
           comment,
           created_at,
           reviewer_id,
-          tags,
+          type,
           profiles:reviewer_id (
             full_name,
             avatar_url
-          ),
-          bookings!inner (
-            listing_id,
-            listings!inner (
-              title,
-              owner_id
-            )
           )
         `)
-        .eq('bookings.listings.owner_id', id)
+        .eq('reviewee_id', id)
         .order('created_at', { ascending: false });
 
       if (error) {
