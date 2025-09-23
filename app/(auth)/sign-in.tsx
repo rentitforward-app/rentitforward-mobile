@@ -11,11 +11,13 @@ import {
   StyleSheet,
   Dimensions,
   Image,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/components/AuthProvider';
 import { mobileTokens } from '../../src/lib/design-system';
+import { AuthWebView } from '../../src/components/AuthWebView';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -26,6 +28,7 @@ export default function SignInScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [showForgotPasswordWebView, setShowForgotPasswordWebView] = useState(false);
   
   // Refs for keyboard navigation
   const emailInputRef = useRef<TextInput>(null);
@@ -174,7 +177,10 @@ export default function SignInScreen() {
             </View>
 
             <TouchableOpacity
-              onPress={() => router.push('/(auth)/forgot-password')}
+              onPress={() => {
+                console.log('🔥 FORGOT PASSWORD BUTTON PRESSED - Opening WebView!');
+                setShowForgotPasswordWebView(true);
+              }}
               style={styles.forgotPasswordButton}
             >
               <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
@@ -206,6 +212,22 @@ export default function SignInScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Forgot Password WebView */}
+      <AuthWebView
+        isVisible={showForgotPasswordWebView}
+        url="https://rentitforward.com.au/forgot-password"
+        title="Reset Password"
+        onClose={() => setShowForgotPasswordWebView(false)}
+        onSuccess={() => {
+          setShowForgotPasswordWebView(false);
+          Alert.alert(
+            'Password Reset Complete',
+            'Your password has been successfully reset. You can now sign in with your new password.',
+            [{ text: 'OK' }]
+          );
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }

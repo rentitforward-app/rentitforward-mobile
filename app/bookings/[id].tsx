@@ -19,6 +19,7 @@ import { colors, spacing, typography } from '../../src/lib/design-system';
 import { Header } from '../../src/components/Header';
 import { CancelBookingModal } from '../../src/components/booking/CancelBookingModal';
 import { IssueReportsSection } from '../../src/components/booking/IssueReportsSection';
+import { ReviewModal } from '../../src/components/ReviewModal';
 import { getNotificationApiService } from '../../src/lib/notification-api';
 
 export default function BookingDetailScreen() {
@@ -28,6 +29,7 @@ export default function BookingDetailScreen() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [showCancelModal, setShowCancelModal] = React.useState(false);
+  const [showReviewModal, setShowReviewModal] = React.useState(false);
 
   // Fetch booking details
   const { data: booking, isLoading, error } = useQuery({
@@ -146,15 +148,12 @@ export default function BookingDetailScreen() {
 
       // Call web API to cancel booking (includes email notifications)
       const notificationApi = getNotificationApiService();
-      const response = await notificationApi.notifyBookingAction({
-        bookingId: booking.id,
-        action: 'cancel',
-        userId: user.id,
-        additionalData: {
-          reason,
-          note
-        }
-      });
+      const response = await notificationApi.cancelBooking(
+        booking.id,
+        user.id,
+        reason,
+        note
+      );
 
       if (!response.success) {
         throw new Error(response.error || 'Failed to cancel booking');
@@ -174,6 +173,24 @@ export default function BookingDetailScreen() {
     },
   });
 
+  // Calculate confirmation state at component level
+  const isRenter = user?.id === booking?.renter_id;
+  const isOwner = user?.id === booking?.owner_id;
+  
+  // Pickup confirmation status
+  const renterConfirmedPickup = booking?.pickup_confirmed_by_renter || false;
+  const ownerConfirmedPickup = booking?.pickup_confirmed_by_owner || false;
+  const bothPickupConfirmed = renterConfirmedPickup && ownerConfirmedPickup;
+  const currentUserPickupConfirmed = (isRenter && renterConfirmedPickup) || (isOwner && ownerConfirmedPickup);
+  const otherPartyPickupConfirmed = (isRenter && ownerConfirmedPickup) || (isOwner && renterConfirmedPickup);
+  
+  // Return confirmation status
+  const renterConfirmedReturn = booking?.return_confirmed_by_renter || false;
+  const ownerConfirmedReturn = booking?.return_confirmed_by_owner || false;
+  const bothReturnConfirmed = renterConfirmedReturn && ownerConfirmedReturn;
+  const currentUserReturnConfirmed = (isRenter && renterConfirmedReturn) || (isOwner && ownerConfirmedReturn);
+  const otherPartyReturnConfirmed = (isRenter && ownerConfirmedReturn) || (isOwner && renterConfirmedReturn);
+
   // Calculate pickup date info with new timing (start date 00:00 to end date 23:59)
   const pickupInfo = booking ? (() => {
     const today = new Date();
@@ -192,35 +209,71 @@ export default function BookingDetailScreen() {
     const isBeforePickupPeriod = today < startOfPickupPeriod;
     const isAfterPickupPeriod = today > endOfPickupPeriod;
     
-    const hasBeenPickedUp = booking.status === 'active' || booking.status === 'picked_up';
-    const showPickupButton = booking.status === 'confirmed' || booking.status === 'payment_required';
+    const hasBeenPickedUp = booking.status === 'active' || booking.status === 'in_progress' || booking.status === 'picked_up' || bothPickupConfirmed;
     
-    const canConfirmPickup = isWithinPickupPeriod && booking.status === 'confirmed' && !hasBeenPickedUp;
-    const canReturn = isAfterPickupPeriod && hasBeenPickedUp;
+    const canConfirmPickup = isWithinPickupPeriod && booking.status === 'confirmed' && !hasBeenPickedUp && !currentUserPickupConfirmed;
+    
+    // Can return if both parties have confirmed pickup and we're within or after the rental period
+    const isWithinOrAfterRentalPeriod = today >= startOfPickupPeriod;
+    const canReturn = bothPickupConfirmed && isWithinOrAfterRentalPeriod && booking.status !== 'completed' && !currentUserReturnConfirmed;
+    
+    // Show pickup/return section when booking is confirmed, payment required, or return is available
+    const showPickupButton = booking.status === 'confirmed' || booking.status === 'payment_required' || canReturn || bothPickupConfirmed || currentUserReturnConfirmed;
     
     // Generate button text
     let pickupButtonText: string;
-    if (hasBeenPickedUp && canReturn) {
-      pickupButtonText = 'Confirm Return';
-    } else if (isBeforePickupPeriod) {
-      pickupButtonText = 'Confirm Pickup (Not Available Yet)';
+    let pickupButtonNote: string | null = null;
+    
+    // Return confirmation states (highest priority)
+    if (currentUserReturnConfirmed && !otherPartyReturnConfirmed) {
+      // Current user confirmed return, waiting for other party
+      const otherPartyName = isRenter ? 'owner' : 'renter';
+      pickupButtonText = `Waiting for ${otherPartyName} return confirmation`;
+      pickupButtonNote = `You've confirmed the return. Waiting for the ${otherPartyName} to verify and confirm return.`;
+    } else if (!currentUserReturnConfirmed && otherPartyReturnConfirmed) {
+      // Other party confirmed return, current user needs to confirm
+      const otherPartyName = isRenter ? 'owner' : 'renter';
+      pickupButtonText = 'Verify Return';
+      pickupButtonNote = `The ${otherPartyName} has confirmed return. Please verify the item and confirm.`;
+    } else if (bothReturnConfirmed) {
+      // Both confirmed return - booking completed
+      pickupButtonText = 'Return Completed';
+      pickupButtonNote = 'Both parties have confirmed return. The rental is now complete.';
+    } 
+    // Return available states
+    else if (canReturn) {
+      pickupButtonText = 'Verify Return';
+      pickupButtonNote = 'The rental period is active. You can now verify and confirm the return of the item.';
+    } 
+    // Pickup confirmation states
+    else if (bothPickupConfirmed && !canReturn) {
+      // Both confirmed pickup but return not yet available
+      pickupButtonText = 'Pickup Confirmed';
+      pickupButtonNote = 'Both parties have confirmed pickup. Return verification will be available during the rental period.';
+    } else if (currentUserPickupConfirmed && !otherPartyPickupConfirmed) {
+      // Current user confirmed pickup, waiting for other party
+      const otherPartyName = isRenter ? 'owner' : 'renter';
+      pickupButtonText = `Waiting for ${otherPartyName} confirmation`;
+      pickupButtonNote = `You've confirmed pickup. Waiting for the ${otherPartyName} to verify and confirm pickup.`;
+    } else if (!currentUserPickupConfirmed && otherPartyPickupConfirmed) {
+      // Other party confirmed pickup, current user needs to confirm
+      const otherPartyName = isRenter ? 'owner' : 'renter';
+      pickupButtonText = 'Verify Pickup';
+      pickupButtonNote = `The ${otherPartyName} has confirmed pickup. Please verify the item and confirm.`;
+    } 
+    // Initial pickup states
+    else if (isBeforePickupPeriod) {
+      pickupButtonText = 'Verify Pickup (Not Available Yet)';
+      const daysUntil = Math.ceil((startOfPickupPeriod.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      pickupButtonNote = `Pickup verification will be available starting ${startDate.toLocaleDateString()} at 12:00 AM (${daysUntil} day${daysUntil !== 1 ? 's' : ''} from now)`;
     } else if (isAfterPickupPeriod && !hasBeenPickedUp) {
       pickupButtonText = 'Pickup Date Passed';
-    } else if (isWithinPickupPeriod && booking.status !== 'confirmed') {
-      pickupButtonText = 'Complete Payment First';
-    } else {
-      pickupButtonText = 'Confirm Pickup';
-    }
-    
-    // Generate button note
-    let pickupButtonNote: string | null = null;
-    if (isBeforePickupPeriod) {
-      const daysUntil = Math.ceil((startOfPickupPeriod.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      pickupButtonNote = `Pickup button will be active starting ${startDate.toLocaleDateString()} at 12:00 AM (${daysUntil} day${daysUntil !== 1 ? 's' : ''} from now)`;
-    } else if (isAfterPickupPeriod && !hasBeenPickedUp) {
       pickupButtonNote = 'Pickup date has passed. Contact support if you need assistance.';
     } else if (isWithinPickupPeriod && booking.status !== 'confirmed') {
-      pickupButtonNote = 'Complete payment first to enable pickup confirmation.';
+      pickupButtonText = 'Complete Payment First';
+      pickupButtonNote = 'Complete payment first to enable pickup verification.';
+    } else {
+      pickupButtonText = 'Verify Pickup';
     }
     
     return {
@@ -265,84 +318,24 @@ export default function BookingDetailScreen() {
     (booking.status === 'confirmed' || booking.status === 'pending' || booking.status === 'payment_required');
 
 
-  // Pickup confirmation mutation - Call web API for email notifications
-  const pickupConfirmationMutation = useMutation({
-    mutationFn: async () => {
-      if (!booking || !user?.id) {
-        throw new Error('Booking or user not found');
-      }
-
-      // Call web API to confirm pickup (includes email notifications)
-      const notificationApi = getNotificationApiService();
-      const response = await notificationApi.notifyBookingAction({
-        bookingId: booking.id,
-        action: 'pickup',
-        userId: user.id
-      });
-
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to confirm pickup');
-      }
-
-      return response;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['booking-details', id] });
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
-      Alert.alert('Success', 'Pickup confirmed! Booking is now active.');
-    },
-    onError: (error) => {
-      Alert.alert('Error', error.message || 'Failed to confirm pickup');
-    },
-  });
-
-  // Return confirmation mutation - Call web API for email notifications
-  const returnConfirmationMutation = useMutation({
-    mutationFn: async () => {
-      if (!booking || !user?.id) {
-        throw new Error('Booking or user not found');
-      }
-
-      // Call web API to confirm return (includes email notifications)
-      const notificationApi = getNotificationApiService();
-      const response = await notificationApi.notifyBookingAction({
-        bookingId: booking.id,
-        action: 'return',
-        userId: user.id
-      });
-
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to confirm return');
-      }
-
-      return response;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['booking-details', id] });
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
-      Alert.alert('Success', 'Return confirmed! Booking is now completed.');
-    },
-    onError: (error) => {
-      Alert.alert('Error', error.message || 'Failed to confirm return');
-    },
-  });
+  // No API mutations needed - verification screens handle everything directly with Supabase
 
   const handleCancelBooking = async (reason: string, note: string) => {
     await cancelBookingMutation.mutateAsync({ reason, note });
   };
 
   const handleConfirmPickup = async () => {
-    await pickupConfirmationMutation.mutateAsync();
+    // Navigate to pickup verification screen
+    router.push(`/bookings/${id}/pickup-verification`);
   };
 
   const handleConfirmReturn = async () => {
-    await returnConfirmationMutation.mutateAsync();
+    // Navigate to return verification screen
+    router.push(`/bookings/${id}/return-verification`);
   };
 
-  // Helper functions for button text and states (using shared utility)
+  // Helper functions for button text and states (using enhanced logic)
   const getPickupButtonText = () => {
-    if (pickupConfirmationMutation.isPending) return 'Confirming...';
-    if (returnConfirmationMutation.isPending) return 'Confirming...';
     return sharedPickupButtonText;
   };
 
@@ -351,19 +344,39 @@ export default function BookingDetailScreen() {
   };
 
   const getPickupButtonAction = () => {
-    if (hasBeenPickedUp && canReturn) {
+    // Return verification actions (highest priority)
+    if (!currentUserReturnConfirmed && otherPartyReturnConfirmed) {
+      // Other party confirmed return, current user needs to confirm
+      return handleConfirmReturn;
+    } else if (canReturn && !currentUserReturnConfirmed) {
+      // Return is available and user hasn't confirmed yet
       return handleConfirmReturn;
     }
-    if (canConfirmPickup) {
+    
+    // Pickup verification actions
+    if (!currentUserPickupConfirmed && otherPartyPickupConfirmed) {
+      // Other party confirmed pickup, current user needs to confirm
+      return handleConfirmPickup;
+    } else if (canConfirmPickup) {
+      // Pickup is available and user hasn't confirmed yet
       return handleConfirmPickup;
     }
+    
+    // No action available
     return undefined;
   };
 
   const isPickupButtonDisabled = () => {
-    if (pickupConfirmationMutation.isPending || returnConfirmationMutation.isPending) return true;
-    if (hasBeenPickedUp) return !canReturn;
-    return !canConfirmPickup;
+    // Enable for return verification when other party confirmed or return available
+    if (!currentUserReturnConfirmed && otherPartyReturnConfirmed) return false;
+    if (canReturn && !currentUserReturnConfirmed) return false;
+    
+    // Enable for pickup verification when other party confirmed or pickup available  
+    if (!currentUserPickupConfirmed && otherPartyPickupConfirmed) return false;
+    if (canConfirmPickup) return false;
+    
+    // Disable in all other cases (waiting states, completed states, etc.)
+    return true;
   };
 
   if (isLoading) {
@@ -481,17 +494,17 @@ export default function BookingDetailScreen() {
         {showPickupButton && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
-              {hasBeenPickedUp ? 'Return Confirmation' : 'Pickup Confirmation'}
+              {canReturn || currentUserReturnConfirmed || otherPartyReturnConfirmed ? 'Return Confirmation' : 'Pickup Confirmation'}
             </Text>
             <View style={styles.pickupConfirmationCard}>
               <View style={styles.pickupHeader}>
                 <Ionicons 
-                  name={hasBeenPickedUp ? "flag-outline" : "cube-outline"} 
+                  name={canReturn || currentUserReturnConfirmed || otherPartyReturnConfirmed ? "flag-outline" : "cube-outline"} 
                   size={24} 
                   color={colors.primary.main} 
                 />
                 <Text style={styles.pickupTitle}>
-                  {hasBeenPickedUp ? 'Return Confirmation' : 'Pickup Confirmation'}
+                  {canReturn || currentUserReturnConfirmed || otherPartyReturnConfirmed ? 'Return Confirmation' : 'Pickup Confirmation'}
                 </Text>
               </View>
               
@@ -516,7 +529,7 @@ export default function BookingDetailScreen() {
                 onPress={getPickupButtonAction()}
               >
                 <Ionicons 
-                  name={hasBeenPickedUp ? "flag" : "checkmark-circle"} 
+                  name={canReturn || currentUserReturnConfirmed || otherPartyReturnConfirmed ? "flag" : "checkmark-circle"} 
                   size={20} 
                   color={!isPickupButtonDisabled() ? colors.white : colors.gray[400]} 
                 />
@@ -784,6 +797,21 @@ export default function BookingDetailScreen() {
           </View>
         </View>
 
+        {/* Review Section - Show when booking is completed */}
+        {booking.status === 'completed' && (
+          <View style={styles.reviewSection}>
+            <TouchableOpacity
+              style={styles.reviewButton}
+              onPress={() => setShowReviewModal(true)}
+            >
+              <Ionicons name="star" size={20} color="white" />
+              <Text style={styles.reviewButtonText}>
+                Leave a Review
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Bottom Spacing */}
         <View style={styles.bottomSpacing} />
       </ScrollView>
@@ -803,6 +831,22 @@ export default function BookingDetailScreen() {
             owner_name: booking.listings?.profiles?.full_name || 'Unknown Owner',
             renter_name: booking.renter?.full_name || 'Unknown Renter',
           }}
+          isRenter={user?.id === booking.renter_id}
+        />
+      )}
+
+      {/* Review Modal */}
+      {booking && (
+        <ReviewModal
+          visible={showReviewModal}
+          onClose={() => setShowReviewModal(false)}
+          bookingId={booking.id}
+          itemTitle={booking.listings?.title || 'Unknown Item'}
+          recipientName={
+            user?.id === booking.renter_id 
+              ? booking.listings?.profiles?.full_name || 'Owner'
+              : booking.renter?.full_name || 'Renter'
+          }
           isRenter={user?.id === booking.renter_id}
         />
       )}
@@ -1288,5 +1332,26 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: spacing.xl,
+  },
+  reviewSection: {
+    backgroundColor: colors.white,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    borderRadius: 12,
+    padding: spacing.md,
+  },
+  reviewButton: {
+    backgroundColor: colors.primary.main,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    borderRadius: 8,
+  },
+  reviewButtonText: {
+    color: 'white',
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold,
+    marginLeft: spacing.sm,
   },
 });

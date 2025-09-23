@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '../../src/lib/supabase';
 
 export default function ForgotPasswordScreen() {
+  console.log('🚀 FORGOT PASSWORD SCREEN MOUNTED!');
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,12 +36,38 @@ export default function ForgotPasswordScreen() {
   };
 
   const handleResetPassword = async () => {
+    console.log('🔥 MOBILE FORGOT PASSWORD FUNCTION CALLED!');
     if (!validateForm()) return;
 
     setLoading(true);
     try {
+      // Use the same redirect URL construction as the web app
+      // Determine the correct base URL for the redirect (same logic as web)
+      let baseUrl = process.env.EXPO_PUBLIC_APP_URL || process.env.EXPO_PUBLIC_BASE_URL;
+      
+      // Fallback to hardcoded URL if no environment variable is set
+      if (!baseUrl) {
+        baseUrl = 'https://rentitforward.com.au';
+      }
+      
+      // Use the correct callback format for password reset
+      const redirectUrl = `${baseUrl}/auth/callback?type=recovery`;
+      
+      console.log('Mobile password reset configuration:', {
+        email: email.trim(),
+        redirectUrl,
+        baseUrl
+      });
+      
+      // Show user what URL we're using (for debugging)
+      Alert.alert(
+        'Debug Info', 
+        `Sending reset email with redirect URL: ${redirectUrl}`,
+        [{ text: 'OK' }]
+      );
+      
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: 'exp://your-app-scheme/reset-password',
+        redirectTo: redirectUrl,
       });
 
       if (error) {
@@ -80,6 +107,7 @@ export default function ForgotPasswordScreen() {
             
             <Text style={styles.instructionText}>
               Click the link in the email to reset your password. The link will expire in 24 hours.
+              {'\n\n'}🔧 DEBUG: Using callback URL format for mobile app.
             </Text>
 
             <View style={styles.actionButtons}>
@@ -180,6 +208,16 @@ export default function ForgotPasswordScreen() {
                 Sign In
               </Text>
             </Text>
+            
+            {/* Development only - test reset password screen */}
+            {__DEV__ && (
+              <TouchableOpacity
+                onPress={() => router.push('/(auth)/dev-reset-password')}
+                style={styles.devButton}
+              >
+                <Text style={styles.devButtonText}>🧪 Dev: Test Reset Password</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -284,6 +322,19 @@ const styles = StyleSheet.create({
   linkText: {
     color: '#16A34A',
     fontWeight: '600',
+  },
+  devButton: {
+    marginTop: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  devButtonText: {
+    color: '#6B7280',
+    fontSize: 14,
+    fontWeight: '500',
   },
   // Success screen styles
   successContainer: {

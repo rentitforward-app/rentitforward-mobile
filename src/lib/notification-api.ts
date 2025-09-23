@@ -148,6 +148,20 @@ export class MobileNotificationApiService {
   }
 
   /**
+   * Cancel booking with reason and note
+   */
+  async cancelBooking(bookingId: string, userId: string, reason: string, note: string): Promise<NotificationApiResponse> {
+    console.log('Cancelling booking:', { bookingId, userId, reason, note });
+    
+    const endpoint = `/api/bookings/${bookingId}/cancel`;
+    return this.makeRequest(endpoint, 'POST', { 
+      userId, 
+      reason, 
+      note 
+    });
+  }
+
+  /**
    * Update notification preferences
    */
   async updateNotificationPreferences(preferences: Record<string, boolean>): Promise<NotificationApiResponse> {
