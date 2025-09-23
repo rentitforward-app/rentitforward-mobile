@@ -24,7 +24,8 @@ import { supabase } from '../../../src/lib/supabase';
 const { width: screenWidth } = Dimensions.get('window');
 
 interface ReturnPhoto {
-  uri: string;
+  uri?: string;      // Local URI (for photos being taken)
+  url?: string;      // Cloud URL (for photos from database)
   timestamp: string;
   location?: {
     latitude: number;
@@ -32,13 +33,35 @@ interface ReturnPhoto {
     address?: string;
   };
   description?: string;
+  user_id?: string;
+  user_type?: string;
+  uploaded_by?: string; // User ID who uploaded this photo
+  photo_index?: number;
+  uploaded_at?: string;
+  metadata?: {
+    timestamp: string;
+    location?: {
+      latitude: number;
+      longitude: number;
+      address?: string;
+    };
+  };
 }
 
 interface PickupPhoto {
-  uri: string;
+  uri?: string;      // Local URI (for photos being taken)
+  url?: string;      // Cloud URL (for photos from database)
   timestamp: string;
   user_type: 'owner' | 'renter';
   photo_index: number;
+  metadata?: {
+    timestamp: string;
+    location?: {
+      latitude: number;
+      longitude: number;
+      address?: string;
+    };
+  };
 }
 
 interface BookingDetails {
@@ -52,6 +75,10 @@ interface BookingDetails {
   owner_id: string;
   renter_id: string;
   status: string;
+  damage_report?: string;
+  damage_reported_by?: string;
+  damage_reported_at?: string;
+  owner_notes?: string;
   listings?: {
     title: string;
     images: string[];
@@ -70,6 +97,7 @@ export default function ReturnVerificationScreen() {
   const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
   const [showDamageModal, setShowDamageModal] = useState(false);
   const [damageReport, setDamageReport] = useState('');
+  const [ownerNotes, setOwnerNotes] = useState('');
   const [selectedPickupPhoto, setSelectedPickupPhoto] = useState<PickupPhoto | null>(null);
 
   useEffect(() => {
@@ -116,6 +144,14 @@ export default function ReturnVerificationScreen() {
         // Load existing return photos if any
         if (data.return_images && Array.isArray(data.return_images)) {
           setPhotos(data.return_images);
+        }
+        
+        // Load existing damage report and owner notes
+        if (data.damage_report) {
+          setDamageReport(data.damage_report);
+        }
+        if (data.owner_notes) {
+          setOwnerNotes(data.owner_notes);
         }
       }
     } catch (error) {
@@ -194,6 +230,25 @@ export default function ReturnVerificationScreen() {
   };
 
   const removePhoto = (index: number) => {
+    if (!user || !booking) return;
+    
+    const photoToRemove = photos[index];
+    if (!photoToRemove) return;
+    
+    // Check ownership - prevent deletion of photos not uploaded by current user
+    // For backward compatibility: if uploaded_by is missing, assume it belongs to renter
+    const photoOwner = photoToRemove.uploaded_by || photoToRemove.user_id || booking.renter_id;
+    
+    if (photoOwner !== user.id) {
+      const ownerName = photoOwner === booking.renter_id ? 'renter' : 'owner';
+      Alert.alert(
+        'Cannot Delete Photo',
+        `You can only delete photos you uploaded. This photo was uploaded by the ${ownerName}.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
     Alert.alert(
       'Remove Photo',
       'Are you sure you want to remove this photo?',
@@ -255,14 +310,51 @@ export default function ReturnVerificationScreen() {
       }
 
 
-      // Process photos with metadata
-      const processedPhotos = photos.map((photo, index) => ({
-        ...photo,
-        user_id: user.id,
-        user_type: isRenter ? 'renter' : 'owner',
-        photo_index: index,
-        uploaded_at: new Date().toISOString(),
-      }));
+      // Upload photos to Supabase Storage and get URLs
+      const uploadedPhotos = [];
+      
+      for (let i = 0; i < photos.length; i++) {
+        const photo = photos[i];
+        try {
+          // Convert image to blob for upload
+          const response = await fetch(photo.uri!);
+          const blob = await response.blob();
+          
+          // Generate unique filename
+          const fileExt = photo.uri?.split('.').pop() || 'jpg';
+          const fileName = `return_${bookingId}_${user.id}_${Date.now()}_${i}.${fileExt}`;
+          
+          // Upload to Supabase Storage
+          const { data, error } = await supabase.storage
+            .from('booking-confirmations')
+            .upload(fileName, blob);
+          
+          if (error) throw error;
+          
+          // Get public URL
+          const { data: { publicUrl } } = supabase.storage
+            .from('booking-confirmations')
+            .getPublicUrl(fileName);
+          
+          // Create photo object with cloud URL
+          uploadedPhotos.push({
+            url: publicUrl,
+            user_id: user.id,
+            user_type: isRenter ? 'renter' : 'owner',
+            uploaded_by: user.id, // Track who uploaded this photo
+            photo_index: i,
+            uploaded_at: new Date().toISOString(),
+            metadata: {
+              timestamp: photo.timestamp || new Date().toISOString(),
+              location: photo.location,
+            },
+          });
+        } catch (uploadError) {
+          console.error('Error uploading photo:', uploadError);
+          Alert.alert('Upload Failed', `Failed to upload photo ${i + 1}. Please try again.`);
+          return;
+        }
+      }
 
       // Get current return images
       const currentReturnImages = booking.return_images || [];
@@ -270,7 +362,7 @@ export default function ReturnVerificationScreen() {
       // Add new photos to existing ones
       const updatedReturnImages = [
         ...currentReturnImages,
-        ...processedPhotos,
+        ...uploadedPhotos,
       ];
 
       // Update booking with return verification data
@@ -287,11 +379,16 @@ export default function ReturnVerificationScreen() {
         updateData.return_confirmed_at = new Date().toISOString();
       }
 
-      // Add damage report if provided
-      if (damageReport.trim()) {
+      // Add damage report if provided (only renter can create/edit damage report)
+      if (isRenter && damageReport.trim()) {
         updateData.damage_report = damageReport.trim();
         updateData.damage_reported_by = user.id;
         updateData.damage_reported_at = new Date().toISOString();
+      }
+      
+      // Add owner notes if provided (only owner can add notes)
+      if (isOwner && ownerNotes.trim()) {
+        updateData.owner_notes = ownerNotes.trim();
       }
 
       // Check if both parties have now confirmed return
@@ -501,7 +598,7 @@ export default function ReturnVerificationScreen() {
                   onPress={() => setSelectedPickupPhoto(photo)}
                 >
                   <Image
-                    source={{ uri: photo.uri }}
+                    source={{ uri: photo.uri || photo.url }}
                     style={styles.referencePhoto}
                     resizeMode="cover"
                   />
@@ -523,8 +620,14 @@ export default function ReturnVerificationScreen() {
                 style={styles.damageButton}
                 onPress={reportDamage}
               >
-                <Ionicons name="warning" size={16} color={mobileTokens.colors.warning} />
-                <Text style={styles.damageButtonText}>Report Damage</Text>
+                <Ionicons 
+                  name={booking && user && booking.renter_id === user.id ? "warning" : "document-text"} 
+                  size={16} 
+                  color={mobileTokens.colors.warning} 
+                />
+                <Text style={styles.damageButtonText}>
+                  {booking && user && booking.renter_id === user.id ? "Report Damage" : "Add Notes"}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.addPhotoButton}
@@ -538,25 +641,47 @@ export default function ReturnVerificationScreen() {
           </View>
 
           <View style={styles.photoGrid}>
-            {photos.map((photo, index) => (
-              <View key={index} style={styles.photoContainer}>
-                <Image source={{ uri: photo.uri }} style={styles.photoThumbnail} />
-                <TouchableOpacity
-                  style={styles.removePhotoButton}
-                  onPress={() => removePhoto(index)}
-                >
-                  <Ionicons name="close-circle" size={24} color={mobileTokens.colors.error} />
-                </TouchableOpacity>
-                <View style={styles.photoInfo}>
-                  <Text style={styles.photoTimestamp}>
-                    {new Date(photo.timestamp).toLocaleTimeString()}
-                  </Text>
-                  {photo.location && (
-                    <Ionicons name="location" size={12} color={mobileTokens.colors.primary.main} />
+            {photos.map((photo, index) => {
+              // Determine photo ownership - for backward compatibility, assume renter if no owner specified
+              const photoOwner = photo.uploaded_by || photo.user_id || booking?.renter_id;
+              const canDelete = photoOwner === user?.id;
+              const ownerLabel = photoOwner === booking?.renter_id ? 'Renter' : 'Owner';
+              
+              return (
+                <View key={index} style={styles.photoContainer}>
+                  <Image source={{ uri: photo.uri || photo.url }} style={styles.photoThumbnail} />
+                  
+                  {/* Delete button - only show for photos owned by current user */}
+                  {canDelete && (
+                    <TouchableOpacity
+                      style={styles.removePhotoButton}
+                      onPress={() => removePhoto(index)}
+                    >
+                      <Ionicons name="close-circle" size={24} color={mobileTokens.colors.error} />
+                    </TouchableOpacity>
                   )}
+                  
+                  {/* Ownership indicator */}
+                  <View style={[
+                    styles.ownerBadge, 
+                    { backgroundColor: photoOwner === booking?.renter_id ? mobileTokens.colors.info : mobileTokens.colors.neutral.mediumGray }
+                  ]}>
+                    <Text style={styles.ownerBadgeText}>{ownerLabel}</Text>
+                  </View>
+                  
+                  <View style={styles.photoInfo}>
+                    <Text style={styles.photoTimestamp}>
+                      {photo.timestamp && !isNaN(new Date(photo.timestamp).getTime()) 
+                        ? new Date(photo.timestamp).toLocaleTimeString()
+                        : 'Invalid Date'}
+                    </Text>
+                    {photo.location && (
+                      <Ionicons name="location" size={12} color={mobileTokens.colors.primary.main} />
+                    )}
+                  </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
 
           {photos.length === 0 && (
@@ -609,42 +734,83 @@ export default function ReturnVerificationScreen() {
         </View>
       </ScrollView>
 
-      {/* Damage Report Modal */}
+      {/* Damage Report / Owner Notes Modal */}
       <Modal
         visible={showDamageModal}
         animationType="slide"
         presentationStyle="pageSheet"
       >
         <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowDamageModal(false)}>
-              <Text style={styles.modalCancelButton}>Cancel</Text>
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Report Damage</Text>
-            <TouchableOpacity onPress={submitDamageReport}>
-              <Text style={styles.modalSubmitButton}>Submit</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView style={styles.modalContent}>
-            <Text style={styles.modalDescription}>
-              Please describe any damage or issues you've found with the returned item. Be as specific as possible.
-            </Text>
+          {(() => {
+            const isRenter = booking && user && booking.renter_id === user.id;
+            const isOwner = booking && user && booking.owner_id === user.id;
             
-            <TextInput
-              style={styles.damageInput}
-              multiline
-              numberOfLines={8}
-              placeholder="Describe the damage or issue in detail..."
-              value={damageReport}
-              onChangeText={setDamageReport}
-              textAlignVertical="top"
-            />
-            
-            <Text style={styles.modalNote}>
-              This report will be reviewed by our team and may affect the security deposit.
-            </Text>
-          </ScrollView>
+            return (
+              <>
+                <View style={styles.modalHeader}>
+                  <TouchableOpacity onPress={() => setShowDamageModal(false)}>
+                    <Text style={styles.modalCancelButton}>Cancel</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.modalTitle}>
+                    {isRenter ? 'Report Damage' : 'Owner Notes'}
+                  </Text>
+                  <TouchableOpacity onPress={submitDamageReport}>
+                    <Text style={styles.modalSubmitButton}>Submit</Text>
+                  </TouchableOpacity>
+                </View>
+                
+                <ScrollView style={styles.modalContent}>
+                  {/* Show existing damage report if any */}
+                  {booking?.damage_report && (
+                    <View style={styles.existingReportContainer}>
+                      <Text style={styles.existingReportTitle}>Damage Report by Renter:</Text>
+                      <Text style={styles.existingReportText}>{booking.damage_report}</Text>
+                      {booking.damage_reported_at && (
+                        <Text style={styles.existingReportDate}>
+                          Reported: {new Date(booking.damage_reported_at).toLocaleString()}
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                  
+                  {/* Show existing owner notes if any */}
+                  {booking?.owner_notes && (
+                    <View style={styles.existingNotesContainer}>
+                      <Text style={styles.existingNotesTitle}>Owner Notes:</Text>
+                      <Text style={styles.existingNotesText}>{booking.owner_notes}</Text>
+                    </View>
+                  )}
+                  
+                  <Text style={styles.modalDescription}>
+                    {isRenter 
+                      ? 'Please describe any damage or issues you\'ve found with the returned item. Be as specific as possible.'
+                      : 'Add your notes about the item condition, damage assessment, or any other observations.'
+                    }
+                  </Text>
+                  
+                  <TextInput
+                    style={styles.damageInput}
+                    multiline
+                    numberOfLines={8}
+                    placeholder={isRenter 
+                      ? 'Describe the damage or issue in detail...'
+                      : 'Add your notes about item condition, damage assessment, etc...'
+                    }
+                    value={isRenter ? damageReport : ownerNotes}
+                    onChangeText={isRenter ? setDamageReport : setOwnerNotes}
+                    textAlignVertical="top"
+                  />
+                  
+                  <Text style={styles.modalNote}>
+                    {isRenter 
+                      ? 'This report will be reviewed by our team and may affect the security deposit.'
+                      : 'Your notes will be added to the return verification record.'
+                    }
+                  </Text>
+                </ScrollView>
+              </>
+            );
+          })()}
         </View>
       </Modal>
 
@@ -662,7 +828,7 @@ export default function ReturnVerificationScreen() {
             >
               <View style={styles.photoViewerContent}>
                 <Image
-                  source={{ uri: selectedPickupPhoto.uri }}
+                  source={{ uri: selectedPickupPhoto.uri || selectedPickupPhoto.url }}
                   style={styles.fullSizePhoto}
                   resizeMode="contain"
                 />
@@ -881,6 +1047,19 @@ const styles = StyleSheet.create({
     top: 4,
     right: 4,
   },
+  ownerBadge: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    paddingHorizontal: mobileTokens.spacing.xs,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  ownerBadgeText: {
+    color: 'white',
+    fontSize: mobileTokens.typography.sizes.xs,
+    fontWeight: mobileTokens.typography.weights.semibold,
+  },
   photoInfo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1010,6 +1189,49 @@ const styles = StyleSheet.create({
     fontSize: mobileTokens.typography.sizes.sm,
     color: mobileTokens.colors.text.tertiary,
     fontStyle: 'italic',
+  },
+  existingReportContainer: {
+    backgroundColor: mobileTokens.colors.warning + '20', // 20% opacity
+    borderLeftWidth: 4,
+    borderLeftColor: mobileTokens.colors.warning,
+    padding: mobileTokens.spacing.sm,
+    marginBottom: mobileTokens.spacing.md,
+    borderRadius: 8,
+  },
+  existingReportTitle: {
+    fontSize: mobileTokens.typography.sizes.sm,
+    fontWeight: mobileTokens.typography.weights.semibold,
+    color: mobileTokens.colors.warning,
+    marginBottom: mobileTokens.spacing.xs,
+  },
+  existingReportText: {
+    fontSize: mobileTokens.typography.sizes.base,
+    color: mobileTokens.colors.text.primary,
+    marginBottom: mobileTokens.spacing.xs,
+    lineHeight: 20,
+  },
+  existingReportDate: {
+    fontSize: mobileTokens.typography.sizes.xs,
+    color: mobileTokens.colors.text.tertiary,
+  },
+  existingNotesContainer: {
+    backgroundColor: mobileTokens.colors.info + '20', // 20% opacity
+    borderLeftWidth: 4,
+    borderLeftColor: mobileTokens.colors.info,
+    padding: mobileTokens.spacing.sm,
+    marginBottom: mobileTokens.spacing.md,
+    borderRadius: 8,
+  },
+  existingNotesTitle: {
+    fontSize: mobileTokens.typography.sizes.sm,
+    fontWeight: mobileTokens.typography.weights.semibold,
+    color: mobileTokens.colors.info,
+    marginBottom: mobileTokens.spacing.xs,
+  },
+  existingNotesText: {
+    fontSize: mobileTokens.typography.sizes.base,
+    color: mobileTokens.colors.text.primary,
+    lineHeight: 20,
   },
   // Photo viewer modal styles
   photoViewerContainer: {

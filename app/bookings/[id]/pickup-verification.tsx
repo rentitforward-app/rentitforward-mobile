@@ -23,7 +23,8 @@ import { supabase } from '../../../src/lib/supabase';
 const { width: screenWidth } = Dimensions.get('window');
 
 interface PickupPhoto {
-  uri: string;
+  uri?: string;      // Local URI (for photos being taken)
+  url?: string;      // Cloud URL (for photos from database)
   timestamp: string;
   location?: {
     latitude: number;
@@ -31,6 +32,18 @@ interface PickupPhoto {
     address?: string;
   };
   description?: string;
+  user_id?: string;
+  user_type?: string;
+  photo_index?: number;
+  uploaded_at?: string;
+  metadata?: {
+    timestamp: string;
+    location?: {
+      latitude: number;
+      longitude: number;
+      address?: string;
+    };
+  };
 }
 
 interface BookingDetails {
@@ -226,14 +239,50 @@ export default function PickupVerificationScreen() {
       }
 
 
-      // Process photos with metadata
-      const processedPhotos = photos.map((photo, index) => ({
-        ...photo,
-        user_id: user.id,
-        user_type: isRenter ? 'renter' : 'owner',
-        photo_index: index,
-        uploaded_at: new Date().toISOString(),
-      }));
+      // Upload photos to Supabase Storage and get URLs
+      const uploadedPhotos = [];
+      
+      for (let i = 0; i < photos.length; i++) {
+        const photo = photos[i];
+        try {
+          // Convert image to blob for upload
+          const response = await fetch(photo.uri!);
+          const blob = await response.blob();
+          
+          // Generate unique filename
+          const fileExt = photo.uri?.split('.').pop() || 'jpg';
+          const fileName = `pickup_${bookingId}_${user.id}_${Date.now()}_${i}.${fileExt}`;
+          
+          // Upload to Supabase Storage
+          const { data, error } = await supabase.storage
+            .from('booking-confirmations')
+            .upload(fileName, blob);
+          
+          if (error) throw error;
+          
+          // Get public URL
+          const { data: { publicUrl } } = supabase.storage
+            .from('booking-confirmations')
+            .getPublicUrl(fileName);
+          
+          // Create photo object with cloud URL
+          uploadedPhotos.push({
+            url: publicUrl,
+            user_id: user.id,
+            user_type: isRenter ? 'renter' : 'owner',
+            photo_index: i,
+            uploaded_at: new Date().toISOString(),
+            metadata: {
+              timestamp: photo.timestamp || new Date().toISOString(),
+              location: photo.location,
+            },
+          });
+        } catch (uploadError) {
+          console.error('Error uploading photo:', uploadError);
+          Alert.alert('Upload Failed', `Failed to upload photo ${i + 1}. Please try again.`);
+          return;
+        }
+      }
 
       // Get current pickup images
       const currentPickupImages = booking.pickup_images || [];
@@ -241,7 +290,7 @@ export default function PickupVerificationScreen() {
       // Add new photos to existing ones
       const updatedPickupImages = [
         ...currentPickupImages,
-        ...processedPhotos,
+        ...uploadedPhotos,
       ];
 
       // Update booking with pickup verification data
@@ -494,7 +543,7 @@ export default function PickupVerificationScreen() {
         <View style={styles.photoGrid}>
           {photos.map((photo, index) => (
             <View key={index} style={styles.photoContainer}>
-              <Image source={{ uri: photo.uri }} style={styles.photoThumbnail} />
+              <Image source={{ uri: photo.uri || photo.url }} style={styles.photoThumbnail} />
               {/* Only allow renter to delete photos */}
               {booking && user && booking.renter_id === user.id && (
                 <TouchableOpacity
