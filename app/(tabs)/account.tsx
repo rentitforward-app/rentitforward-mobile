@@ -98,9 +98,11 @@ export default function AccountScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+              console.log('User confirmed sign out from account screen');
               await signOut();
             } catch (error) {
-              console.error('Sign out error:', error);
+              console.error('Sign out error from account screen:', error);
+              // Error handling is already done in AuthProvider.signOut()
             }
           },
         },

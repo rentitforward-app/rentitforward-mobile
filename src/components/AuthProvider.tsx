@@ -18,6 +18,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     error: null,
   });
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isSignOutInProgress, setIsSignOutInProgress] = useState(false); // Prevent multiple simultaneous sign outs
 
   // Remove aggressive timeout - let Supabase handle session restoration naturally
 
@@ -59,11 +60,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Handle sign out for deleted users
   const handleDeletedUserSignOut = async () => {
+    // Prevent multiple simultaneous deleted user sign outs
+    if (isSignOutInProgress) {
+      console.log('Sign out already in progress, ignoring deleted user sign out');
+      return;
+    }
+
     try {
       console.log('Handling deleted user sign out...');
+      setIsSignOutInProgress(true);
       
-      // Clear the auth session
-      await supabase.auth.signOut();
+      // Clear Sentry user context first
+      clearSentryUser();
+      addSentryBreadcrumb('Deleted user sign out started', 'auth');
+      
+      try {
+        // Clear the auth session
+        await supabase.auth.signOut();
+      } catch (error) {
+        // Handle session errors gracefully during deleted user sign out
+        if (error?.message?.includes('session') && error?.message?.includes('missing')) {
+          console.log('Session already missing during deleted user sign out - proceeding');
+          addSentryBreadcrumb('Session already missing during deleted user sign out', 'auth');
+        } else {
+          throw error;
+        }
+      }
       
       // Clear local state immediately
       setState({
@@ -73,8 +95,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error: null,
       });
       
-      // Clear Sentry user context
-      clearSentryUser();
       addSentryBreadcrumb('Deleted user signed out automatically', 'auth');
       
       // Show alert to user
@@ -95,6 +115,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Error during deleted user sign out:', error);
       captureSentryException(error, { action: 'handleDeletedUserSignOut' });
+      
+      // Even if there's an error, clear state and navigate
+      setState({
+        user: null,
+        profile: null,
+        loading: false,
+        error: null,
+      });
+      router.replace('/(auth)/welcome');
+    } finally {
+      setIsSignOutInProgress(false);
     }
   };
 
@@ -175,53 +206,75 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, session) => {
         if (!mounted) return;
 
-        // Don't update state if we're in the middle of signing out
-        if (isSigningOut && event === 'SIGNED_OUT') {
+        console.log('Auth state change event:', event, 'hasSession:', !!session);
+        addSentryBreadcrumb(`Auth state change: ${event}`, 'auth', { hasSession: !!session });
+
+        // Don't update state if we're in the middle of signing out manually
+        if (isSigningOut && (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED')) {
+          console.log('Ignoring auth state change during manual sign out:', event);
+          return;
+        }
+
+        // Don't update state if sign out is in progress
+        if (isSignOutInProgress) {
+          console.log('Ignoring auth state change during sign out process:', event);
           return;
         }
 
         if (session?.user) {
-          const profile = await fetchProfile(session.user.id);
-          
-          // If profile is null, the user might have been deleted
-          // The fetchProfile function will handle the sign out automatically
-          if (profile === null) {
-            // Don't update state here, let handleDeletedUserSignOut handle it
-            return;
+          try {
+            const profile = await fetchProfile(session.user.id);
+            
+            // If profile is null, the user might have been deleted
+            // The fetchProfile function will handle the sign out automatically
+            if (profile === null) {
+              // Don't update state here, let handleDeletedUserSignOut handle it
+              return;
+            }
+            
+            setState({
+              user: session.user,
+              profile,
+              loading: false,
+              error: null,
+            });
+            
+            // Set Sentry user context
+            setSentryUser({
+              id: session.user.id,
+              email: session.user.email,
+              name: profile?.full_name || session.user.user_metadata?.full_name,
+            });
+            
+            addSentryBreadcrumb('Auth state changed - user signed in', 'auth', {
+              event,
+              userId: session.user.id,
+              email: session.user.email,
+            });
+          } catch (error) {
+            console.error('Error during auth state change (sign in):', error);
+            captureSentryException(error, { 
+              action: 'authStateChange_signIn', 
+              event, 
+              userId: session.user.id 
+            });
           }
-          
-          setState({
-            user: session.user,
-            profile,
-            loading: false,
-            error: null,
-          });
-          
-          // Set Sentry user context
-          setSentryUser({
-            id: session.user.id,
-            email: session.user.email,
-            name: profile?.full_name || session.user.user_metadata?.full_name,
-          });
-          
-          addSentryBreadcrumb('Auth state changed - user signed in', 'auth', {
-            event,
-            userId: session.user.id,
-            email: session.user.email,
-          });
         } else {
-          setState({
-            user: null,
-            profile: null,
-            loading: false,
-            error: null,
-          });
-          
-          // Clear Sentry user context
-          clearSentryUser();
-          addSentryBreadcrumb('Auth state changed - user signed out', 'auth', {
-            event,
-          });
+          // Only update state if not manually signing out
+          if (!isSigningOut && !isSignOutInProgress) {
+            setState({
+              user: null,
+              profile: null,
+              loading: false,
+              error: null,
+            });
+            
+            // Clear Sentry user context only if not already cleared
+            clearSentryUser();
+            addSentryBreadcrumb('Auth state changed - user signed out', 'auth', {
+              event,
+            });
+          }
         }
       }
     );
@@ -230,7 +283,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [isSigningOut]);
+  }, [isSigningOut, isSignOutInProgress]);
 
   // Splash screen is now managed by SplashScreenManager in _layout.tsx
 
@@ -362,13 +415,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    // Prevent multiple simultaneous sign out attempts
+    if (isSignOutInProgress) {
+      console.log('Sign out already in progress, ignoring duplicate request');
+      return;
+    }
+
     try {
+      console.log('Starting sign out process...');
+      setIsSignOutInProgress(true);
       setIsSigningOut(true);
       setState(prev => ({ ...prev, loading: true }));
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
       
-      // Clear the state immediately
+      addSentryBreadcrumb('Sign out started', 'auth');
+      
+      // Clear Sentry user context before sign out
+      clearSentryUser();
+      
+      // Call Supabase sign out
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        // Handle specific auth session errors gracefully
+        if (error.message?.includes('session') && error.message?.includes('missing')) {
+          console.log('Session already missing during sign out - proceeding with cleanup');
+          addSentryBreadcrumb('Session already missing during sign out - proceeding', 'auth');
+        } else {
+          throw error;
+        }
+      }
+      
+      // Clear the state immediately after successful sign out
       setState({
         user: null,
         profile: null,
@@ -376,18 +453,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error: null,
       });
       
-      // Small delay to ensure state is cleared before navigation
-      setTimeout(() => {
-        // Navigate directly to welcome screen to avoid routing loops
-        console.log('Signing out - redirecting to welcome screen');
-        router.replace('/(auth)/welcome');
-        setIsSigningOut(false);
-      }, 100);
+      addSentryBreadcrumb('Sign out completed successfully', 'auth');
+      
+      // Navigate directly to welcome screen
+      console.log('Sign out successful - redirecting to welcome screen');
+      router.replace('/(auth)/welcome');
+      
     } catch (error: any) {
+      console.error('Sign out error:', error);
       setState(prev => ({ ...prev, loading: false, error: error.message }));
-      captureSentryException(error, { action: 'signOut' });
+      captureSentryException(error, { action: 'signOut', platform: 'mobile' });
+      
+      // Show user-friendly error message
+      Alert.alert(
+        'Sign Out Error', 
+        'There was a problem signing you out. Please try again.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Even if there's an error, clear local state and navigate
+              setState({
+                user: null,
+                profile: null,
+                loading: false,
+                error: null,
+              });
+              router.replace('/(auth)/welcome');
+            }
+          }
+        ]
+      );
+    } finally {
+      // Always reset the flags
       setIsSigningOut(false);
-      Alert.alert('Sign Out Error', error.message);
+      setIsSignOutInProgress(false);
     }
   };
 
