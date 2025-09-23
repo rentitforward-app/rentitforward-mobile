@@ -30,6 +30,8 @@ export default function BookingDetailScreen() {
   const queryClient = useQueryClient();
   const [showCancelModal, setShowCancelModal] = React.useState(false);
   const [showReviewModal, setShowReviewModal] = React.useState(false);
+  const [existingReview, setExistingReview] = React.useState<any>(null);
+  const [reviewCheckLoading, setReviewCheckLoading] = React.useState(true);
 
   // Fetch booking details
   const { data: booking, isLoading, error } = useQuery({
@@ -79,6 +81,57 @@ export default function BookingDetailScreen() {
     },
     enabled: !!id,
   });
+
+  // Effect to check for existing review after booking loads
+  React.useEffect(() => {
+    if (booking && user) {
+      checkExistingReview(booking, user);
+    }
+  }, [booking?.id, user?.id]);
+
+  // Function to check if user has already reviewed this booking
+  const checkExistingReview = async (bookingData: any, userData: any) => {
+    // Return confirmation status
+    const renterConfirmedReturn = bookingData.return_confirmed_by_renter || false;
+    const ownerConfirmedReturn = bookingData.return_confirmed_by_owner || false;
+    const bothReturnConfirmed = renterConfirmedReturn && ownerConfirmedReturn;
+    
+    // Only check for reviews if booking is completed OR both parties confirmed return
+    if (bookingData.status !== 'completed' && !bothReturnConfirmed) {
+      setReviewCheckLoading(false);
+      return;
+    }
+
+    try {
+      const { data: reviewData, error } = await supabase
+        .from('reviews')
+        .select(`
+          id,
+          rating,
+          comment,
+          created_at,
+          type,
+          profiles:reviewer_id (
+            id,
+            full_name,
+            avatar_url
+          )
+        `)
+        .eq('booking_id', bookingData.id)
+        .eq('reviewer_id', userData.id)
+        .single();
+
+      if (reviewData) {
+        setExistingReview(reviewData);
+      } else {
+        setExistingReview(null);
+      }
+    } catch (error) {
+      console.error('Error checking existing review:', error);
+    } finally {
+      setReviewCheckLoading(false);
+    }
+  };
 
   // Helper functions
   const getStatusColor = (status: string) => {
@@ -797,20 +850,103 @@ export default function BookingDetailScreen() {
           </View>
         </View>
 
-        {/* Review Section - Show when booking is completed */}
-        {booking.status === 'completed' && (
-          <View style={styles.reviewSection}>
-            <TouchableOpacity
-              style={styles.reviewButton}
-              onPress={() => setShowReviewModal(true)}
-            >
-              <Ionicons name="star" size={20} color="white" />
-              <Text style={styles.reviewButtonText}>
-                Leave a Review
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        {/* Review Section - Enhanced with existing review display */}
+        {(() => {
+          const renterConfirmedReturn = booking.return_confirmed_by_renter || false;
+          const ownerConfirmedReturn = booking.return_confirmed_by_owner || false;
+          const bothReturnConfirmed = renterConfirmedReturn && ownerConfirmedReturn;
+          const canShowReview = booking.status === 'completed' || bothReturnConfirmed;
+          const canLeaveReview = canShowReview && !existingReview && !reviewCheckLoading;
+
+          if (!canShowReview) return null;
+
+          return (
+            <View style={styles.reviewCard}>
+              {/* Card Header */}
+              <View style={styles.reviewCardHeader}>
+                <View style={styles.reviewIconContainer}>
+                  <Ionicons name="star" size={20} color={colors.semantic.warning} />
+                </View>
+                <Text style={styles.reviewCardTitle}>Review Experience</Text>
+              </View>
+              
+              {existingReview ? (
+                /* Show existing review */
+                <View style={styles.existingReviewContainer}>
+                  <View style={styles.reviewHeader}>
+                    {/* Profile Image */}
+                    {existingReview.profiles?.avatar_url ? (
+                      <Image
+                        source={{ uri: existingReview.profiles.avatar_url }}
+                        style={styles.reviewerAvatar}
+                      />
+                    ) : (
+                      <View style={styles.reviewerAvatarPlaceholder}>
+                        <Ionicons name="person" size={20} color={colors.gray[600]} />
+                      </View>
+                    )}
+                    
+                    <View style={styles.reviewInfo}>
+                      {/* Reviewer Name and Rating */}
+                      <Text style={styles.reviewerName}>Your Review</Text>
+                      <View style={styles.reviewRatingContainer}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Ionicons
+                            key={star}
+                            name={star <= existingReview.rating ? 'star' : 'star-outline'}
+                            size={16}
+                            color={star <= existingReview.rating ? colors.semantic.warning : colors.gray[300]}
+                            style={{ marginRight: 2 }}
+                          />
+                        ))}
+                        <Text style={styles.reviewRatingText}>
+                          {existingReview.rating}/5
+                        </Text>
+                      </View>
+                      {/* Review Date */}
+                      <Text style={styles.reviewDate}>
+                        Reviewed on {new Date(existingReview.created_at).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                      </Text>
+                    </View>
+                  </View>
+                  
+                  {/* Review Comment */}
+                  {existingReview.comment && (
+                    <Text style={styles.reviewComment}>
+                      {existingReview.comment}
+                    </Text>
+                  )}
+                </View>
+              ) : canLeaveReview ? (
+                /* Show review button */
+                <View style={styles.reviewPromptContainer}>
+                  <Text style={styles.reviewPromptText}>
+                    Your rental experience is complete! Share your review to help other renters.
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.reviewButton}
+                    onPress={() => setShowReviewModal(true)}
+                  >
+                    <Ionicons name="star" size={20} color="white" />
+                    <Text style={styles.reviewButtonText}>
+                      Leave a Review
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                /* Loading state */
+                <View style={styles.reviewLoadingContainer}>
+                  <ActivityIndicator size="small" color={colors.primary.main} />
+                  <Text style={styles.reviewLoadingText}>Checking review status...</Text>
+                </View>
+              )}
+            </View>
+          );
+        })()}
 
         {/* Bottom Spacing */}
         <View style={styles.bottomSpacing} />
@@ -1335,25 +1471,124 @@ const styles = StyleSheet.create({
   bottomSpacing: {
     height: spacing.xl,
   },
-  reviewSection: {
+  reviewCard: {
     backgroundColor: colors.white,
     marginHorizontal: spacing.md,
-    marginBottom: spacing.md,
     borderRadius: 12,
     padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  reviewCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  reviewIconContainer: {
+    width: 32,
+    height: 32,
+    backgroundColor: colors.semantic.warning + '20',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+  },
+  reviewCardTitle: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.primary,
+  },
+  existingReviewContainer: {
+    backgroundColor: colors.gray[50],
+    borderRadius: 8,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: spacing.sm,
+  },
+  reviewerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: spacing.sm,
+  },
+  reviewerAvatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.gray[200],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+  },
+  reviewInfo: {
+    flex: 1,
+  },
+  reviewerName: {
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.primary,
+    marginBottom: 4,
+  },
+  reviewRatingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  reviewRatingText: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.medium,
+    color: colors.text.primary,
+    marginLeft: spacing.xs,
+  },
+  reviewDate: {
+    fontSize: typography.sizes.xs,
+    color: colors.text.secondary,
+  },
+  reviewComment: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.primary,
+    lineHeight: 20,
+    marginTop: spacing.sm,
+  },
+  reviewPromptContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  reviewPromptText: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+    lineHeight: 20,
   },
   reviewButton: {
     backgroundColor: colors.primary.main,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: 8,
   },
   reviewButtonText: {
-    color: 'white',
+    color: colors.white,
     fontSize: typography.sizes.base,
     fontWeight: typography.weights.semibold,
+    marginLeft: spacing.sm,
+  },
+  reviewLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+  },
+  reviewLoadingText: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
     marginLeft: spacing.sm,
   },
 });
