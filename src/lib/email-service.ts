@@ -45,7 +45,7 @@ export class EmailService {
 
   constructor() {
     this.provider = process.env.EXPO_PUBLIC_EMAIL_PROVIDER || 'console';
-    this.fromEmail = process.env.EXPO_PUBLIC_FROM_EMAIL || 'noreply@rentitforward.com.au';
+    this.fromEmail = process.env.EXPO_PUBLIC_FROM_EMAIL || 'Rent it Forward <noreply@rentitforward.com.au>';
     
     // Debug logging
     console.log('📧 Mobile Email Service Configuration:');
@@ -266,6 +266,7 @@ export class EmailService {
 <body>
     <div class="container">
         <div class="header">
+            <img src="https://rentitforward.com.au/assets/images/RentitForwardMainLogo.png" alt="Rent it Forward" class="logo" />
             <h1>🎉 Booking Confirmed!</h1>
             <p>Your rental is all set, ${recipientName}!</p>
         </div>
@@ -306,8 +307,10 @@ export class EmailService {
         </div>
         
         <div class="footer">
-            <p>Need help? Contact us at support@rentitforward.com.au</p>
-            <p>© 2024 Rent It Forward - Sustainable Sharing Platform</p>
+            <p><strong>Rent it Forward</strong> - Share More, Buy Less</p>
+            <p>Building communities, one rental at a time.</p>
+            <p>📧 <a href="mailto:hello@rentitforward.com.au" style="color: #44D62C;">hello@rentitforward.com.au</a> | 🌐 <a href="https://rentitforward.com.au" style="color: #44D62C;">rentitforward.com.au</a></p>
+            <p style="font-size: 12px; margin-top: 15px;">© 2025 Rent it Forward. All rights reserved.</p>
         </div>
     </div>
 </body>
@@ -343,6 +346,7 @@ export class EmailService {
 <body>
     <div class="container">
         <div class="header">
+            <img src="https://rentitforward.com.au/assets/images/RentitForwardMainLogo.png" alt="Rent it Forward" class="logo" />
             <h1>💰 New Booking Confirmed!</h1>
             <p>Great news, ${recipientName}! You have a new booking.</p>
         </div>
@@ -383,8 +387,10 @@ export class EmailService {
         </div>
         
         <div class="footer">
-            <p>Questions? Contact us at support@rentitforward.com.au</p>
-            <p>© 2024 Rent It Forward - Sustainable Sharing Platform</p>
+            <p><strong>Rent it Forward</strong> - Share More, Buy Less</p>
+            <p>Building communities, one rental at a time.</p>
+            <p>📧 <a href="mailto:hello@rentitforward.com.au" style="color: #44D62C;">hello@rentitforward.com.au</a> | 🌐 <a href="https://rentitforward.com.au" style="color: #44D62C;">rentitforward.com.au</a></p>
+            <p style="font-size: 12px; margin-top: 15px;">© 2025 Rent it Forward. All rights reserved.</p>
         </div>
     </div>
 </body>
