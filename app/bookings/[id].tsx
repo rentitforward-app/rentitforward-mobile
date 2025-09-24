@@ -168,6 +168,40 @@ export default function BookingDetailScreen() {
     }
   };
 
+  const getStatusDescription = (status: string) => {
+    switch (status) {
+      case 'confirmed':
+        return 'Your booking is confirmed and ready for pickup';
+      case 'pending':
+        return 'Waiting for host approval';
+      case 'payment_required':
+        return 'Complete payment to confirm your booking';
+      case 'cancelled':
+        return 'This booking has been cancelled';
+      case 'completed':
+        return 'Rental completed successfully';
+      default:
+        return '';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'confirmed':
+        return 'checkmark-circle';
+      case 'pending':
+        return 'time-outline';
+      case 'payment_required':
+        return 'card-outline';
+      case 'cancelled':
+        return 'close-circle';
+      case 'completed':
+        return 'checkmark-done-circle';
+      default:
+        return 'information-circle-outline';
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -485,15 +519,9 @@ export default function BookingDetailScreen() {
       />
 
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        {/* Status Badge */}
-        <View style={styles.statusContainer}>
-          <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
-            <Text style={[styles.statusText, { color: statusColor.text }]}>
-              {getStatusText(booking.status)}
-            </Text>
-          </View>
-        </View>
-
+        {/* Top Spacing */}
+        <View style={styles.topSpacing} />
+        
         {/* Item Information */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Item Information</Text>
@@ -511,6 +539,29 @@ export default function BookingDetailScreen() {
               <Text style={styles.itemPrice}>
                 {formatPrice(booking.price_per_day)}/day
               </Text>
+              
+              {/* Booking Status - Now with context */}
+              <View style={styles.bookingStatusContainer}>
+                <View style={styles.statusRow}>
+                  <Ionicons 
+                    name={getStatusIcon(booking.status)} 
+                    size={20} 
+                    color={statusColor.bg} 
+                    style={styles.statusIcon}
+                  />
+                  <Text style={styles.bookingStatusLabel}>Booking Status:</Text>
+                  <View style={[styles.statusBadge, { backgroundColor: statusColor.bg }]}>
+                    <Text style={[styles.statusText, { color: statusColor.text }]}>
+                      {getStatusText(booking.status)}
+                    </Text>
+                  </View>
+                </View>
+                {getStatusDescription(booking.status) && (
+                  <Text style={styles.statusDescription}>
+                    {getStatusDescription(booking.status)}
+                  </Text>
+                )}
+              </View>
             </View>
           </View>
         </View>
@@ -608,10 +659,6 @@ export default function BookingDetailScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Your Host</Text>
           <View style={styles.hostCard}>
-            <View style={styles.hostHeader}>
-              <Ionicons name="person" size={24} color={colors.primary.main} />
-              <Text style={styles.hostTitle}>Your Host</Text>
-            </View>
             <View style={styles.hostInfo}>
               {booking.listings?.profiles?.avatar_url ? (
                 <Image 
@@ -628,6 +675,15 @@ export default function BookingDetailScreen() {
                 <Text style={styles.hostRole}>Host</Text>
               </View>
             </View>
+            <TouchableOpacity 
+              style={[styles.hostMessageButton]}
+              onPress={() => {
+                router.push(`/messages/${booking.id}`);
+              }}
+            >
+              <Ionicons name="chatbubble-outline" size={18} color={colors.primary.main} />
+              <Text style={styles.hostMessageButtonText}>Message</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -711,15 +767,6 @@ export default function BookingDetailScreen() {
               <Text style={styles.reportButtonText}>Report Issue</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.messageButton]}
-              onPress={() => {
-                router.push(`/messages/${booking.id}`);
-              }}
-            >
-              <Ionicons name="chatbubble-outline" size={20} color={colors.primary.main} />
-              <Text style={styles.messageButtonText}>Message Host</Text>
-            </TouchableOpacity>
             
             <TouchableOpacity 
               style={[styles.actionButton, styles.viewButton]}
@@ -1000,6 +1047,9 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flex: 1,
   },
+  topSpacing: {
+    height: spacing.lg,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -1041,14 +1091,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.base,
     fontWeight: typography.weights.semibold,
   },
-  statusContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.md,
-    backgroundColor: colors.white,
-    marginBottom: spacing.sm,
-  },
   statusBadge: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
@@ -1057,6 +1099,32 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: typography.sizes.sm,
     fontWeight: typography.weights.semibold,
+  },
+  bookingStatusContainer: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray[200],
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  statusIcon: {
+    marginRight: spacing.sm,
+  },
+  bookingStatusLabel: {
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.medium,
+    color: colors.text.primary,
+    marginRight: spacing.sm,
+  },
+  statusDescription: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.secondary,
+    fontStyle: 'italic',
+    marginTop: spacing.xs,
   },
   section: {
     marginBottom: spacing.md,
@@ -1252,20 +1320,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: spacing.md,
   },
-  hostHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  hostTitle: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.semibold,
-    color: colors.text.primary,
-    marginLeft: spacing.sm,
-  },
   hostInfo: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: spacing.md,
   },
   hostAvatar: {
     width: 50,
@@ -1293,6 +1351,24 @@ const styles = StyleSheet.create({
   hostRole: {
     fontSize: typography.sizes.sm,
     color: colors.text.secondary,
+  },
+  hostMessageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.primary.main,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    borderRadius: 8,
+    width: '100%',
+  },
+  hostMessageButtonText: {
+    color: colors.primary.main,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold,
+    marginLeft: spacing.sm,
   },
   paymentSummaryCard: {
     backgroundColor: colors.white,
