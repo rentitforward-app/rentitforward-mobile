@@ -119,6 +119,89 @@ serve(async (req) => {
         break
       }
 
+      case 'payment_intent.succeeded': {
+        const paymentIntent = event.data.object as Stripe.PaymentIntent
+        console.log('Payment intent succeeded:', paymentIntent.id)
+
+        // Find booking by payment intent ID
+        const { data: booking, error: findError } = await supabaseClient
+          .from('bookings')
+          .select('id, status')
+          .eq('stripe_payment_intent_id', paymentIntent.id)
+          .single()
+
+        if (findError || !booking) {
+          console.error('Booking not found for payment intent:', paymentIntent.id)
+          return new Response('Booking not found', { status: 404 })
+        }
+
+        // Update payment status
+        const { error: updateError } = await supabaseClient
+          .from('bookings')
+          .update({
+            payment_status: 'succeeded',
+            paid_at: new Date().toISOString(),
+          })
+          .eq('id', booking.id)
+
+        if (updateError) {
+          console.error('Error updating payment status:', updateError)
+          return new Response('Database error', { status: 500 })
+        }
+
+        console.log('Payment status updated for booking:', booking.id)
+        break
+      }
+
+      case 'transfer.created': {
+        const transfer = event.data.object as Stripe.Transfer
+        console.log('Transfer created:', transfer.id)
+
+        // Find booking by payment intent ID from transfer metadata
+        const bookingId = transfer.metadata?.bookingId
+        if (!bookingId) {
+          console.error('No booking ID found in transfer metadata')
+          return new Response('No booking ID in transfer', { status: 400 })
+        }
+
+        // Update booking with transfer ID
+        const { error: updateError } = await supabaseClient
+          .from('bookings')
+          .update({
+            stripe_transfer_id: transfer.id,
+          })
+          .eq('id', bookingId)
+
+        if (updateError) {
+          console.error('Error updating transfer ID:', updateError)
+          return new Response('Database error', { status: 500 })
+        }
+
+        console.log('Transfer ID updated for booking:', bookingId)
+        break
+      }
+
+      case 'account.updated': {
+        const account = event.data.object as Stripe.Account
+        console.log('Account updated:', account.id)
+
+        // Update profile with account status
+        const { error: updateError } = await supabaseClient
+          .from('profiles')
+          .update({
+            stripe_onboarding_completed: account.details_submitted && account.charges_enabled,
+          })
+          .eq('stripe_account_id', account.id)
+
+        if (updateError) {
+          console.error('Error updating account status:', updateError)
+          return new Response('Database error', { status: 500 })
+        }
+
+        console.log('Account status updated for:', account.id)
+        break
+      }
+
       default:
         console.log('Unhandled event type:', event.type)
     }

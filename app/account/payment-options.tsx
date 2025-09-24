@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,43 +7,214 @@ import {
   Alert,
   Linking,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography } from '../../src/lib/design-system';
 import { Header } from '../../src/components/Header';
+import { supabase } from '../../src/lib/supabase';
+
+interface AccountStatus {
+  has_account: boolean;
+  onboarding_completed: boolean;
+  charges_enabled: boolean;
+  payouts_enabled: boolean;
+  requirements: string[];
+  payout_methods: Array<{
+    id: string;
+    type: string;
+    last4: string;
+    bank_name?: string;
+    currency: string;
+    default_for_currency: boolean;
+  }>;
+  recent_payouts: Array<{
+    id: string;
+    amount: number;
+    currency: string;
+    status: string;
+    arrival_date: number;
+    created: number;
+  }>;
+  payout_schedule: {
+    interval: string;
+    delay_days?: number;
+  } | null;
+}
 
 export default function PaymentOptionsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const [accountStatus, setAccountStatus] = useState<AccountStatus | null>(null);
+  const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const handleOpenSettings = async () => {
-    setActionLoading(true);
+  const fetchAccountStatus = async () => {
     try {
-      // Simple redirect to web app settings with anchor to seller account section
-      const webUrl = 'https://rentitforward.com.au/settings#seller-account';
-      const canOpen = await Linking.canOpenURL(webUrl);
-      if (canOpen) {
-        await Linking.openURL(webUrl);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch('https://rentitforward.com.au/api/mobile/stripe/account-status', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAccountStatus(data);
       } else {
-        Alert.alert('Error', 'Cannot open web browser');
+        console.error('Failed to fetch account status');
       }
-    } catch (err) {
-      Alert.alert('Error', 'Failed to open settings. Please try again.');
+    } catch (error) {
+      console.error('Error fetching account status:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAccountStatus();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchAccountStatus();
+  };
+
+  const handleStartOnboarding = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      setActionLoading(true);
+
+      const response = await fetch('https://rentitforward.com.au/api/mobile/stripe/create-onboarding-link', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        await Linking.openURL(data.url);
+      } else {
+        Alert.alert('Error', 'Failed to create onboarding link');
+      }
+    } catch (error) {
+      console.error('Error starting onboarding:', error);
+      Alert.alert('Error', 'Something went wrong. Please try again.');
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleViewTransactionHistory = () => {
-    Alert.alert(
-      'Transaction History',
-      'Transaction history will be available soon.',
-      [{ text: 'OK' }]
-    );
+  const handleRefreshOnboarding = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      setActionLoading(true);
+
+      const response = await fetch('https://rentitforward.com.au/api/mobile/stripe/refresh-onboarding', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        await Linking.openURL(data.url);
+      } else {
+        Alert.alert('Error', 'Failed to refresh onboarding link');
+      }
+    } catch (error) {
+      console.error('Error refreshing onboarding:', error);
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    } finally {
+      setActionLoading(false);
+    }
   };
+
+  const handleManagePayouts = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      setActionLoading(true);
+
+      const response = await fetch('https://rentitforward.com.au/api/mobile/stripe/login-link', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        await Linking.openURL(data.url);
+      } else {
+        Alert.alert('Error', 'Failed to create dashboard link');
+      }
+    } catch (error) {
+      console.error('Error creating dashboard link:', error);
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const getStatusColor = () => {
+    if (!accountStatus?.has_account) return colors.gray[500];
+    if (!accountStatus.onboarding_completed) return colors.semantic.warning;
+    if (accountStatus.requirements.length > 0) return colors.semantic.warning;
+    return colors.semantic.success;
+  };
+
+  const getStatusText = () => {
+    if (!accountStatus?.has_account) return 'Not Set Up';
+    if (!accountStatus.onboarding_completed) return 'Setup Required';
+    if (accountStatus.requirements.length > 0) return 'Action Required';
+    return 'Active';
+  };
+
+  const getStatusIcon = () => {
+    if (!accountStatus?.has_account) return 'alert-circle-outline';
+    if (!accountStatus.onboarding_completed) return 'time-outline';
+    if (accountStatus.requirements.length > 0) return 'warning-outline';
+    return 'checkmark-circle-outline';
+  };
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.gray[50] }}>
+        <Header 
+          title="Payment Options" 
+          showBackButton 
+          onBackPress={() => router.back()} 
+        />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary.main} />
+          <Text style={{ 
+            marginTop: spacing.md, 
+            color: colors.gray[600],
+            fontSize: typography.sizes.base 
+          }}>
+            Loading account status...
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.gray[50] }}>
@@ -53,10 +224,16 @@ export default function PaymentOptionsScreen() {
         onBackPress={() => router.back()} 
       />
 
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={{ flex: 1 }} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         <View style={{ padding: spacing.lg }}>
 
-          {/* Seller Account */}
+          {/* Account Status */}
           <View style={{
             backgroundColor: colors.white,
             borderRadius: 12,
@@ -70,19 +247,41 @@ export default function PaymentOptionsScreen() {
             <View style={{
               flexDirection: 'row',
               alignItems: 'center',
+              justifyContent: 'space-between',
               paddingHorizontal: spacing.lg,
               paddingTop: spacing.lg,
               paddingBottom: spacing.md,
             }}>
-              <Ionicons name="card-outline" size={24} color={colors.primary.main} />
-              <Text style={{
-                fontSize: typography.sizes.lg,
-                fontWeight: typography.weights.semibold,
-                color: colors.gray[900],
-                marginLeft: spacing.sm,
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="card-outline" size={24} color={colors.primary.main} />
+                <Text style={{
+                  fontSize: typography.sizes.lg,
+                  fontWeight: typography.weights.semibold,
+                  color: colors.gray[900],
+                  marginLeft: spacing.sm,
+                }}>
+                  Seller Account
+                </Text>
+              </View>
+              
+              <View style={{ 
+                flexDirection: 'row', 
+                alignItems: 'center',
+                backgroundColor: getStatusColor() + '20',
+                paddingHorizontal: spacing.sm,
+                paddingVertical: spacing.xs,
+                borderRadius: 16,
               }}>
-                Seller Account
-              </Text>
+                <Ionicons name={getStatusIcon()} size={16} color={getStatusColor()} />
+                <Text style={{
+                  fontSize: typography.sizes.sm,
+                  fontWeight: typography.weights.medium,
+                  color: getStatusColor(),
+                  marginLeft: spacing.xs,
+                }}>
+                  {getStatusText()}
+                </Text>
+              </View>
             </View>
             
             <Text style={{
@@ -95,105 +294,188 @@ export default function PaymentOptionsScreen() {
             </Text>
 
             <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
-              <View style={{
-                backgroundColor: colors.semantic.info + '10',
-                padding: spacing.md,
-                borderRadius: 8,
-                marginBottom: spacing.md,
-              }}>
-                <Text style={{
-                  fontSize: typography.sizes.sm,
-                  fontWeight: typography.weights.medium,
-                  color: colors.semantic.info,
-                  marginBottom: spacing.sm,
-                }}>
-                  Manage Your Seller Account
-                </Text>
-                <Text style={{
-                  fontSize: typography.sizes.sm,
-                  color: colors.gray[600],
-                  lineHeight: 18,
-                }}>
-                  Set up and manage your Stripe Connect account to receive payments from renters. All account management is handled through our web platform.
-                </Text>
-              </View>
+              {!accountStatus?.has_account || !accountStatus.onboarding_completed ? (
+                <>
+                  <View style={{
+                    backgroundColor: colors.semantic.info + '10',
+                    padding: spacing.md,
+                    borderRadius: 8,
+                    marginBottom: spacing.md,
+                  }}>
+                    <Text style={{
+                      fontSize: typography.sizes.sm,
+                      fontWeight: typography.weights.medium,
+                      color: colors.semantic.info,
+                      marginBottom: spacing.sm,
+                    }}>
+                      {!accountStatus?.has_account ? 'Setup Required' : 'Complete Your Setup'}
+                    </Text>
+                    <Text style={{
+                      fontSize: typography.sizes.sm,
+                      color: colors.gray[600],
+                      lineHeight: 18,
+                    }}>
+                      {!accountStatus?.has_account 
+                        ? 'Create your Stripe Connect account to start receiving payments from renters.'
+                        : 'Complete your account setup to start receiving payments.'
+                      }
+                    </Text>
+                  </View>
 
-              <TouchableOpacity
-                onPress={handleOpenSettings}
-                disabled={actionLoading}
-                style={{
-                  backgroundColor: colors.primary.main,
-                  paddingVertical: spacing.md,
-                  paddingHorizontal: spacing.lg,
-                  borderRadius: 8,
-                  alignItems: 'center',
-                  opacity: actionLoading ? 0.6 : 1,
-                }}
-              >
-                {actionLoading ? (
-                  <ActivityIndicator size="small" color={colors.white} />
-                ) : (
-                  <Text style={{
-                    color: colors.white,
-                    fontSize: typography.sizes.base,
-                    fontWeight: typography.weights.semibold,
+                  <TouchableOpacity
+                    onPress={!accountStatus?.has_account ? handleStartOnboarding : handleRefreshOnboarding}
+                    disabled={actionLoading}
+                    style={{
+                      backgroundColor: colors.primary.main,
+                      paddingVertical: spacing.md,
+                      paddingHorizontal: spacing.lg,
+                      borderRadius: 8,
+                      alignItems: 'center',
+                      opacity: actionLoading ? 0.6 : 1,
+                    }}
+                  >
+                    {actionLoading ? (
+                      <ActivityIndicator size="small" color={colors.white} />
+                    ) : (
+                      <Text style={{
+                        color: colors.white,
+                        fontSize: typography.sizes.base,
+                        fontWeight: typography.weights.semibold,
+                      }}>
+                        {!accountStatus?.has_account ? 'Start Setup' : 'Complete Setup'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  {/* Account Details */}
+                  <View style={{
+                    backgroundColor: colors.semantic.success + '10',
+                    padding: spacing.md,
+                    borderRadius: 8,
+                    marginBottom: spacing.md,
                   }}>
-                    Open Settings
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
+                    <Text style={{
+                      fontSize: typography.sizes.sm,
+                      fontWeight: typography.weights.medium,
+                      color: colors.semantic.success,
+                      marginBottom: spacing.sm,
+                    }}>
+                      Account Active
+                    </Text>
+                    <Text style={{
+                      fontSize: typography.sizes.sm,
+                      color: colors.gray[600],
+                      lineHeight: 18,
+                    }}>
+                      Your account is set up and ready to receive payments.
+                    </Text>
+                  </View>
 
-          {/* Transaction History */}
-          <View style={{
-            backgroundColor: colors.white,
-            borderRadius: 12,
-            marginBottom: spacing.lg,
-            shadowColor: colors.black,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 4,
-            elevation: 3,
-          }}>
-            <Text style={{
-              fontSize: typography.sizes.lg,
-              fontWeight: typography.weights.semibold,
-              color: colors.gray[900],
-              paddingHorizontal: spacing.lg,
-              paddingTop: spacing.lg,
-              paddingBottom: spacing.md,
-            }}>
-              Transaction History
-            </Text>
-            
-            <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>
-              <TouchableOpacity
-                onPress={handleViewTransactionHistory}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingVertical: spacing.md,
-                }}
-              >
-                <Ionicons name="receipt-outline" size={24} color={colors.gray[600]} />
-                <View style={{ flex: 1, marginLeft: spacing.md }}>
-                  <Text style={{
-                    fontSize: typography.sizes.base,
-                    color: colors.gray[900],
-                  }}>
-                    View All Transactions
-                  </Text>
-                  <Text style={{
-                    fontSize: typography.sizes.sm,
-                    color: colors.gray[500],
-                    marginTop: spacing.xs / 2,
-                  }}>
-                    See your payment and payout history
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.gray[400]} />
-              </TouchableOpacity>
+                  {/* Payout Methods */}
+                  {accountStatus.payout_methods.length > 0 && (
+                    <View style={{ marginBottom: spacing.md }}>
+                      <Text style={{
+                        fontSize: typography.sizes.sm,
+                        fontWeight: typography.weights.medium,
+                        color: colors.gray[900],
+                        marginBottom: spacing.sm,
+                      }}>
+                        Payout Method
+                      </Text>
+                      {accountStatus.payout_methods.map((method) => (
+                        <View key={method.id} style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          backgroundColor: colors.gray[50],
+                          padding: spacing.sm,
+                          borderRadius: 8,
+                          marginBottom: spacing.xs,
+                        }}>
+                          <Ionicons 
+                            name={method.type === 'bank_account' ? 'card-outline' : 'card'} 
+                            size={20} 
+                            color={colors.gray[600]} 
+                          />
+                          <Text style={{
+                            fontSize: typography.sizes.sm,
+                            color: colors.gray[900],
+                            marginLeft: spacing.sm,
+                          }}>
+                            {method.bank_name || 'Bank Account'} •••• {method.last4}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Recent Payouts */}
+                  {accountStatus.recent_payouts.length > 0 && (
+                    <View style={{ marginBottom: spacing.md }}>
+                      <Text style={{
+                        fontSize: typography.sizes.sm,
+                        fontWeight: typography.weights.medium,
+                        color: colors.gray[900],
+                        marginBottom: spacing.sm,
+                      }}>
+                        Recent Payouts
+                      </Text>
+                      {accountStatus.recent_payouts.slice(0, 3).map((payout) => (
+                        <View key={payout.id} style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          backgroundColor: colors.gray[50],
+                          padding: spacing.sm,
+                          borderRadius: 8,
+                          marginBottom: spacing.xs,
+                        }}>
+                          <Text style={{
+                            fontSize: typography.sizes.sm,
+                            color: colors.gray[900],
+                          }}>
+                            ${payout.amount.toFixed(2)} {payout.currency.toUpperCase()}
+                          </Text>
+                          <Text style={{
+                            fontSize: typography.sizes.xs,
+                            color: colors.gray[500],
+                          }}>
+                            {payout.status}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    onPress={handleManagePayouts}
+                    disabled={actionLoading}
+                    style={{
+                      backgroundColor: colors.white,
+                      borderWidth: 1,
+                      borderColor: colors.primary.main,
+                      paddingVertical: spacing.md,
+                      paddingHorizontal: spacing.lg,
+                      borderRadius: 8,
+                      alignItems: 'center',
+                      opacity: actionLoading ? 0.6 : 1,
+                    }}
+                  >
+                    {actionLoading ? (
+                      <ActivityIndicator size="small" color={colors.primary.main} />
+                    ) : (
+                      <Text style={{
+                        color: colors.primary.main,
+                        fontSize: typography.sizes.base,
+                        fontWeight: typography.weights.semibold,
+                      }}>
+                        Manage Payout Details
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </View>
 

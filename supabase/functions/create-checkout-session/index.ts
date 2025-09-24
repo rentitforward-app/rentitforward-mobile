@@ -50,13 +50,17 @@ serve(async (req) => {
       }
     )
 
-    // Get booking details with renter profile for email
+    // Get booking details with renter and owner profiles
     const { data: booking, error: bookingError } = await supabaseClient
       .from('bookings')
       .select(`
         *,
-        profiles!renter_id (
+        renter:profiles!renter_id (
           email
+        ),
+        owner:profiles!owner_id (
+          stripe_account_id,
+          stripe_onboarding_completed
         )
       `)
       .eq('id', bookingId)
@@ -76,6 +80,14 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'Booking not found or not eligible for payment' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Validate owner has completed Stripe onboarding
+    if (!booking.owner?.stripe_account_id || !booking.owner?.stripe_onboarding_completed) {
+      return new Response(
+        JSON.stringify({ error: 'Owner has not completed payment setup. Please contact the owner.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -165,9 +177,11 @@ serve(async (req) => {
       metadata: {
         bookingId: booking.id,
         renterId: booking.renter_id,
+        ownerId: booking.owner_id,
         listingId: booking.listing_id,
+        ownerStripeAccount: booking.owner?.stripe_account_id || '',
       },
-      customer_email: booking.profiles?.email || undefined,
+      customer_email: booking.renter?.email || undefined,
       expires_at: Math.floor(Date.now() / 1000) + (30 * 60), // 30 minutes from now
     })
 
