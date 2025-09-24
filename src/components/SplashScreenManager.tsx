@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Text, Platform } from 'react-native';
 import { SplashScreen } from 'expo-router';
 
 interface SplashScreenManagerProps {
@@ -10,20 +10,31 @@ interface SplashScreenManagerProps {
 export function SplashScreenManager({ isReady, children }: SplashScreenManagerProps) {
   const [appIsReady, setAppIsReady] = useState(false);
   const [splashHidden, setSplashHidden] = useState(false);
+  const [startTime] = useState(Date.now());
 
   useEffect(() => {
     if (isReady && !appIsReady) {
       setAppIsReady(true);
       
-      // Hide splash screen with proper error handling
+      // Hide splash screen with proper error handling and minimum duration
       const hideSplash = async () => {
         try {
-          // Add delay for iOS production builds
-          const delay = __DEV__ ? 100 : 1000;
-          await new Promise(resolve => setTimeout(resolve, delay));
+          // Calculate minimum splash duration based on platform and build type
+          const minDuration = __DEV__ ? 500 : Platform.OS === 'ios' ? 2000 : 1500;
+          const elapsed = Date.now() - startTime;
+          const remainingDelay = Math.max(0, minDuration - elapsed);
+          
+          console.log(`Splash screen timing: elapsed=${elapsed}ms, remaining=${remainingDelay}ms`);
+          
+          // Wait for minimum duration
+          if (remainingDelay > 0) {
+            await new Promise(resolve => setTimeout(resolve, remainingDelay));
+          }
           
           await SplashScreen.hideAsync();
           setSplashHidden(true);
+          
+          console.log('Splash screen hidden successfully');
         } catch (error) {
           console.warn('Failed to hide splash screen:', error);
           // Force hide after timeout
@@ -33,7 +44,7 @@ export function SplashScreenManager({ isReady, children }: SplashScreenManagerPr
 
       hideSplash();
     }
-  }, [isReady, appIsReady]);
+  }, [isReady, appIsReady, startTime]);
 
   // Show loading screen until splash is properly hidden
   if (!appIsReady || !splashHidden) {

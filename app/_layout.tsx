@@ -1,19 +1,12 @@
 import React from 'react';
 import { Stack } from 'expo-router';
-import { AuthProvider, useAuth } from '../src/components/AuthProvider';
-import { FCMProvider } from '../src/components/FCMProvider';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { queryClient } from '../src/lib/query-client';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SplashScreenManager } from '../src/components/SplashScreenManager';
-import { initSentry } from '../src/lib/sentry';
+import { AppInitializationProvider, useAppInitialization } from '../src/components/AppInitializationManager';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { NotificationService } from '../src/components/NotificationService';
 // import { TrackingPermissionProvider } from '../src/components/TrackingPermissionProvider';
-
-// Initialize Sentry as early as possible
-initSentry();
 
 // Suppress Text component warnings in development mode
 if (__DEV__) {
@@ -31,10 +24,10 @@ if (__DEV__) {
 }
 
 function RootLayoutNav() {
-  const { loading } = useAuth();
+  const { isAppReady } = useAppInitialization();
   
   return (
-    <SplashScreenManager isReady={!loading}>
+    <SplashScreenManager isReady={isAppReady}>
       <NotificationService />
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -62,17 +55,13 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <FCMProvider>
-              {/* <TrackingPermissionProvider> */}
-                <SafeAreaProvider>
-                  <RootLayoutNav />
-                </SafeAreaProvider>
-              {/* </TrackingPermissionProvider> */}
-            </FCMProvider>
-          </AuthProvider>
-        </QueryClientProvider>
+        <AppInitializationProvider>
+          {/* <TrackingPermissionProvider> */}
+            <SafeAreaProvider>
+              <RootLayoutNav />
+            </SafeAreaProvider>
+          {/* </TrackingPermissionProvider> */}
+        </AppInitializationProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>
   );

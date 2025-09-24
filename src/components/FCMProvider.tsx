@@ -36,9 +36,10 @@ const FCMContext = createContext<FCMContextType | null>(null);
 
 interface FCMProviderProps {
   children: React.ReactNode;
+  onReady?: () => void;
 }
 
-export function FCMProvider({ children }: FCMProviderProps) {
+export function FCMProvider({ children, onReady }: FCMProviderProps) {
   const { user } = useAuth();
   const hasInitialized = useRef(false);
   const fcmService = getFCMService();
@@ -70,8 +71,13 @@ export function FCMProvider({ children }: FCMProviderProps) {
         setBadgeCountState(count);
         
         console.log('FCM initialized:', { permission, enabled, count });
+        
+        // Notify that FCM is ready
+        onReady?.();
       } catch (error) {
         console.error('Failed to initialize FCM:', error);
+        // Notify that FCM is ready even on error (don't block app initialization)
+        onReady?.();
       }
     };
 
