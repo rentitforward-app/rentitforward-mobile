@@ -373,41 +373,72 @@ export default function MyListingsScreen() {
     ? ratingsWithReviews.reduce((sum, listing) => sum + listing.rating, 0) / ratingsWithReviews.length
     : 0;
 
-  const renderTabButton = (tab: 'items' | 'bookings' | 'earnings', label: string, count?: number) => (
-    <TouchableOpacity
-      onPress={() => setActiveTab(tab)}
-      style={{
-        flex: 1,
-        paddingVertical: spacing.sm,
-        borderBottomWidth: 2,
-        borderBottomColor: activeTab === tab ? colors.primary.main : 'transparent',
-        alignItems: 'center',
-      }}
-    >
-      <Text style={{
-        fontSize: typography.sizes.sm,
-        fontWeight: activeTab === tab ? typography.weights.semibold : typography.weights.medium,
-        color: activeTab === tab ? colors.primary.main : colors.text.secondary,
-      }}>
-        {label}
-        {count !== undefined && (
-          <Text style={{ color: colors.text.secondary }}> ({count})</Text>
-        )}
-      </Text>
-    </TouchableOpacity>
-  );
+  const renderTabButton = (tab: 'items' | 'bookings' | 'earnings', label: string) => {
+    const getTabIcon = () => {
+      switch (tab) {
+        case 'items':
+          return 'cube-outline';
+        case 'bookings':
+          return 'calendar-outline';
+        case 'earnings':
+          return 'cash-outline';
+        default:
+          return 'cube-outline';
+      }
+    };
+
+    return (
+      <TouchableOpacity
+        onPress={() => setActiveTab(tab)}
+        style={{
+          flex: 1,
+          paddingVertical: spacing.md,
+          paddingHorizontal: spacing.sm,
+          marginHorizontal: spacing.xs,
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor: activeTab === tab ? colors.primary.main : colors.gray[200],
+          backgroundColor: activeTab === tab ? colors.primary.main : colors.white,
+          alignItems: 'center',
+          shadowColor: colors.black,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: activeTab === tab ? 0.15 : 0.05,
+          shadowRadius: 4,
+          elevation: activeTab === tab ? 3 : 1,
+        }}
+      >
+        <Ionicons 
+          name={getTabIcon() as any} 
+          size={20} 
+          color={activeTab === tab ? colors.white : colors.text.secondary}
+          style={{ marginBottom: spacing.xs / 2 }}
+        />
+        <Text style={{
+          fontSize: typography.sizes.sm,
+          fontWeight: activeTab === tab ? typography.weights.bold : typography.weights.medium,
+          color: activeTab === tab ? colors.white : colors.text.secondary,
+          textAlign: 'center',
+        }}>
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
 
   const renderListingCard = ({ item }: { item: Listing }) => (
-    <View style={{
-      backgroundColor: colors.white,
-      borderRadius: 12,
-      padding: spacing.md,
-      marginBottom: spacing.md,
-      shadowColor: colors.black,
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 2,
-    }}>
+    <TouchableOpacity
+      onPress={() => router.push(`/listing/${item.id}`)}
+      style={{
+        backgroundColor: colors.white,
+        borderRadius: 12,
+        padding: spacing.md,
+        marginBottom: spacing.md,
+        shadowColor: colors.black,
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+      }}
+    >
       <View style={{ flexDirection: 'row', marginBottom: spacing.sm }}>
         <View style={{ flex: 1 }}>
           <Text style={{
@@ -462,7 +493,7 @@ export default function MyListingsScreen() {
         </View>
       </View>
 
-      <View style={{ flexDirection: 'row', marginBottom: spacing.sm }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: typography.sizes.sm, color: colors.text.secondary }}>
             {item.view_count} views • {item.total_bookings} bookings
@@ -471,85 +502,9 @@ export default function MyListingsScreen() {
             {formatPrice(item.total_earnings)} earned
           </Text>
         </View>
+        <Ionicons name="chevron-forward" size={20} color={colors.gray[400]} />
       </View>
-
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-        <TouchableOpacity
-          onPress={() => router.push(`/listing/${item.id}`)}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: spacing.sm,
-            paddingVertical: spacing.xs,
-            backgroundColor: colors.gray[100],
-            borderRadius: 8,
-          }}
-        >
-          <Ionicons name="eye-outline" size={16} color={colors.text.secondary} />
-          <Text style={{ fontSize: typography.sizes.sm, color: colors.text.secondary, marginLeft: spacing.xs / 2 }}>
-            View
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => router.push(`/listing/create?edit=${item.id}`)}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: spacing.sm,
-            paddingVertical: spacing.xs,
-            backgroundColor: colors.gray[100],
-            borderRadius: 8,
-          }}
-        >
-          <Ionicons name="create-outline" size={16} color={colors.text.secondary} />
-          <Text style={{ fontSize: typography.sizes.sm, color: colors.text.secondary, marginLeft: spacing.xs / 2 }}>
-            Edit
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => toggleListingStatus(item.id, item.status)}
-          disabled={updatingListings.has(item.id) || item.status === 'pending_approval' || item.status === 'rejected' || item.status === 'rented'}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: spacing.sm,
-            paddingVertical: spacing.xs,
-            backgroundColor: updatingListings.has(item.id) ? colors.gray[200] : colors.gray[100],
-            borderRadius: 8,
-            opacity: (item.status === 'pending_approval' || item.status === 'rejected' || item.status === 'rented') ? 0.5 : 1,
-          }}
-        >
-          <Ionicons 
-            name={item.status === 'active' ? 'pause-outline' : 'play-outline'} 
-            size={16} 
-            color={colors.text.secondary} 
-          />
-          <Text style={{ fontSize: typography.sizes.sm, color: colors.text.secondary, marginLeft: spacing.xs / 2 }}>
-            {item.status === 'active' ? 'Pause' : 'Activate'}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => deleteListing(item.id, item.title)}
-          disabled={updatingListings.has(item.id)}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: spacing.sm,
-            paddingVertical: spacing.xs,
-            backgroundColor: updatingListings.has(item.id) ? colors.gray[200] : colors.semantic.error + '20',
-            borderRadius: 8,
-          }}
-        >
-          <Ionicons name="trash-outline" size={16} color={colors.semantic.error} />
-          <Text style={{ fontSize: typography.sizes.sm, color: colors.semantic.error, marginLeft: spacing.xs / 2 }}>
-            Delete
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+    </TouchableOpacity>
   );
 
   const renderBookingCard = ({ item }: { item: ItemBooking }) => (
@@ -716,48 +671,23 @@ export default function MyListingsScreen() {
     <View style={{ flex: 1, backgroundColor: colors.neutral.lightGray }}>
       <Header {...HeaderPresets.main("My Listings")} />
       
-      {/* Add Item Button */}
+      {/* Enhanced Tabs */}
       <View style={{
-        backgroundColor: colors.white,
+        backgroundColor: colors.gray[50],
         paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
+        paddingVertical: spacing.md,
         borderBottomWidth: 1,
         borderBottomColor: colors.gray[200],
+        shadowColor: colors.black,
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        elevation: 2,
       }}>
-        <TouchableOpacity
-          onPress={() => router.push('/listing/create')}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            paddingHorizontal: spacing.md,
-            paddingVertical: spacing.sm,
-            backgroundColor: colors.primary.main,
-            borderRadius: 8,
-          }}
-        >
-          <Ionicons name="add" size={20} color={colors.white} />
-          <Text style={{
-            fontSize: typography.sizes.sm,
-            color: colors.white,
-            marginLeft: spacing.xs / 2,
-            fontWeight: typography.weights.semibold,
-          }}>
-            Add Item
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Tabs */}
-      <View style={{
-        backgroundColor: colors.white,
-        flexDirection: 'row',
-        borderBottomWidth: 1,
-        borderBottomColor: colors.gray[200],
-      }}>
-        {renderTabButton('items', 'My Items', listings.length)}
-        {renderTabButton('bookings', 'Bookings', itemBookings.length)}
-        {renderTabButton('earnings', 'Earnings')}
+        <View style={{ flexDirection: 'row', gap: spacing.xs }}>
+          {renderTabButton('items', 'My Items')}
+          {renderTabButton('bookings', 'Bookings')}
+          {renderTabButton('earnings', 'Earnings')}
+        </View>
       </View>
 
       <ScrollView
@@ -768,6 +698,44 @@ export default function MyListingsScreen() {
       >
         {activeTab === 'items' && (
           <View style={{ padding: spacing.md }}>
+            {/* Items Count Header */}
+            <View style={{
+              backgroundColor: colors.white,
+              borderRadius: 12,
+              padding: spacing.md,
+              marginBottom: spacing.md,
+              shadowColor: colors.black,
+              shadowOpacity: 0.05,
+              shadowRadius: 2,
+              elevation: 1,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View>
+                  <Text style={{
+                    fontSize: typography.sizes.xl,
+                    fontWeight: typography.weights.bold,
+                    color: colors.text.primary,
+                  }}>
+                    {listings.length}
+                  </Text>
+                  <Text style={{
+                    fontSize: typography.sizes.sm,
+                    color: colors.text.secondary,
+                    marginTop: spacing.xs / 2,
+                  }}>
+                    {listings.length === 1 ? 'Item Listed' : 'Items Listed'}
+                  </Text>
+                </View>
+                <View style={{
+                  backgroundColor: colors.primary.main + '15',
+                  padding: spacing.sm,
+                  borderRadius: 8,
+                }}>
+                  <Ionicons name="cube-outline" size={24} color={colors.primary.main} />
+                </View>
+              </View>
+            </View>
+
             {listings.length === 0 ? (
               <View style={{
                 backgroundColor: colors.white,
@@ -830,6 +798,44 @@ export default function MyListingsScreen() {
 
         {activeTab === 'bookings' && (
           <View style={{ padding: spacing.md }}>
+            {/* Bookings Count Header */}
+            <View style={{
+              backgroundColor: colors.white,
+              borderRadius: 12,
+              padding: spacing.md,
+              marginBottom: spacing.md,
+              shadowColor: colors.black,
+              shadowOpacity: 0.05,
+              shadowRadius: 2,
+              elevation: 1,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View>
+                  <Text style={{
+                    fontSize: typography.sizes.xl,
+                    fontWeight: typography.weights.bold,
+                    color: colors.text.primary,
+                  }}>
+                    {itemBookings.length}
+                  </Text>
+                  <Text style={{
+                    fontSize: typography.sizes.sm,
+                    color: colors.text.secondary,
+                    marginTop: spacing.xs / 2,
+                  }}>
+                    {itemBookings.length === 1 ? 'Active Booking' : 'Active Bookings'}
+                  </Text>
+                </View>
+                <View style={{
+                  backgroundColor: colors.semantic.success + '15',
+                  padding: spacing.sm,
+                  borderRadius: 8,
+                }}>
+                  <Ionicons name="calendar-outline" size={24} color={colors.semantic.success} />
+                </View>
+              </View>
+            </View>
+
             {itemBookings.length === 0 ? (
               <View style={{
                 backgroundColor: colors.white,
@@ -870,6 +876,44 @@ export default function MyListingsScreen() {
 
         {activeTab === 'earnings' && (
           <View style={{ padding: spacing.md }}>
+            {/* Earnings Summary Header */}
+            <View style={{
+              backgroundColor: colors.white,
+              borderRadius: 12,
+              padding: spacing.md,
+              marginBottom: spacing.md,
+              shadowColor: colors.black,
+              shadowOpacity: 0.05,
+              shadowRadius: 2,
+              elevation: 1,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View>
+                  <Text style={{
+                    fontSize: typography.sizes.xl,
+                    fontWeight: typography.weights.bold,
+                    color: colors.text.primary,
+                  }}>
+                    {formatPrice(totalEarnings)}
+                  </Text>
+                  <Text style={{
+                    fontSize: typography.sizes.sm,
+                    color: colors.text.secondary,
+                    marginTop: spacing.xs / 2,
+                  }}>
+                    Total Earnings from {totalBookings} {totalBookings === 1 ? 'Booking' : 'Bookings'}
+                  </Text>
+                </View>
+                <View style={{
+                  backgroundColor: colors.semantic.warning + '15',
+                  padding: spacing.sm,
+                  borderRadius: 8,
+                }}>
+                  <Ionicons name="cash-outline" size={24} color={colors.semantic.warning} />
+                </View>
+              </View>
+            </View>
+
             {/* Stats Cards - Single Column Layout */}
             <View style={{
               gap: spacing.sm,
@@ -1008,6 +1052,29 @@ export default function MyListingsScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Floating Add Item Button */}
+      <TouchableOpacity
+        onPress={() => router.push('/listing/create')}
+        style={{
+          position: 'absolute',
+          bottom: spacing.xl,
+          right: spacing.md,
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          backgroundColor: colors.primary.main,
+          alignItems: 'center',
+          justifyContent: 'center',
+          shadowColor: colors.black,
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.3,
+          shadowRadius: 8,
+          elevation: 8,
+        }}
+      >
+        <Ionicons name="add" size={24} color={colors.white} />
+      </TouchableOpacity>
     </View>
   );
 }

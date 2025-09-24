@@ -321,6 +321,79 @@ export default function ListingDetailScreen() {
     }
   };
 
+  const handleToggleListingStatus = async () => {
+    if (!listing || !user) return;
+
+    if (listing.approval_status === 'pending' || listing.approval_status === 'rejected') {
+      Alert.alert(
+        'Cannot Change Status',
+        listing.approval_status === 'pending' 
+          ? 'Cannot change status while listing is pending approval'
+          : 'Cannot change status while listing is rejected'
+      );
+      return;
+    }
+
+    try {
+      const newIsActive = !listing.is_active;
+      
+      const { error } = await supabase
+        .from('listings')
+        .update({ is_active: newIsActive })
+        .eq('id', listing.id);
+
+      if (error) {
+        console.error('Error updating listing status:', error);
+        Alert.alert('Error', 'Failed to update listing status');
+        return;
+      }
+
+      // Update local state
+      setListing(prev => prev ? { ...prev, is_active: newIsActive } : null);
+      Alert.alert('Success', newIsActive ? 'Listing activated' : 'Listing paused');
+    } catch (error) {
+      console.error('Error updating listing status:', error);
+      Alert.alert('Error', 'Failed to update listing status');
+    }
+  };
+
+  const handleDeleteListing = async () => {
+    if (!listing || !user) return;
+
+    Alert.alert(
+      'Delete Listing',
+      `Are you sure you want to delete "${listing.title}"? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('listings')
+                .delete()
+                .eq('id', listing.id);
+
+              if (error) {
+                console.error('Error deleting listing:', error);
+                Alert.alert('Error', 'Failed to delete listing');
+                return;
+              }
+
+              Alert.alert('Success', 'Listing deleted successfully', [
+                { text: 'OK', onPress: () => router.back() }
+              ]);
+            } catch (error) {
+              console.error('Error deleting listing:', error);
+              Alert.alert('Error', 'Failed to delete listing');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const formatPrice = (price: number | null | undefined) => {
     if (!price || price === 0) {
       return 'Contact for price';
@@ -1105,34 +1178,104 @@ export default function ListingDetailScreen() {
             gap: spacing.sm
           }}>
             {listing.profiles.id === user?.id ? (
-              // Show message for listing owner
-              <View style={{
-                backgroundColor: colors.primary.main + '10',
-                borderRadius: 12,
-                paddingVertical: spacing.lg,
-                paddingHorizontal: spacing.md,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderWidth: 1,
-                borderColor: colors.primary.main + '30'
-              }}>
-                <Ionicons name="checkmark-circle" size={24} color={colors.primary.main} style={{ marginBottom: spacing.xs }} />
-                <Text style={{
-                  fontSize: typography.sizes.base,
-                  fontWeight: typography.weights.semibold,
-                  color: colors.primary.main,
-                  textAlign: 'center',
-                  marginBottom: spacing.xs
+              // Show owner action buttons
+              <View style={{ gap: spacing.sm }}>
+                <View style={{
+                  backgroundColor: colors.primary.main + '10',
+                  borderRadius: 12,
+                  paddingVertical: spacing.md,
+                  paddingHorizontal: spacing.md,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 1,
+                  borderColor: colors.primary.main + '30',
+                  marginBottom: spacing.sm
                 }}>
-                  This is Your Listing
-                </Text>
-                <Text style={{
-                  fontSize: typography.sizes.sm,
-                  color: colors.text.secondary,
-                  textAlign: 'center'
-                }}>
-                  You can manage this listing from your account
-                </Text>
+                  <Ionicons name="checkmark-circle" size={20} color={colors.primary.main} style={{ marginBottom: spacing.xs / 2 }} />
+                  <Text style={{
+                    fontSize: typography.sizes.sm,
+                    fontWeight: typography.weights.semibold,
+                    color: colors.primary.main,
+                    textAlign: 'center'
+                  }}>
+                    This is Your Listing
+                  </Text>
+                </View>
+
+                {/* Owner Action Buttons */}
+                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                  <TouchableOpacity
+                    onPress={() => router.push(`/listing/create?edit=${listing.id}`)}
+                    style={{
+                      flex: 1,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      paddingVertical: spacing.md,
+                      backgroundColor: colors.gray[100],
+                      borderRadius: 12,
+                    }}
+                  >
+                    <Ionicons name="create-outline" size={20} color={colors.text.primary} style={{ marginRight: spacing.xs }} />
+                    <Text style={{
+                      fontSize: typography.sizes.base,
+                      fontWeight: typography.weights.semibold,
+                      color: colors.text.primary
+                    }}>
+                      Edit
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => handleToggleListingStatus()}
+                    disabled={listing.approval_status === 'pending' || listing.approval_status === 'rejected'}
+                    style={{
+                      flex: 1,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      paddingVertical: spacing.md,
+                      backgroundColor: listing.is_active ? colors.semantic.warning + '20' : colors.semantic.success + '20',
+                      borderRadius: 12,
+                      opacity: (listing.approval_status === 'pending' || listing.approval_status === 'rejected') ? 0.5 : 1,
+                    }}
+                  >
+                    <Ionicons 
+                      name={listing.is_active ? 'pause-outline' : 'play-outline'} 
+                      size={20} 
+                      color={listing.is_active ? colors.semantic.warning : colors.semantic.success} 
+                      style={{ marginRight: spacing.xs }} 
+                    />
+                    <Text style={{
+                      fontSize: typography.sizes.base,
+                      fontWeight: typography.weights.semibold,
+                      color: listing.is_active ? colors.semantic.warning : colors.semantic.success
+                    }}>
+                      {listing.is_active ? 'Pause' : 'Activate'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  onPress={() => handleDeleteListing()}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    paddingVertical: spacing.md,
+                    backgroundColor: colors.semantic.error + '20',
+                    borderRadius: 12,
+                  }}
+                >
+                  <Ionicons name="trash-outline" size={20} color={colors.semantic.error} style={{ marginRight: spacing.xs }} />
+                  <Text style={{
+                    fontSize: typography.sizes.base,
+                    fontWeight: typography.weights.semibold,
+                    color: colors.semantic.error
+                  }}>
+                    Delete Listing
+                  </Text>
+                </TouchableOpacity>
               </View>
             ) : (
               // Show Book Now button for other users
