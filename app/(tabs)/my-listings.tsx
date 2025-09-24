@@ -6,7 +6,7 @@ import { colors, spacing, typography } from '../../src/lib/design-system';
 import { useAuth } from '../../src/components/AuthProvider';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../src/lib/supabase';
-import { Header } from '../../src/components/Header';
+import { Header, HeaderPresets } from '../../src/components/Header';
 
 interface Listing {
   id: string;
@@ -714,11 +714,7 @@ export default function MyListingsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.neutral.lightGray }}>
-      <Header 
-        title="My Listings" 
-        showBackButton={false}
-        showNotificationIcon={true}
-      />
+      <Header {...HeaderPresets.main("My Listings")} />
       
       {/* Add Item Button */}
       <View style={{

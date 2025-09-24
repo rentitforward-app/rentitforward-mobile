@@ -11,8 +11,10 @@ export interface HeaderProps {
   subtitle?: string;
   logo?: any; // Logo image source
   showBackButton?: boolean;
+  showBrowseIcon?: boolean;
   showNotificationIcon?: boolean;
   onBackPress?: () => void;
+  onBrowsePress?: () => void;
   onNotificationPress?: () => void;
   rightAction?: {
     icon: keyof typeof Ionicons.glyphMap;
@@ -29,8 +31,10 @@ export function Header({
   subtitle,
   logo,
   showBackButton = false,
+  showBrowseIcon = false,
   showNotificationIcon = true,
   onBackPress,
+  onBrowsePress,
   onNotificationPress,
   rightAction,
   backgroundColor = colors.white,
@@ -55,6 +59,15 @@ export function Header({
     } else {
       // Default behavior - navigate to notifications
       router.push('/notifications');
+    }
+  };
+
+  const handleBrowsePress = () => {
+    if (onBrowsePress) {
+      onBrowsePress();
+    } else {
+      // Default behavior - navigate to browse page
+      router.push('/browse');
     }
   };
   const headerStyle: ViewStyle = {
@@ -110,7 +123,7 @@ export function Header({
       <StatusBar barStyle="dark-content" backgroundColor={backgroundColor} />
       <View style={headerStyle}>
         <View style={containerStyle}>
-          {/* Left side - Back button or spacer */}
+          {/* Left side - Back button, Browse icon, or spacer */}
           <View style={{ width: 40, alignItems: 'flex-start' }}>
             {showBackButton ? (
               <TouchableOpacity
@@ -121,6 +134,19 @@ export function Header({
               >
                 <Ionicons
                   name="arrow-back"
+                  size={24}
+                  color={titleColor}
+                />
+              </TouchableOpacity>
+            ) : showBrowseIcon ? (
+              <TouchableOpacity
+                onPress={handleBrowsePress}
+                style={iconButtonStyle}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                testID="header-browse-button"
+              >
+                <Ionicons
+                  name="search-outline"
                   size={24}
                   color={titleColor}
                 />
@@ -217,17 +243,19 @@ export function Header({
 
 // Preset header configurations for common use cases
 export const HeaderPresets = {
-  // Main screen header with title and notification icon
+  // Main screen header with title, browse icon, and notification icon
   main: (title: string) => ({
     title,
     showBackButton: false,
+    showBrowseIcon: true,
     showNotificationIcon: true,
   }),
 
-  // Home screen header with logo and notification icon
+  // Home screen header with logo, browse icon, and notification icon
   home: (logo: any) => ({
     logo,
     showBackButton: false,
+    showBrowseIcon: true,
     showNotificationIcon: true,
   }),
 

@@ -16,14 +16,14 @@ import {
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { supabase } from '../../src/lib/supabase';
 import { captureSentryException } from '../../src/lib/sentry';
 import { colors, spacing, typography, componentStyles } from '../../src/lib/design-system';
 import { RealAPIPredictiveSearchInput, RealAPIPredictiveSearchInputRef } from '../../src/components/search/RealAPIPredictiveSearchInput';
-import { Header } from '../../src/components/Header';
+import { Header, HeaderPresets } from '../../src/components/Header';
 
 // Categories - matching web version
 const CATEGORIES = [
@@ -1036,11 +1036,7 @@ export default function BrowseScreen() {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <Header 
-          title="Browse Items" 
-          showBackButton={false}
-          showNotificationIcon={true}
-        />
+        <Header {...HeaderPresets.detail("Browse Items")} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary.main} />
           <Text style={styles.loadingText}>Loading listings...</Text>
@@ -1055,13 +1051,11 @@ export default function BrowseScreen() {
   };
 
   return (
-    <TouchableWithoutFeedback onPress={handleOutsidePress}>
-      <View style={styles.container}>
-        <Header 
-          title="Browse Items" 
-          showBackButton={false}
-          showNotificationIcon={true}
-        />
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <TouchableWithoutFeedback onPress={handleOutsidePress}>
+        <View style={styles.container}>
+          <Header {...HeaderPresets.detail("Browse Items")} />
 
         {/* Search Bar */}
           <View style={styles.searchContainer}>
@@ -1349,8 +1343,9 @@ export default function BrowseScreen() {
           </View>
         </View>
       </Modal>
-      </View>
-    </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
+    </>
   );
 }
 
@@ -1861,4 +1856,4 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.base,
     fontWeight: typography.weights.semibold,
   },
-}); 
+});

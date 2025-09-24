@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/components/AuthProvider';
 import { supabase } from '../../src/lib/supabase';
 import { colors, spacing, typography } from '../../src/lib/design-system';
-import { Header } from '../../src/components/Header';
+import { Header, HeaderPresets } from '../../src/components/Header';
 import { useNotificationCount } from '../../src/hooks/useNotificationBadge';
 import { NotificationBadge } from '../../src/components/NotificationBadge';
 
@@ -127,7 +127,7 @@ export default function AccountScreen() {
   if (!currentUser) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.gray[50] }}>
-        <Header title="Account" />
+        <Header {...HeaderPresets.main("Account")} />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.lg }}>
           <Text style={{ fontSize: typography.sizes['2xl'], fontWeight: typography.weights.bold, color: colors.text.primary, marginBottom: spacing.sm }}>
             Please Sign In
@@ -156,7 +156,7 @@ export default function AccountScreen() {
   if (isLoading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.gray[50] }}>
-        <Header title="Account" />
+        <Header {...HeaderPresets.main("Account")} />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color={colors.primary.main} />
           <Text style={{ marginTop: spacing.md, color: colors.gray[600] }}>Loading account...</Text>
@@ -168,7 +168,7 @@ export default function AccountScreen() {
   if (!profile) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.gray[50] }}>
-        <Header title="Account" />
+        <Header {...HeaderPresets.main("Account")} />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.lg }}>
           <Text style={{ fontSize: typography.sizes.xl, fontWeight: typography.weights.bold, color: colors.gray[900], marginBottom: spacing.sm }}>
             Profile not found
@@ -193,7 +193,7 @@ export default function AccountScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.gray[50] }}>
-      <Header title="Account" />
+      <Header {...HeaderPresets.main("Account")} />
       
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
         {/* Profile Header Section */}

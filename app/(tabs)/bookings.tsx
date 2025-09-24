@@ -16,7 +16,7 @@ import { useRouter } from 'expo-router';
 import { supabase } from '../../src/lib/supabase';
 import { useAuth } from '../../src/components/AuthProvider';
 import { colors, spacing, typography } from '../../src/lib/design-system';
-import { Header } from '../../src/components/Header';
+import { Header, HeaderPresets } from '../../src/components/Header';
 
 interface Booking {
   id: string;
@@ -246,11 +246,7 @@ export default function BookingsScreen() {
   if (!user) {
     return (
       <View style={styles.container}>
-        <Header 
-          title="My Bookings" 
-          showBackButton={false}
-          showNotificationIcon={true}
-        />
+        <Header {...HeaderPresets.main("My Bookings")} />
         <View style={styles.centerContent}>
           <Text style={styles.notLoggedInText}>Please log in to view your bookings</Text>
         </View>
@@ -261,11 +257,7 @@ export default function BookingsScreen() {
   if (isLoading && !refreshing) {
     return (
       <View style={styles.container}>
-        <Header 
-          title="My Bookings" 
-          showBackButton={false}
-          showNotificationIcon={true}
-        />
+        <Header {...HeaderPresets.main("My Bookings")} />
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={colors.primary?.main || '#44d62c'} />
           <Text style={styles.loadingText}>Loading bookings...</Text>
@@ -277,11 +269,7 @@ export default function BookingsScreen() {
   if (error) {
     return (
       <View style={styles.container}>
-        <Header 
-          title="My Bookings" 
-          showBackButton={false}
-          showNotificationIcon={true}
-        />
+        <Header {...HeaderPresets.main("My Bookings")} />
         <View style={styles.centerContent}>
           <Text style={styles.errorText}>Error loading bookings</Text>
           <TouchableOpacity onPress={() => refetch()} style={styles.retryButton}>
@@ -294,11 +282,7 @@ export default function BookingsScreen() {
 
   return (
     <View style={styles.container}>
-      <Header 
-        title="My Bookings" 
-        showBackButton={false}
-        showNotificationIcon={true}
-      />
+      <Header {...HeaderPresets.main("My Bookings")} />
 
       {/* Stats Section */}
       <View style={styles.statsContainer}>
