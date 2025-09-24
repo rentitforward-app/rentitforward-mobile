@@ -2,12 +2,12 @@
   "expo": {
     "name": "Rent It Forward",
     "slug": "rentitforward-mobile",
-    "version": "1.0.36",
+    "version": "1.0.37",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/icons/ios-light.png",
     "splash": {
-      "image": "./assets/icons/splash-icon-dark.png",
+      "image": "./assets/icons/ios-dark.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -17,10 +17,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "au.com.rentitforward.mobile",
-      "buildNumber": "36",
+      "buildNumber": "37",
       "icon": "./assets/icons/ios-light.png",
       "splash": {
-        "image": "./assets/icons/splash-icon-dark_300x300.png",
+        "image": "./assets/icons/ios-dark.png",
         "resizeMode": "contain",
         "backgroundColor": "#ffffff"
       },
@@ -41,7 +41,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "au.com.rentitforward.mobile",
-      "versionCode": 36,
+      "versionCode": 37,
       "splash": {
         "image": "./assets/icons/splash-icon-dark.png",
         "resizeMode": "contain",
@@ -77,6 +77,18 @@
           "icon": "./assets/icons/adaptive-icon.png",
           "color": "#44D62C",
           "defaultChannel": "default"
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#ffffff",
+          "image": "./assets/icons/splash-icon-dark.png",
+          "dark": {
+            "image": "./assets/icons/splash-icon-light.png",
+            "backgroundColor": "#000000"
+          },
+          "imageWidth": 200
         }
       ]
     ],

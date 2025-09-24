@@ -74,10 +74,14 @@ export default function MessagesTab() {
             owner_id,
             renter_id,
             listing:listings(title)
+          ),
+          listing:listings(
+            id,
+            title,
+            owner_id
           )
         `)
         .contains('participants', [user.id])
-        .not('booking_id', 'is', null)
         .order('updated_at', { ascending: false });
       
       console.log('📊 Found conversations:', conversationsData?.length || 0);
@@ -94,11 +98,17 @@ export default function MessagesTab() {
           if (!otherUserId) return null;
 
           // Fetch other user's profile
-          const { data: otherUserData } = await supabase
+          const { data: otherUserData, error: userError } = await supabase
             .from('profiles')
             .select('id, full_name, avatar_url, verified')
             .eq('id', otherUserId)
             .single();
+
+          // Skip this conversation if we can't find the other user
+          if (userError || !otherUserData) {
+            console.warn('Could not find other user profile:', otherUserId, userError);
+            return null;
+          }
 
           // Get the last viewed timestamp for this conversation
           const lastViewedKey = `conversation_viewed_${conv.id}`;
@@ -141,33 +151,41 @@ export default function MessagesTab() {
             }
           }
 
+          // Handle both booking conversations and inquiry conversations
+          const isInquiry = !conv.booking_id;
+          
           return {
             id: conv.id,
-            bookingId: conv.booking_id,
+            bookingId: conv.booking_id || conv.id, // Use conversation ID for inquiries
             otherUserId: otherUserId,
-            otherUser: otherUserData ? {
+            otherUser: {
               id: otherUserData.id,
               full_name: otherUserData.full_name || '',
               avatar_url: otherUserData.avatar_url,
               verified: otherUserData.verified || false,
-            } : null,
+            },
             lastMessage: {
               id: 'last',
-              content: conv.last_message || 'No messages yet',
+              content: conv.last_message || (isInquiry ? 'Inquiry started' : 'No messages yet'),
               sent_at: conv.last_message_at || conv.updated_at,
               sender_id: 'system',
               message_type: 'text' as const,
             },
             unreadCount: unreadCount,
             updatedAt: conv.updated_at,
-            booking: conv.booking ? (() => {
+            booking: isInquiry ? {
+              // Create a pseudo-booking for inquiries
+              id: conv.id,
+              status: 'inquiry',
+              listing: Array.isArray(conv.listing) ? conv.listing[0] : conv.listing,
+            } : (conv.booking ? (() => {
               const bookingData = Array.isArray(conv.booking) ? conv.booking[0] : conv.booking;
               return bookingData ? {
                 id: bookingData.id,
                 status: bookingData.status,
                 listing: Array.isArray(bookingData.listing) ? bookingData.listing[0] : bookingData.listing,
               } : null;
-            })() : null,
+            })() : null),
           };
         })
       );
@@ -259,7 +277,7 @@ export default function MessagesTab() {
 
   // Filter messages based on search
   const filteredMessages = messages.filter(msg =>
-    msg.otherUser.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    msg.otherUser?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (Array.isArray(msg.booking?.listing) ? msg.booking?.listing[0]?.title : msg.booking?.listing?.title)?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -290,6 +308,8 @@ export default function MessagesTab() {
   // Get status indicator color
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'inquiry':
+        return '#3b82f6'; // Blue for inquiries
       case 'pending':
         return '#f59e0b';
       case 'confirmed':
@@ -324,7 +344,9 @@ export default function MessagesTab() {
       onPress={() => {
         // Mark as read before navigating
         markConversationAsRead(item.id);
-        router.push(`/messages/${item.bookingId}`);
+        // For inquiries, navigate to conversation ID; for bookings, use booking ID
+        const navigationId = item.booking?.status === 'inquiry' ? item.id : item.bookingId;
+        router.push(`/conversations/${navigationId}`);
       }}
     >
       <View style={styles.messageHeader}>

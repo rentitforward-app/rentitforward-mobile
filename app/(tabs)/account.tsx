@@ -317,7 +317,7 @@ export default function AccountScreen() {
                   borderBottomColor: colors.gray[100],
                 }}
               >
-                <Ionicons name="card-outline" size={24} color={colors.gray[600]} />
+                <Ionicons name="card-outline" size={24} color={colors.semantic.info} />
                 <Text style={{
                   fontSize: typography.sizes.base,
                   color: colors.gray[900],
@@ -340,7 +340,7 @@ export default function AccountScreen() {
                 }}
               >
                 <View style={{ position: 'relative' }}>
-                  <Ionicons name="notifications-outline" size={24} color={colors.gray[600]} />
+                  <Ionicons name="notifications-outline" size={24} color={colors.semantic.warning} />
                   {notificationCount > 0 && (
                     <View style={{
                       position: 'absolute',
@@ -373,7 +373,7 @@ export default function AccountScreen() {
                   borderBottomColor: colors.gray[100],
                 }}
               >
-                <Ionicons name="shield-checkmark-outline" size={24} color={colors.gray[600]} />
+                <Ionicons name="shield-checkmark-outline" size={24} color={colors.semantic.success} />
                 <Text style={{
                   fontSize: typography.sizes.base,
                   color: colors.gray[900],
@@ -393,7 +393,7 @@ export default function AccountScreen() {
                   paddingVertical: spacing.md,
                 }}
               >
-                <Ionicons name="settings-outline" size={24} color={colors.gray[600]} />
+                <Ionicons name="settings-outline" size={24} color={colors.primary.main} />
                 <Text style={{
                   fontSize: typography.sizes.base,
                   color: colors.gray[900],
@@ -440,7 +440,7 @@ export default function AccountScreen() {
                   borderBottomColor: colors.gray[100],
                 }}
               >
-                <Ionicons name="heart-outline" size={24} color={colors.gray[600]} />
+                <Ionicons name="heart-outline" size={24} color="#FF6B6B" />
                 <View style={{ flex: 1, marginLeft: spacing.md }}>
                   <Text style={{
                     fontSize: typography.sizes.base,
@@ -469,7 +469,7 @@ export default function AccountScreen() {
                   borderBottomColor: colors.gray[100],
                 }}
               >
-                <Ionicons name="chatbubble-outline" size={24} color={colors.gray[600]} />
+                <Ionicons name="chatbubble-outline" size={24} color="#4A90E2" />
                 <View style={{ flex: 1, marginLeft: spacing.md }}>
                   <Text style={{
                     fontSize: typography.sizes.base,
@@ -496,7 +496,7 @@ export default function AccountScreen() {
                   paddingVertical: spacing.md,
                 }}
               >
-                <Ionicons name="add-circle-outline" size={24} color={colors.gray[600]} />
+                <Ionicons name="add-circle-outline" size={24} color={colors.primary.main} />
                 <View style={{ flex: 1, marginLeft: spacing.md }}>
                   <Text style={{
                     fontSize: typography.sizes.base,
@@ -550,7 +550,7 @@ export default function AccountScreen() {
                   borderBottomColor: colors.gray[100],
                 }}
               >
-                <Ionicons name="help-circle-outline" size={24} color={colors.gray[600]} />
+                <Ionicons name="help-circle-outline" size={24} color="#8E44AD" />
                 <Text style={{
                   fontSize: typography.sizes.base,
                   color: colors.gray[900],
@@ -572,7 +572,7 @@ export default function AccountScreen() {
                   borderBottomColor: colors.gray[100],
                 }}
               >
-                <Ionicons name="people-outline" size={24} color={colors.gray[600]} />
+                <Ionicons name="people-outline" size={24} color="#E67E22" />
                 <Text style={{
                   fontSize: typography.sizes.base,
                   color: colors.gray[900],
@@ -592,7 +592,7 @@ export default function AccountScreen() {
                   paddingVertical: spacing.md,
                 }}
               >
-                <Ionicons name="chatbubble-outline" size={24} color={colors.gray[600]} />
+                <Ionicons name="chatbubble-outline" size={24} color="#4A90E2" />
                 <Text style={{
                   fontSize: typography.sizes.base,
                   color: colors.gray[900],
@@ -639,7 +639,7 @@ export default function AccountScreen() {
                   borderBottomColor: colors.gray[100],
                 }}
               >
-                <Ionicons name="shield-outline" size={24} color={colors.gray[600]} />
+                <Ionicons name="shield-outline" size={24} color={colors.semantic.success} />
                 <Text style={{
                   fontSize: typography.sizes.base,
                   color: colors.gray[900],
@@ -659,7 +659,7 @@ export default function AccountScreen() {
                   paddingVertical: spacing.md,
                 }}
               >
-                <Ionicons name="document-text-outline" size={24} color={colors.gray[600]} />
+                <Ionicons name="document-text-outline" size={24} color="#95A5A6" />
                 <Text style={{
                   fontSize: typography.sizes.base,
                   color: colors.gray[900],

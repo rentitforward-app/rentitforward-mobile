@@ -11,10 +11,12 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../src/components/AuthProvider';
 import { supabase } from '../../src/lib/supabase';
+import { ConversationShimmer } from '../../src/components/ShimmerLoading';
+import { Header } from '../../src/components/Header';
 
 interface Message {
   id: string;
@@ -50,7 +52,7 @@ interface ConversationData {
 }
 
 export default function ConversationScreen() {
-  const { id: bookingId } = useLocalSearchParams<{ id: string }>();
+  const { id: conversationId } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -60,143 +62,175 @@ export default function ConversationScreen() {
   const [isSending, setIsSending] = useState(false);
 
   // Debug: Log the route parameters
-  console.log('🚀 ConversationScreen loaded with:', { bookingId, userId: user?.id });
+  console.log('🚀 ConversationScreen loaded with:', { conversationId, userId: user?.id });
 
   // Early return for debugging - show basic screen first
-  if (!bookingId) {
+  if (!conversationId) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>No booking ID provided</Text>
-          <TouchableOpacity style={styles.button} onPress={() => router.back()}>
-            <Text style={styles.buttonText}>Go Back</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <SafeAreaView style={styles.container}>
+          <Header
+            title="Conversation"
+            showBackButton={true}
+            showNotificationIcon={false}
+            onBackPress={() => router.back()}
+          />
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>No conversation ID provided</Text>
+            <TouchableOpacity style={styles.button} onPress={() => router.back()}>
+              <Text style={styles.buttonText}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </>
     );
   }
 
   if (!user) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>User not authenticated</Text>
-          <TouchableOpacity style={styles.button} onPress={() => router.back()}>
-            <Text style={styles.buttonText}>Go Back</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <SafeAreaView style={styles.container}>
+          <Header
+            title="Conversation"
+            showBackButton={true}
+            showNotificationIcon={false}
+            onBackPress={() => router.back()}
+          />
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>User not authenticated</Text>
+            <TouchableOpacity style={styles.button} onPress={() => router.back()}>
+              <Text style={styles.buttonText}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </>
     );
   }
 
-  // Fetch conversation data and create conversation if needed
+  // Fetch conversation data
   const { data: conversation, isLoading: conversationLoading, error: conversationError } = useQuery({
-    queryKey: ['conversation', bookingId],
+    queryKey: ['conversation', conversationId],
     queryFn: async () => {
-      console.log('🔍 Fetching conversation for booking ID:', bookingId);
-      // First, fetch booking data
-      const { data: bookingData, error: bookingError } = await supabase
-        .from('bookings')
+      console.log('🔍 Fetching conversation for ID:', conversationId);
+      
+      // Fetch conversation data with listing info
+      const { data: conversationData, error: conversationError } = await supabase
+        .from('conversations')
         .select(`
           id,
-          status,
+          booking_id,
           listing_id,
-          owner_id,
-          renter_id,
-          start_date,
-          end_date,
-          listing:listings(title),
-          owner:profiles!bookings_owner_id_fkey(id, full_name, avatar_url, verified),
-          renter:profiles!bookings_renter_id_fkey(id, full_name, avatar_url, verified)
+          participants,
+          listing:listings(title)
         `)
-        .eq('id', bookingId)
+        .eq('id', conversationId)
         .single();
       
-      if (bookingError) {
-        console.error('❌ Error fetching booking data:', bookingError);
-        throw bookingError;
+      if (conversationError) {
+        console.error('❌ Error fetching conversation:', conversationError);
+        throw conversationError;
       }
       
-      console.log('✅ Booking data fetched:', bookingData.id, bookingData.status);
-
-      // Check if conversation already exists for this booking
-      const { data: existingConversation, error: conversationError } = await supabase
-        .from('conversations')
-        .select('id')
-        .eq('booking_id', bookingId)
-        .maybeSingle(); // Use maybeSingle() instead of single() to handle no results gracefully
-
-      // If no conversation exists, create one
-      if (!existingConversation) {
-        const participants = [bookingData.owner_id, bookingData.renter_id];
-        const { error: createError } = await supabase
-          .from('conversations')
-          .insert({
-            booking_id: bookingId,
-            listing_id: bookingData.listing_id,
-            participants: participants,
-            last_message: 'Conversation started',
-            last_message_at: new Date().toISOString(),
-          });
-
-        if (createError) {
-          console.error('Error creating conversation:', createError);
-          // Don't throw here, continue with the booking data
-        }
+      // Get the other participant
+      const otherUserId = conversationData.participants.find(id => id !== user?.id);
+      if (!otherUserId) {
+        throw new Error('Other participant not found');
       }
+      
+      // Fetch other user's profile
+      const { data: otherUserData, error: userError } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url, verified')
+        .eq('id', otherUserId)
+        .single();
+      
+      if (userError) {
+        console.error('❌ Error fetching other user:', userError);
+        throw userError;
+      }
+      
+      // Check if this is an inquiry conversation (no booking_id) or a booking conversation
+      if (!conversationData.booking_id) {
+        // This is an inquiry conversation
+        return {
+          id: conversationData.id,
+          bookingId: conversationData.id, // Use conversation ID as bookingId for compatibility
+          booking: {
+            id: conversationData.id,
+            status: 'inquiry', // Special status for inquiries
+            listingId: conversationData.listing_id,
+            ownerId: otherUserId, // The other user is the owner in inquiries
+            renterId: user?.id,
+            startDate: new Date().toISOString(),
+            endDate: new Date().toISOString(),
+            listing: Array.isArray(conversationData.listing) ? conversationData.listing[0] : conversationData.listing,
+          },
+          otherUser: {
+            id: otherUserData.id,
+            full_name: otherUserData.full_name || '',
+            avatar_url: otherUserData.avatar_url,
+            verified: otherUserData.verified || false,
+          },
+        } as ConversationData;
+      } else {
+        // This is a booking conversation - fetch booking data
+        const { data: bookingData, error: bookingError } = await supabase
+          .from('bookings')
+          .select(`
+            id,
+            status,
+            listing_id,
+            owner_id,
+            renter_id,
+            start_date,
+            end_date,
+            listing:listings(title),
+            owner:profiles!bookings_owner_id_fkey(id, full_name, avatar_url, verified),
+            renter:profiles!bookings_renter_id_fkey(id, full_name, avatar_url, verified)
+          `)
+          .eq('id', conversationData.booking_id)
+          .single();
+        
+        if (bookingError) {
+          console.error('❌ Error fetching booking data:', bookingError);
+          throw bookingError;
+        }
+        
+        console.log('✅ Booking data fetched:', bookingData.id, bookingData.status);
 
-      const isOwner = bookingData.owner_id === user?.id;
-      const otherUser = isOwner ? 
-        (Array.isArray(bookingData.renter) ? bookingData.renter[0] : bookingData.renter) : 
-        (Array.isArray(bookingData.owner) ? bookingData.owner[0] : bookingData.owner);
+        const isOwner = bookingData.owner_id === user?.id;
+        const otherUser = isOwner ? 
+          (Array.isArray(bookingData.renter) ? bookingData.renter[0] : bookingData.renter) : 
+          (Array.isArray(bookingData.owner) ? bookingData.owner[0] : bookingData.owner);
 
-      return {
-        id: bookingId,
-        bookingId: bookingData.id,
-        booking: {
-          id: bookingData.id,
-          status: bookingData.status,
-          listingId: bookingData.listing_id,
-          ownerId: bookingData.owner_id,
-          renterId: bookingData.renter_id,
-          startDate: bookingData.start_date,
-          endDate: bookingData.end_date,
-          listing: Array.isArray(bookingData.listing) ? bookingData.listing[0] : bookingData.listing,
-        },
-        otherUser,
-      } as ConversationData;
+        return {
+          id: conversationData.id,
+          bookingId: bookingData.id,
+          booking: {
+            id: bookingData.id,
+            status: bookingData.status,
+            listingId: bookingData.listing_id,
+            ownerId: bookingData.owner_id,
+            renterId: bookingData.renter_id,
+            startDate: bookingData.start_date,
+            endDate: bookingData.end_date,
+            listing: Array.isArray(bookingData.listing) ? bookingData.listing[0] : bookingData.listing,
+          },
+          otherUser,
+        } as ConversationData;
+      }
     },
-    enabled: !!bookingId && !!user?.id,
+    enabled: !!conversationId && !!user?.id,
   });
 
   // Fetch real messages from database
   const { data: messages = [], isLoading: messagesLoading, error: messagesError } = useQuery({
-    queryKey: ['messages', bookingId],
+    queryKey: ['messages', conversationId],
     queryFn: async () => {
-      console.log('💬 Fetching messages for booking ID:', bookingId);
-      // Get conversation ID first
-      const { data: conversationData, error: convError } = await supabase
-        .from('conversations')
-        .select('id')
-        .eq('booking_id', bookingId)
-        .maybeSingle(); // Use maybeSingle() to handle no results gracefully
-
-      if (convError) {
-        console.error('Error fetching conversation:', convError);
-        return [];
-      }
-
-      if (!conversationData) {
-        // Return welcome message if no conversation found yet
-        return [{
-          id: 'system-welcome',
-          content: `Conversation started for ${conversation?.booking.listing?.title || 'this booking'}. You can now discuss pickup details and other arrangements.`,
-          senderId: 'system',
-          messageType: 'system' as const,
-          sentAt: new Date().toISOString(),
-        }];
-      }
-
+      console.log('💬 Fetching messages for conversation ID:', conversationId);
+      
       // Fetch messages for this conversation
       const { data: messagesData, error: messagesError } = await supabase
         .from('messages')
@@ -208,7 +242,7 @@ export default function ConversationScreen() {
           created_at,
           metadata
         `)
-        .eq('conversation_id', conversationData.id)
+        .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true });
 
       if (messagesError) {
@@ -227,9 +261,14 @@ export default function ConversationScreen() {
 
       // If no messages exist, add a system message
       if (transformedMessages.length === 0) {
+        const isInquiry = conversation?.booking.status === 'inquiry';
+        const welcomeMessage = isInquiry 
+          ? `Inquiry started for ${conversation?.booking.listing?.title || 'this listing'}. You can ask questions about availability, condition, and other details.`
+          : `Conversation started for ${conversation?.booking.listing?.title || 'this booking'}. You can now discuss pickup details and other arrangements.`;
+        
         transformedMessages.push({
           id: 'system-welcome',
-          content: `Conversation started for ${conversation?.booking.listing?.title || 'this booking'}. You can now discuss pickup details and other arrangements.`,
+          content: welcomeMessage,
           senderId: 'system',
           messageType: 'system',
           sentAt: new Date().toISOString(),
@@ -238,27 +277,12 @@ export default function ConversationScreen() {
 
       return transformedMessages;
     },
-    enabled: !!conversation && !!bookingId,
+    enabled: !!conversation && !!conversationId,
   });
 
   // Send message mutation
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
-      // Get conversation ID first
-      const { data: conversationData, error: convError } = await supabase
-        .from('conversations')
-        .select('id')
-        .eq('booking_id', bookingId)
-        .maybeSingle();
-
-      if (convError) {
-        throw new Error(`Error fetching conversation: ${convError.message}`);
-      }
-
-      if (!conversationData) {
-        throw new Error('Conversation not found. Please try refreshing the page.');
-      }
-
       // Determine receiver ID
       const receiverId = conversation?.booking.ownerId === user?.id 
         ? conversation?.booking.renterId 
@@ -268,10 +292,10 @@ export default function ConversationScreen() {
       const { data: messageData, error: messageError } = await supabase
         .from('messages')
         .insert({
-          conversation_id: conversationData.id,
+          conversation_id: conversationId,
           sender_id: user?.id,
           receiver_id: receiverId,
-          booking_id: bookingId,
+          booking_id: conversation?.booking.status === 'inquiry' ? null : conversation?.booking.id,
           content,
           message_type: 'text',
           is_read: false,
@@ -291,7 +315,7 @@ export default function ConversationScreen() {
           last_message_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
-        .eq('id', conversationData.id);
+        .eq('id', conversationId);
 
       // Transform to our message format
       const newMessage: Message = {
@@ -306,7 +330,7 @@ export default function ConversationScreen() {
     },
     onSuccess: (newMessage) => {
       // Add message to local state
-      queryClient.setQueryData(['messages', bookingId], (old: Message[] = []) => [
+      queryClient.setQueryData(['messages', conversationId], (old: Message[] = []) => [
         ...old,
         newMessage,
       ]);
@@ -401,6 +425,8 @@ export default function ConversationScreen() {
   // Get status color
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'inquiry':
+        return '#3b82f6'; // Blue for inquiries
       case 'pending':
         return '#f59e0b';
       case 'confirmed':
@@ -417,68 +443,80 @@ export default function ConversationScreen() {
 
   if (conversationLoading || messagesLoading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading conversation...</Text>
-          <Text style={styles.loadingText}>Booking ID: {bookingId}</Text>
-          <Text style={styles.loadingText}>User ID: {user?.id}</Text>
-        </View>
-      </SafeAreaView>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <SafeAreaView style={styles.container}>
+          <ConversationShimmer />
+        </SafeAreaView>
+      </>
     );
   }
 
   if (conversationError) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Error loading conversation</Text>
-          <Text style={styles.errorText}>{conversationError.message}</Text>
-          <TouchableOpacity style={styles.button} onPress={() => router.back()}>
-            <Text style={styles.buttonText}>Go Back</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <SafeAreaView style={styles.container}>
+          <Header
+            title="Conversation"
+            showBackButton={true}
+            showNotificationIcon={false}
+            onBackPress={() => router.back()}
+          />
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>Error loading conversation</Text>
+            <Text style={styles.errorText}>{conversationError.message}</Text>
+            <TouchableOpacity style={styles.button} onPress={() => router.back()}>
+              <Text style={styles.buttonText}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </>
     );
   }
 
   if (!conversation) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Conversation not found</Text>
-          <Text style={styles.errorText}>Booking ID: {bookingId}</Text>
-          <TouchableOpacity style={styles.button} onPress={() => router.back()}>
-            <Text style={styles.buttonText}>Go Back</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <SafeAreaView style={styles.container}>
+          <Header
+            title="Conversation"
+            showBackButton={true}
+            showNotificationIcon={false}
+            onBackPress={() => router.back()}
+          />
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>Conversation not found</Text>
+            <Text style={styles.errorText}>Conversation ID: {conversationId}</Text>
+            <TouchableOpacity style={styles.button} onPress={() => router.back()}>
+              <Text style={styles.buttonText}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← Back</Text>
-        </TouchableOpacity>
-        
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>
-            {conversation.otherUser.full_name}
-          </Text>
-          {conversation.otherUser.verified && (
-            <Text style={styles.verifiedBadge}>✓ Verified</Text>
-          )}
-        </View>
-
-        <TouchableOpacity 
-          style={styles.detailsButton}
-          onPress={() => router.push(`/bookings/${conversation.bookingId}`)}
-        >
-          <Text style={styles.detailsButtonText}>Details</Text>
-        </TouchableOpacity>
-      </View>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <SafeAreaView style={styles.container}>
+        <Header
+          title={conversation.otherUser.full_name}
+          subtitle={conversation.otherUser.verified ? '✓ Verified' : undefined}
+          showBackButton={true}
+          showNotificationIcon={true}
+          rightAction={
+            // Only show booking details button for actual bookings, not inquiries
+            conversation.booking.status !== 'inquiry' ? {
+              icon: 'information-circle-outline',
+              onPress: () => router.push(`/bookings/${conversation.bookingId}`),
+              testID: 'conversation-details-button'
+            } : undefined
+          }
+          onBackPress={() => router.back()}
+        />
 
       {/* Booking Context */}
       <View style={styles.bookingContext}>
@@ -488,9 +526,15 @@ export default function ConversationScreen() {
             {conversation.booking.listing?.title || `Booking #${conversation.booking.id.substring(0, 8)}`}
           </Text>
         </View>
-        <Text style={styles.contextDates}>
-          {new Date(conversation.booking.startDate).toLocaleDateString('en-AU')} - {new Date(conversation.booking.endDate).toLocaleDateString('en-AU')}
-        </Text>
+        {conversation.booking.status === 'inquiry' ? (
+          <Text style={styles.contextDates}>
+            Pre-booking inquiry
+          </Text>
+        ) : (
+          <Text style={styles.contextDates}>
+            {new Date(conversation.booking.startDate).toLocaleDateString('en-AU')} - {new Date(conversation.booking.endDate).toLocaleDateString('en-AU')}
+          </Text>
+        )}
       </View>
 
       {/* Messages */}
@@ -542,7 +586,8 @@ export default function ConversationScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </>
   );
 }
 
@@ -571,45 +616,6 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     marginBottom: 20,
     textAlign: 'center',
-  },
-  header: {
-    backgroundColor: '#ffffff',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  backButton: {
-    padding: 8,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#44d62c',
-    fontWeight: '500',
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  verifiedBadge: {
-    fontSize: 12,
-    color: '#10b981',
-    marginTop: 2,
-  },
-  detailsButton: {
-    padding: 8,
-  },
-  detailsButtonText: {
-    fontSize: 16,
-    color: '#44d62c',
-    fontWeight: '500',
   },
   bookingContext: {
     backgroundColor: '#ffffff',

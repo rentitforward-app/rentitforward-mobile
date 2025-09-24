@@ -24,6 +24,7 @@ interface ListingData {
   postal_code: string;
   country: string;
   condition: string;
+  category: string;
   brand: string | null;
   model: string | null;
   year: number | null;
@@ -47,6 +48,7 @@ interface ListingData {
     state: string | null;
     postal_code: string | null;
     created_at: string;
+    verified: boolean;
   };
 }
 
@@ -100,7 +102,8 @@ export default function ListingDetailScreen() {
             city,
             state,
             postal_code,
-            created_at
+            created_at,
+            verified
           )
         `)
         .eq('id', id)
@@ -195,7 +198,99 @@ export default function ListingDetailScreen() {
       Alert.alert('Sign In Required', 'Please sign in to contact the owner');
       return;
     }
-    router.push(`/conversations/new?ownerId=${listing?.profiles.id}&listingId=${listing?.id}`);
+
+    if (!listing?.profiles.id) {
+      Alert.alert('Error', 'Unable to contact owner');
+      return;
+    }
+
+    // Prevent owners from contacting themselves
+    if (listing.profiles.id === user.id) {
+      Alert.alert('Cannot Contact Yourself', 'You cannot contact yourself about your own listing');
+      return;
+    }
+
+    // Navigate to message screen
+    router.push(`/message/${listing.id}`);
+  };
+
+  const handleSendMessage = async (message: string) => {
+    if (!user || !listing?.profiles.id) {
+      throw new Error('Missing user or listing information');
+    }
+
+    try {
+      // Check if conversation already exists for this listing between these users
+      const { data: existingConversation, error: checkError } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('listing_id', listing.id)
+        .is('booking_id', null) // Only inquiry conversations (no booking)
+        .contains('participants', [user.id])
+        .contains('participants', [listing.profiles.id])
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking existing conversation:', checkError);
+      }
+
+      let conversationId: string;
+
+      // If no conversation exists, create one
+      if (!existingConversation) {
+        const { data: newConversation, error: createError } = await supabase
+          .from('conversations')
+          .insert({
+            booking_id: null, // NULL for inquiry conversations
+            listing_id: listing.id,
+            participants: [listing.profiles.id, user.id],
+            last_message: message,
+            last_message_at: new Date().toISOString(),
+          })
+          .select('id')
+          .single();
+
+        if (createError || !newConversation) {
+          console.error('Error creating conversation:', createError);
+          throw new Error('Failed to create conversation');
+        }
+
+        conversationId = newConversation.id;
+      } else {
+        conversationId = existingConversation.id;
+      }
+
+      // Send the actual message
+      const { error: messageError } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: conversationId,
+          sender_id: user.id,
+          receiver_id: listing.profiles.id,
+          content: message,
+          message_type: 'text',
+        });
+
+      if (messageError) {
+        console.error('Error sending message:', messageError);
+        throw new Error('Failed to send message');
+      }
+
+      // Update conversation with latest message
+      await supabase
+        .from('conversations')
+        .update({
+          last_message: message,
+          last_message_at: new Date().toISOString(),
+        })
+        .eq('id', conversationId);
+
+      // Navigate to the conversation
+      router.push(`/conversations/${conversationId}`);
+    } catch (error) {
+      console.error('Error in handleSendMessage:', error);
+      throw error; // Re-throw so modal can handle it
+    }
   };
 
   const handleViewProfile = () => {
@@ -906,64 +1001,98 @@ export default function ListingDetailScreen() {
 
         <SafeAreaView edges={['bottom']} style={{ backgroundColor: colors.white }}>
           <View style={{
-            flexDirection: 'row',
+            flexDirection: 'column',
             padding: spacing.md,
             backgroundColor: colors.white,
             borderTopWidth: 1,
             borderTopColor: colors.gray[200],
-            gap: spacing.md
+            gap: spacing.sm
           }}>
-            <TouchableOpacity
-              onPress={handleContactOwner}
-              style={{
-                flex: 1,
-                backgroundColor: colors.gray[100],
+            {listing.profiles.id === user?.id ? (
+              // Show message for listing owner
+              <View style={{
+                backgroundColor: colors.primary.main + '10',
                 borderRadius: 12,
-                paddingVertical: spacing.md,
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <Text style={{
-                fontSize: typography.sizes.base,
-                fontWeight: typography.weights.semibold,
-                color: colors.text.primary
-              }}>
-                Contact Owner
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              onPress={handleBookNow}
-              disabled={bookingLoading || !listing.is_active}
-              style={{
-                flex: 2,
-                backgroundColor: listing.is_active ? colors.primary.main : colors.gray[400],
-                borderRadius: 12,
-                paddingVertical: spacing.md,
+                paddingVertical: spacing.lg,
+                paddingHorizontal: spacing.md,
                 alignItems: 'center',
                 justifyContent: 'center',
-                flexDirection: 'row'
-              }}
-            >
-              {bookingLoading ? (
-                <ActivityIndicator size="small" color={colors.white} />
-              ) : (
-                <>
-                  <Ionicons name="calendar-outline" size={20} color={colors.white} style={{ marginRight: spacing.xs }} />
+                borderWidth: 1,
+                borderColor: colors.primary.main + '30'
+              }}>
+                <Ionicons name="checkmark-circle" size={24} color={colors.primary.main} style={{ marginBottom: spacing.xs }} />
+                <Text style={{
+                  fontSize: typography.sizes.base,
+                  fontWeight: typography.weights.semibold,
+                  color: colors.primary.main,
+                  textAlign: 'center',
+                  marginBottom: spacing.xs
+                }}>
+                  This is Your Listing
+                </Text>
+                <Text style={{
+                  fontSize: typography.sizes.sm,
+                  color: colors.text.secondary,
+                  textAlign: 'center'
+                }}>
+                  You can manage this listing from your account
+                </Text>
+              </View>
+            ) : (
+              // Show action buttons for other users
+              <>
+                <TouchableOpacity
+                  onPress={handleContactOwner}
+                  style={{
+                    backgroundColor: colors.gray[100],
+                    borderRadius: 12,
+                    paddingVertical: spacing.md,
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
                   <Text style={{
                     fontSize: typography.sizes.base,
                     fontWeight: typography.weights.semibold,
-                    color: colors.white
+                    color: colors.text.primary
                   }}>
-                    {listing.is_active ? 'Book Now' : 'Not Available'}
+                    Contact Owner
                   </Text>
-                </>
-              )}
-            </TouchableOpacity>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  onPress={handleBookNow}
+                  disabled={bookingLoading || !listing.is_active}
+                  style={{
+                    backgroundColor: listing.is_active ? colors.primary.main : colors.gray[400],
+                    borderRadius: 12,
+                    paddingVertical: spacing.md,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row'
+                  }}
+                >
+                  {bookingLoading ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <>
+                      <Ionicons name="calendar-outline" size={20} color={colors.white} style={{ marginRight: spacing.xs }} />
+                      <Text style={{
+                        fontSize: typography.sizes.base,
+                        fontWeight: typography.weights.semibold,
+                        color: colors.white
+                      }}>
+                        {listing.is_active ? 'Book Now' : 'Not Available'}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </SafeAreaView>
       </SafeAreaView>
+
     </>
   );
 } 
