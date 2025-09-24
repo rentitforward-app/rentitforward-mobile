@@ -56,7 +56,7 @@ const typography = {
     bold: '700',
   },
 };
-import { Header } from '../../src/components/Header';
+import { Header, HeaderPresets } from '../../src/components/Header';
 
 export default function AccountManagementScreen() {
   const insets = useSafeAreaInsets();
@@ -164,7 +164,7 @@ export default function AccountManagementScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.gray[50] }}>
-      <Header title="Account Management" />
+      <Header {...HeaderPresets.subPage("Account Management")} />
       
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
         <View style={{ padding: spacing.lg }}>

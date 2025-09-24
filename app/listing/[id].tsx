@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, Dimensions, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { colors, spacing, typography } from '../../src/lib/design-system';
 import { useAuth } from '../../src/components/AuthProvider';
 import { supabase } from '../../src/lib/supabase';
+import { Header, HeaderPresets } from '../../src/components/Header';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -298,7 +299,26 @@ export default function ListingDetailScreen() {
   };
 
   const handleShare = async () => {
-    Alert.alert('Share', 'Sharing functionality would be implemented here');
+    if (!listing) return;
+
+    try {
+      const shareUrl = `https://rentitforward.com.au/listings/${listing.id}`;
+      const shareMessage = `Check out this ${listing.title} for rent on Rent It Forward!\n\n${formatPrice(listing.price_per_day)}/day in ${listing.city}, ${listing.state}\n\n${shareUrl}`;
+
+      const result = await Share.share({
+        message: shareMessage,
+        url: shareUrl, // iOS will use this for sharing
+        title: `${listing.title} - Rent It Forward`,
+      });
+
+      if (result.action === Share.sharedAction) {
+        // Successfully shared
+        console.log('Listing shared successfully');
+      }
+    } catch (error) {
+      console.error('Error sharing listing:', error);
+      Alert.alert('Error', 'Failed to share listing. Please try again.');
+    }
   };
 
   const formatPrice = (price: number | null | undefined) => {
@@ -383,16 +403,68 @@ export default function ListingDetailScreen() {
           height: 300,
           backgroundColor: colors.gray[100],
           alignItems: 'center',
-          justifyContent: 'center'
+          justifyContent: 'center',
+          position: 'relative'
         }}>
           <Ionicons name="image" size={64} color={colors.gray[400]} />
           <Text style={{ color: colors.gray[500], marginTop: spacing.sm }}>No images available</Text>
+          
+          {/* Floating Action Buttons - Airbnb Style */}
+          <View style={{
+            position: 'absolute',
+            top: spacing.md,
+            right: spacing.md,
+            flexDirection: 'row',
+            gap: spacing.xs
+          }}>
+            <TouchableOpacity
+              onPress={handleShare}
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                alignItems: 'center',
+                justifyContent: 'center',
+                shadowColor: colors.black,
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+                elevation: 3
+              }}
+            >
+              <Ionicons name="share-outline" size={16} color={colors.text.primary} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              onPress={toggleFavorite}
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                alignItems: 'center',
+                justifyContent: 'center',
+                shadowColor: colors.black,
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+                elevation: 3
+              }}
+            >
+              <Ionicons 
+                name={isFavorite ? "heart" : "heart-outline"} 
+                size={16} 
+                color={isFavorite ? colors.semantic.error : colors.text.primary} 
+              />
+            </TouchableOpacity>
+          </View>
         </View>
       );
     }
 
     return (
-      <View>
+      <View style={{ position: 'relative' }}>
         <ScrollView
           horizontal
           pagingEnabled
@@ -414,6 +486,57 @@ export default function ListingDetailScreen() {
             />
           ))}
         </ScrollView>
+        
+        {/* Floating Action Buttons - Airbnb Style */}
+        <View style={{
+          position: 'absolute',
+          top: spacing.md,
+          right: spacing.md,
+          flexDirection: 'row',
+          gap: spacing.xs
+        }}>
+          <TouchableOpacity
+            onPress={handleShare}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 16,
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              shadowColor: colors.black,
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 4,
+              elevation: 3
+            }}
+          >
+            <Ionicons name="share-outline" size={16} color={colors.text.primary} />
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            onPress={toggleFavorite}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 16,
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              shadowColor: colors.black,
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 4,
+              elevation: 3
+            }}
+          >
+            <Ionicons 
+              name={isFavorite ? "heart" : "heart-outline"} 
+              size={16} 
+              color={isFavorite ? colors.semantic.error : colors.text.primary} 
+            />
+          </TouchableOpacity>
+        </View>
         
         {displayImages.length > 1 && (
           <View style={{
@@ -446,12 +569,13 @@ export default function ListingDetailScreen() {
     return (
       <>
         <Stack.Screen options={{ headerShown: false }} />
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>
+        <View style={{ flex: 1, backgroundColor: colors.white }}>
+          <Header {...HeaderPresets.detail("Loading...")} />
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator size="large" color={colors.primary.main} />
             <Text style={{ marginTop: spacing.md, color: colors.text.secondary }}>Loading listing...</Text>
           </View>
-        </SafeAreaView>
+        </View>
       </>
     );
   }
@@ -460,7 +584,8 @@ export default function ListingDetailScreen() {
     return (
       <>
         <Stack.Screen options={{ headerShown: false }} />
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>
+        <View style={{ flex: 1, backgroundColor: colors.white }}>
+          <Header {...HeaderPresets.detail("Listing Not Found")} />
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ fontSize: typography.sizes.lg, color: colors.text.primary }}>Listing not found</Text>
             <TouchableOpacity
@@ -476,7 +601,7 @@ export default function ListingDetailScreen() {
               <Text style={{ color: colors.white, fontWeight: typography.weights.semibold }}>Go Back</Text>
             </TouchableOpacity>
           </View>
-        </SafeAreaView>
+        </View>
       </>
     );
   }
@@ -484,65 +609,8 @@ export default function ListingDetailScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }} edges={['top', 'left', 'right']}>
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: spacing.md,
-          paddingVertical: spacing.sm,
-          backgroundColor: colors.white,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.gray[200]
-        }}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              backgroundColor: colors.gray[100],
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
-          </TouchableOpacity>
-          
-          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-            <TouchableOpacity
-              onPress={handleShare}
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                backgroundColor: colors.gray[100],
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <Ionicons name="share-outline" size={24} color={colors.text.primary} />
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              onPress={toggleFavorite}
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                backgroundColor: colors.gray[100],
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <Ionicons 
-                name={isFavorite ? "heart" : "heart-outline"} 
-                size={24} 
-                color={isFavorite ? colors.semantic.error : colors.text.primary} 
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
+      <View style={{ flex: 1, backgroundColor: colors.white }}>
+        <Header {...HeaderPresets.detail(listing?.title || "Listing Details")} />
 
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
           {renderImageCarousel()}
@@ -640,7 +708,7 @@ export default function ListingDetailScreen() {
                 backgroundColor: colors.gray[50],
                 borderRadius: 12,
                 padding: spacing.md,
-                marginBottom: spacing.lg
+                marginBottom: spacing.md
               }}
             >
               {listing.profiles.avatar_url ? (
@@ -690,6 +758,34 @@ export default function ListingDetailScreen() {
               
               <Ionicons name="chevron-forward" size={20} color={colors.gray[400]} />
             </TouchableOpacity>
+
+            {/* Message Owner Button - Only show if not owner */}
+            {listing.profiles.id !== user?.id && (
+              <TouchableOpacity
+                onPress={handleContactOwner}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: colors.white,
+                  borderWidth: 1,
+                  borderColor: colors.gray[300],
+                  borderRadius: 12,
+                  paddingVertical: spacing.md,
+                  paddingHorizontal: spacing.lg,
+                  marginBottom: spacing.lg
+                }}
+              >
+                <Ionicons name="chatbubble-outline" size={20} color={colors.gray[900]} style={{ marginRight: spacing.sm }} />
+                <Text style={{
+                  fontSize: typography.sizes.base,
+                  fontWeight: typography.weights.semibold,
+                  color: colors.gray[900]
+                }}>
+                  Message
+                </Text>
+              </TouchableOpacity>
+            )}
 
             {/* Description */}
             <View style={{ marginBottom: spacing.lg }}>
@@ -1039,59 +1135,38 @@ export default function ListingDetailScreen() {
                 </Text>
               </View>
             ) : (
-              // Show action buttons for other users
-              <>
-                <TouchableOpacity
-                  onPress={handleContactOwner}
-                  style={{
-                    backgroundColor: colors.gray[100],
-                    borderRadius: 12,
-                    paddingVertical: spacing.md,
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Text style={{
-                    fontSize: typography.sizes.base,
-                    fontWeight: typography.weights.semibold,
-                    color: colors.text.primary
-                  }}>
-                    Contact Owner
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  onPress={handleBookNow}
-                  disabled={bookingLoading || !listing.is_active}
-                  style={{
-                    backgroundColor: listing.is_active ? colors.primary.main : colors.gray[400],
-                    borderRadius: 12,
-                    paddingVertical: spacing.md,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexDirection: 'row'
-                  }}
-                >
-                  {bookingLoading ? (
-                    <ActivityIndicator size="small" color={colors.white} />
-                  ) : (
-                    <>
-                      <Ionicons name="calendar-outline" size={20} color={colors.white} style={{ marginRight: spacing.xs }} />
-                      <Text style={{
-                        fontSize: typography.sizes.base,
-                        fontWeight: typography.weights.semibold,
-                        color: colors.white
-                      }}>
-                        {listing.is_active ? 'Book Now' : 'Not Available'}
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </>
+              // Show Book Now button for other users
+              <TouchableOpacity
+                onPress={handleBookNow}
+                disabled={bookingLoading || !listing.is_active}
+                style={{
+                  backgroundColor: listing.is_active ? colors.primary.main : colors.gray[400],
+                  borderRadius: 12,
+                  paddingVertical: spacing.md,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'row'
+                }}
+              >
+                {bookingLoading ? (
+                  <ActivityIndicator size="small" color={colors.white} />
+                ) : (
+                  <>
+                    <Ionicons name="calendar-outline" size={20} color={colors.white} style={{ marginRight: spacing.xs }} />
+                    <Text style={{
+                      fontSize: typography.sizes.base,
+                      fontWeight: typography.weights.semibold,
+                      color: colors.white
+                    }}>
+                      {listing.is_active ? 'Book Now' : 'Not Available'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
             )}
           </View>
         </SafeAreaView>
-      </SafeAreaView>
+      </View>
 
     </>
   );

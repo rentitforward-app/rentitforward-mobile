@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, TextInput, Image, ScrollView, FlatList, Alert, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+// SafeAreaView removed - Header component handles safe area
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography } from '../../src/lib/design-system';
 import { RealAPIPredictiveSearchInput } from '../../src/components/search/RealAPIPredictiveSearchInput';
@@ -8,6 +8,7 @@ import { useUIStore } from '../../src/stores/ui';
 import { useAuth } from '../../src/components/AuthProvider';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../src/lib/supabase';
+import { Header, HeaderPresets } from '../../src/components/Header';
 
 const logo = require('../../assets/images/RentitForwardMainLogo.png');
 
@@ -29,8 +30,6 @@ const CATEGORIES = [
 
 export default function HomeScreen() {
   const [search, setSearch] = useState('');
-  const notifications = useUIStore(state => state.notifications);
-  const notificationCount = notifications.length;
   const { user, profile, loading } = useAuth();
   const router = useRouter();
 
@@ -112,13 +111,6 @@ export default function HomeScreen() {
   const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
 
   // Handlers
-  const handleNotificationPress = () => {
-    router.push('/notifications');
-  };
-  const handleMenuPress = () => {
-    // If you implement a drawer, replace this with openDrawer()
-    router.push('/profile');
-  };
   const handleCategoryPress = (categoryId: string) => {
     router.push(`/browse?category=${categoryId}`);
   };
@@ -273,73 +265,9 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.neutral.lightGray }} edges={['top']}>
-      <View style={{ backgroundColor: colors.white }}>
-        {/* Header */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingLeft: spacing.xs, // Reduced left padding for logo
-            paddingRight: spacing.md, // Keep right padding for notification
-            paddingTop: spacing.md,
-            paddingBottom: spacing.md,
-            backgroundColor: colors.white,
-          }}
-        >
-          {/* Logo - left aligned */}
-          <Image 
-            source={logo} 
-            style={{ 
-              width: 170, 
-              height: 44, 
-              resizeMode: 'contain',
-            }} 
-          />
-          
-          {/* Notification Icon */}
-          <TouchableOpacity
-            onPress={handleNotificationPress}
-            style={{ 
-              width: 44,
-              height: 44,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: 22,
-            }}
-            accessibilityLabel="Notifications"
-            accessibilityRole="button"
-          >
-            <Ionicons name="notifications-outline" size={24} color={colors.text.primary} />
-            {notificationCount > 0 && (
-              <View 
-                style={{ 
-                  position: 'absolute', 
-                  top: 8, 
-                  right: 8, 
-                  backgroundColor: colors.semantic.error, 
-                  borderRadius: 8, 
-                  width: 16, 
-                  height: 16, 
-                  alignItems: 'center', 
-                  justifyContent: 'center' 
-                }}
-              >
-                <Text 
-                  style={{ 
-                    color: colors.white, 
-                    fontSize: 10, 
-                    fontWeight: typography.weights.bold 
-                  }}
-                >
-                  {notificationCount}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
+    <View style={{ flex: 1, backgroundColor: colors.neutral.lightGray }}>
+      {/* Standardized Header with Logo */}
+      <Header {...HeaderPresets.home(logo)} />
 
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
         {/* Top Banner with Search */}
@@ -471,6 +399,6 @@ export default function HomeScreen() {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 } 

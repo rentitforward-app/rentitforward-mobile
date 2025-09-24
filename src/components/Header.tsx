@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ViewStyle, TextStyle, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, ViewStyle, TextStyle, StatusBar, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,8 +7,9 @@ import { colors, spacing, typography } from '../lib/design-system';
 import { useNotifications } from './NotificationService';
 
 export interface HeaderProps {
-  title: string;
+  title?: string;
   subtitle?: string;
+  logo?: any; // Logo image source
   showBackButton?: boolean;
   showNotificationIcon?: boolean;
   onBackPress?: () => void;
@@ -26,6 +27,7 @@ export interface HeaderProps {
 export function Header({
   title,
   subtitle,
+  logo,
   showBackButton = false,
   showNotificationIcon = true,
   onBackPress,
@@ -73,7 +75,8 @@ export function Header({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingTop: 0, // Remove top padding since headerStyle already handles safe area
+    paddingBottom: spacing.sm,
     minHeight: 56,
   };
 
@@ -125,15 +128,28 @@ export function Header({
             ) : null}
           </View>
 
-          {/* Center - Title and subtitle */}
+          {/* Center - Logo or Title and subtitle */}
           <View style={titleContainerStyle}>
-            <Text style={titleTextStyle} numberOfLines={1}>
-              {title}
-            </Text>
-            {subtitle && (
-              <Text style={subtitleTextStyle} numberOfLines={1}>
-                {subtitle}
-              </Text>
+            {logo ? (
+              <Image 
+                source={logo} 
+                style={{ 
+                  width: 170, 
+                  height: 44, 
+                  resizeMode: 'contain' 
+                }} 
+              />
+            ) : (
+              <>
+                <Text style={titleTextStyle} numberOfLines={1}>
+                  {title}
+                </Text>
+                {subtitle && (
+                  <Text style={subtitleTextStyle} numberOfLines={1}>
+                    {subtitle}
+                  </Text>
+                )}
+              </>
             )}
           </View>
 
@@ -204,6 +220,13 @@ export const HeaderPresets = {
   // Main screen header with title and notification icon
   main: (title: string) => ({
     title,
+    showBackButton: false,
+    showNotificationIcon: true,
+  }),
+
+  // Home screen header with logo and notification icon
+  home: (logo: any) => ({
+    logo,
     showBackButton: false,
     showNotificationIcon: true,
   }),

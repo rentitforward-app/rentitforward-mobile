@@ -8,7 +8,7 @@ import {
   StyleSheet,
   RefreshControl,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+// SafeAreaView removed - Header component handles safe area
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -416,17 +416,17 @@ export default function MessagesTab() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <Header {...HeaderPresets.main('Messages')} />
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Loading messages...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* Header */}
       <Header {...HeaderPresets.main('Messages')} />
 
@@ -456,7 +456,7 @@ export default function MessagesTab() {
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 

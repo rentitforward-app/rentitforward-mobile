@@ -6,6 +6,7 @@ import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { colors, spacing, typography } from '../../src/lib/design-system';
 import { useAuth } from '../../src/components/AuthProvider';
 import { supabase } from '../../src/lib/supabase';
+import { Header, HeaderPresets } from '../../src/components/Header';
 import { Calendar, DateData } from 'react-native-calendars';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { availabilityAPI } from '../../src/lib/api/availability';
@@ -582,12 +583,13 @@ export default function BookingScreen() {
     return (
       <>
         <Stack.Screen options={{ headerShown: false }} />
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>
+        <View style={{ flex: 1, backgroundColor: colors.white }}>
+          <Header {...HeaderPresets.detail("Loading...")} />
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator size="large" color={colors.primary.main} />
             <Text style={{ marginTop: spacing.md, color: colors.text.secondary }}>Loading booking details...</Text>
           </View>
-        </SafeAreaView>
+        </View>
       </>
     );
   }
@@ -596,7 +598,8 @@ export default function BookingScreen() {
     return (
       <>
         <Stack.Screen options={{ headerShown: false }} />
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }}>
+        <View style={{ flex: 1, backgroundColor: colors.white }}>
+          <Header {...HeaderPresets.detail("Booking Not Found")} />
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ fontSize: typography.sizes.lg, color: colors.text.primary }}>Listing not found</Text>
             <TouchableOpacity
@@ -612,7 +615,7 @@ export default function BookingScreen() {
               <Text style={{ color: colors.white, fontWeight: typography.weights.semibold }}>Go Back</Text>
             </TouchableOpacity>
           </View>
-        </SafeAreaView>
+        </View>
       </>
     );
   }
@@ -815,46 +818,8 @@ export default function BookingScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.white }} edges={['top', 'left', 'right']}>
-        {/* Header */}
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: spacing.md,
-          paddingVertical: spacing.sm,
-          backgroundColor: colors.white,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.gray[200]
-        }}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: spacing.xs
-            }}
-          >
-            <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
-            <Text style={{
-              fontSize: typography.sizes.base,
-              fontWeight: typography.weights.medium,
-              color: colors.text.primary
-            }}>
-              Back
-            </Text>
-          </TouchableOpacity>
-          
-          <Text style={{
-            fontSize: typography.sizes.lg,
-            fontWeight: typography.weights.semibold,
-            color: colors.text.primary
-          }}>
-            Book {listing.title}
-          </Text>
-          
-          <View style={{ width: 80 }} />
-        </View>
+      <View style={{ flex: 1, backgroundColor: colors.white }}>
+        <Header {...HeaderPresets.detail(`Book ${listing.title}`)} />
 
         {/* Main Content */}
         <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
@@ -1552,7 +1517,7 @@ export default function BookingScreen() {
             </TouchableOpacity>
           </View>
         </ScrollView>
-      </SafeAreaView>
+      </View>
 
       {/* Payment WebView Modal */}
       <PaymentWebView
