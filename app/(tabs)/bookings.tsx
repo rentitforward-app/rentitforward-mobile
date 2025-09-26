@@ -15,6 +15,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../src/lib/supabase';
 import { useAuth } from '../../src/components/AuthProvider';
+import { useBookingRealtime } from '../../src/hooks/useBookingRealtime';
 import { colors, spacing, typography } from '../../src/lib/design-system';
 import { Header, HeaderPresets } from '../../src/components/Header';
 
@@ -59,6 +60,7 @@ const statusColors = {
   completed: { bg: '#e0e7ff', text: '#4338ca' },
   cancelled: { bg: '#fee2e2', text: '#dc2626' },
   payment_required: { bg: '#fef3c7', text: '#d97706' },
+  disputed: { bg: '#fed7d7', text: '#c53030' },
 };
 
 export default function BookingsScreen() {
@@ -67,6 +69,12 @@ export default function BookingsScreen() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
+
+  // Set up real-time subscription for all user bookings
+  const { isConnected } = useBookingRealtime({
+    userId: user?.id,
+    enabled: !!user?.id,
+  });
 
   // Clean console log without infinite loop
   // Removed console.log to reduce spam

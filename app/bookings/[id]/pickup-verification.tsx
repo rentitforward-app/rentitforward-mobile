@@ -15,10 +15,13 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { mobileTokens } from '../../../src/lib/design-system';
 import { useAuth } from '../../../src/components/AuthProvider';
+import { useBookingRealtime } from '../../../src/hooks/useBookingRealtime';
 import { supabase } from '../../../src/lib/supabase';
+import { Header } from '../../../src/components/Header';
+import { isUserAdmin } from '../../../src/utils/admin';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -67,24 +70,23 @@ export default function PickupVerificationScreen() {
   const { id: bookingId } = useLocalSearchParams();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [booking, setBooking] = useState<BookingDetails | null>(null);
   const [photos, setPhotos] = useState<PickupPhoto[]>([]);
-  const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
 
-  useEffect(() => {
-    loadBookingDetails();
-    getCurrentLocation();
-  }, [bookingId]);
+  // Set up real-time subscription for this booking
+  const { isConnected } = useBookingRealtime({
+    bookingId: bookingId as string,
+    userId: user?.id,
+    enabled: !!bookingId && !!user?.id,
+  });
 
-  const loadBookingDetails = async () => {
-    try {
-      if (!bookingId || typeof bookingId !== 'string') {
-        throw new Error('No booking ID provided');
-      }
+  // Use React Query for booking data so it updates with real-time changes
+  const { data: booking, isLoading: loading, error } = useQuery({
+    queryKey: ['booking-details', bookingId],
+    queryFn: async () => {
+      if (!bookingId) throw new Error('No booking ID');
       
-      // Fetch booking details from Supabase directly
       const { data, error } = await supabase
         .from('bookings')
         .select(`
@@ -98,34 +100,31 @@ export default function PickupVerificationScreen() {
         .eq('id', bookingId)
         .single();
 
-      if (error) {
-        console.error('Error loading booking:', error);
-        Alert.alert('Error', 'Failed to load booking details');
-        return;
-      }
+      if (error) throw error;
+      
+      // Transform data to match expected structure
+      const transformedBooking = {
+        ...data,
+        title: data.listings?.title || 'Unknown Item',
+        listing_images: data.listings?.images || [],
+      };
+      
+      return transformedBooking as BookingDetails;
+    },
+    enabled: !!bookingId,
+  });
 
-      if (data) {
-        // Transform data to match expected structure
-        const transformedBooking = {
-          ...data,
-          title: data.listings?.title || 'Unknown Item',
-          listing_images: data.listings?.images || [],
-        };
-        
-        setBooking(transformedBooking);
-        
-        // Load existing pickup photos if any
-        if (data.pickup_images && Array.isArray(data.pickup_images)) {
-          setPhotos(data.pickup_images);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading booking:', error);
-      Alert.alert('Error', 'Failed to load booking details');
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    getCurrentLocation();
+  }, []);
+
+  // Load existing pickup photos when booking data is available
+  useEffect(() => {
+    if (booking?.pickup_images && Array.isArray(booking.pickup_images)) {
+      setPhotos(booking.pickup_images);
     }
-  };
+  }, [booking?.pickup_images]);
+
 
   const getCurrentLocation = async () => {
     try {
@@ -155,15 +154,27 @@ export default function PickupVerificationScreen() {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
         quality: 0.8,
+        exif: false, // Disable EXIF to avoid potential issues
       });
 
-      if (!result.canceled && result.assets[0]) {
+      console.log('Camera result:', result);
+      
+      if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
+        console.log('Camera asset:', asset);
+        
+        if (!asset.uri) {
+          console.error('Asset URI is undefined:', asset);
+          Alert.alert('Error', 'Failed to capture photo. Please try again.');
+          return;
+        }
         
         // Create photo object with metadata
         const newPhoto: PickupPhoto = {
           uri: asset.uri,
           timestamp: new Date().toISOString(),
+          user_id: user?.id,
+          user_type: booking?.renter_id === user?.id ? 'renter' : 'owner',
           location: currentLocation ? {
             latitude: currentLocation.coords.latitude,
             longitude: currentLocation.coords.longitude,
@@ -212,8 +223,20 @@ export default function PickupVerificationScreen() {
   };
 
   const submitVerification = async () => {
-    if (photos.length < 3) {
-      Alert.alert('More Photos Required', 'Please take at least 3 verification photos to continue.');
+    if (!booking || !user) {
+      Alert.alert('Error', 'Missing booking or user information.');
+      return;
+    }
+
+    // Determine if the current user is the renter or owner
+    const isRenter = booking.renter_id === user.id;
+    const isOwner = booking.owner_id === user.id;
+    const isAdmin = isUserAdmin(user);
+
+    // Renter must take at least 3 photos, owner can confirm without photos
+    // Admin override: allow testing with any number of photos
+    if (isRenter && photos.length < 3 && !isAdmin) {
+      Alert.alert('More Photos Required', 'As the renter, please take at least 3 verification photos to continue.');
       return;
     }
 
@@ -222,21 +245,13 @@ export default function PickupVerificationScreen() {
       return;
     }
 
-    if (!booking || !user) {
-      Alert.alert('Error', 'Missing booking or user information.');
+    if (!isRenter && !isOwner && !isAdmin) {
+      Alert.alert('Error', 'You are not authorized to verify this booking.');
       return;
     }
 
     setUploading(true);
     try {
-      // Determine if the current user is the renter or owner
-      const isRenter = booking.renter_id === user.id;
-      const isOwner = booking.owner_id === user.id;
-
-      if (!isRenter && !isOwner) {
-        Alert.alert('Error', 'You are not authorized to verify this booking.');
-        return;
-      }
 
 
       // Upload photos to Supabase Storage and get URLs
@@ -245,25 +260,108 @@ export default function PickupVerificationScreen() {
       for (let i = 0; i < photos.length; i++) {
         const photo = photos[i];
         try {
-          // Convert image to blob for upload
-          const response = await fetch(photo.uri!);
-          const blob = await response.blob();
+          console.log(`Photo object ${i + 1}:`, photo);
+          
+          // Skip photos that are already uploaded (have URL but no URI)
+          if (photo.url && !photo.uri) {
+            console.log(`Photo ${i + 1} already uploaded, adding to list:`, photo.url);
+            uploadedPhotos.push(photo);
+            continue;
+          }
+          
+          // Only upload photos that have a URI (new photos from camera)
+          if (!photo.uri) {
+            console.log(`Photo ${i + 1} has no URI, skipping upload`);
+            continue;
+          }
           
           // Generate unique filename
-          const fileExt = photo.uri?.split('.').pop() || 'jpg';
+          const fileExt = photo.uri.split('.').pop() || 'jpg';
           const fileName = `pickup_${bookingId}_${user.id}_${Date.now()}_${i}.${fileExt}`;
           
-          // Upload to Supabase Storage
-          const { data, error } = await supabase.storage
-            .from('booking-confirmations')
-            .upload(fileName, blob);
+          console.log(`Uploading new photo ${i + 1}: ${fileName}`);
+          console.log(`Photo URI: ${photo.uri}`);
           
-          if (error) throw error;
+          let publicUrl: string;
           
-          // Get public URL
-          const { data: { publicUrl } } = supabase.storage
-            .from('booking-confirmations')
-            .getPublicUrl(fileName);
+          // Try blob approach first (like profile upload)
+          try {
+            console.log(`Trying blob upload for ${fileName}`);
+            const response = await fetch(photo.uri!);
+            const blob = await response.blob();
+            console.log(`Blob created, size: ${blob.size}`);
+            
+            // Try listing-images bucket with blob
+            const { data, error } = await supabase.storage
+              .from('listing-images')
+              .upload(fileName, blob);
+            
+            if (error) {
+              console.error(`Blob upload error for ${fileName}:`, error);
+              throw error;
+            }
+            
+            console.log(`Successfully uploaded ${fileName} to listing-images bucket via blob`);
+            
+            // Get public URL
+            const { data: { publicUrl: url } } = supabase.storage
+              .from('listing-images')
+              .getPublicUrl(fileName);
+            
+            publicUrl = url;
+            console.log(`Public URL: ${publicUrl}`);
+            
+          } catch (blobError) {
+            console.error(`Blob upload failed, trying FormData:`, blobError);
+            
+            // Fallback to FormData approach
+            const uploadFormData = new FormData();
+            uploadFormData.append('file', {
+              uri: photo.uri!,
+              type: `image/${fileExt}`,
+              name: fileName,
+            } as any);
+            
+            console.log(`FormData created for ${fileName}`);
+            
+            // Try using listing-images bucket first (known to work)
+            const { data, error } = await supabase.storage
+              .from('listing-images')
+              .upload(fileName, uploadFormData);
+            
+            if (error) {
+              console.error(`FormData upload error for ${fileName}:`, error);
+              // Try booking-confirmations bucket as fallback
+              console.log('Trying booking-confirmations bucket as fallback...');
+              const { data: fallbackData, error: fallbackError } = await supabase.storage
+                .from('booking-confirmations')
+                .upload(fileName, uploadFormData);
+              
+              if (fallbackError) {
+                console.error(`Fallback upload error for ${fileName}:`, fallbackError);
+                throw fallbackError;
+              }
+              console.log(`Successfully uploaded ${fileName} to booking-confirmations bucket`);
+              
+              // Get public URL from booking-confirmations
+              const { data: { publicUrl: url } } = supabase.storage
+                .from('booking-confirmations')
+                .getPublicUrl(fileName);
+              
+              publicUrl = url;
+              console.log(`Public URL: ${publicUrl}`);
+            } else {
+              console.log(`Successfully uploaded ${fileName} to listing-images bucket via FormData`);
+              
+              // Get public URL from listing-images
+              const { data: { publicUrl: url } } = supabase.storage
+                .from('listing-images')
+                .getPublicUrl(fileName);
+              
+              publicUrl = url;
+              console.log(`Public URL: ${publicUrl}`);
+            }
+          }
           
           // Create photo object with cloud URL
           uploadedPhotos.push({
@@ -419,7 +517,7 @@ export default function PickupVerificationScreen() {
         }
       }
 
-      // Invalidate queries to refresh booking details
+      // Invalidate cache to ensure booking details page shows updated data
       queryClient.invalidateQueries({ queryKey: ['booking-details', bookingId] });
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
       
@@ -430,6 +528,8 @@ export default function PickupVerificationScreen() {
           {
             text: 'Continue',
             onPress: () => {
+              // Additional cache invalidation right before navigation
+              queryClient.invalidateQueries({ queryKey: ['booking-details', bookingId] });
               router.back();
             },
           },
@@ -465,19 +565,18 @@ export default function PickupVerificationScreen() {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backIcon}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={24} color={mobileTokens.colors.text.primary} />
-        </TouchableOpacity>
-        <Text style={styles.title}>Pickup Verification</Text>
-      </View>
+    <View style={styles.container}>
+      <Header 
+        title="Pickup Verification"
+        showBackButton={true}
+        onBackPress={() => router.back()}
+      />
+      
+      <ScrollView style={styles.scrollContainer}>
+        {/* Top Spacing */}
+        <View style={styles.topSpacing} />
 
-      {/* Booking Info */}
+        {/* Booking Info */}
       <View style={styles.bookingCard}>
         <Text style={styles.bookingTitle}>{booking.title}</Text>
         <Text style={styles.bookingDates}>
@@ -519,10 +618,20 @@ export default function PickupVerificationScreen() {
 
       {/* Photo Grid */}
       <View style={styles.photoSection}>
+        <Text style={styles.sectionTitle}>Verification Photos ({photos.length}/8)</Text>
+        
+        {/* Show information based on user role */}
+        {booking && user && (
+          <Text style={styles.infoText}>
+            {booking.renter_id === user.id 
+              ? "Take photos to verify item condition at pickup" 
+              : "Take photos for your verification (optional) - you can also just confirm the renter's photos"}
+          </Text>
+        )}
+        
         <View style={styles.photoHeader}>
-          <Text style={styles.sectionTitle}>Verification Photos ({photos.length}/8)</Text>
-          {/* Only allow renter to take photos */}
-          {booking && user && booking.renter_id === user.id && (
+          {/* Allow both renter and owner to take photos */}
+          {booking && user && (booking.renter_id === user.id || booking.owner_id === user.id) && (
             <TouchableOpacity 
               style={styles.addPhotoButton}
               onPress={takePhoto}
@@ -532,20 +641,14 @@ export default function PickupVerificationScreen() {
               <Text style={styles.addPhotoText}>Take Photo</Text>
             </TouchableOpacity>
           )}
-          {/* Show information for owner */}
-          {booking && user && booking.owner_id === user.id && (
-            <View style={styles.infoContainer}>
-              <Text style={styles.infoText}>Photos taken by renter during pickup</Text>
-            </View>
-          )}
         </View>
 
         <View style={styles.photoGrid}>
           {photos.map((photo, index) => (
             <View key={index} style={styles.photoContainer}>
               <Image source={{ uri: photo.uri || photo.url }} style={styles.photoThumbnail} />
-              {/* Only allow renter to delete photos */}
-              {booking && user && booking.renter_id === user.id && (
+              {/* Allow users to delete only their own photos */}
+              {booking && user && photo.user_id === user.id && (
                 <TouchableOpacity
                   style={styles.removePhotoButton}
                   onPress={() => removePhoto(index)}
@@ -569,7 +672,11 @@ export default function PickupVerificationScreen() {
           <View style={styles.emptyPhotoState}>
             <Ionicons name="camera-outline" size={64} color={mobileTokens.colors.gray[400]} />
             <Text style={styles.emptyPhotoText}>No photos taken yet</Text>
-            <Text style={styles.emptyPhotoSubtext}>Take at least 3 verification photos</Text>
+            <Text style={styles.emptyPhotoSubtext}>
+              {booking && user && booking.renter_id === user.id 
+                ? "Take at least 3 verification photos" 
+                : "Take photos (optional) or confirm renter's photos"}
+            </Text>
           </View>
         )}
       </View>
@@ -579,11 +686,12 @@ export default function PickupVerificationScreen() {
         <TouchableOpacity
           style={[
             styles.submitButton,
-            photos.length < 3 && styles.submitButtonDisabled,
+            // Only disable for renter if less than 3 photos, owner can always submit
+            (booking && user && booking.renter_id === user.id && photos.length < 3) && styles.submitButtonDisabled,
             uploading && styles.submitButtonDisabled,
           ]}
           onPress={submitVerification}
-          disabled={photos.length < 3 || uploading}
+          disabled={(booking && user && booking.renter_id === user.id && photos.length < 3) || uploading}
         >
           {uploading ? (
             <ActivityIndicator color="white" />
@@ -591,7 +699,7 @@ export default function PickupVerificationScreen() {
             <>
               <Ionicons name="checkmark-circle" size={20} color="white" />
               <Text style={styles.submitButtonText}>
-                Confirm Pickup ({photos.length}/8 photos)
+                Confirm Pickup
               </Text>
             </>
           )}
@@ -599,10 +707,15 @@ export default function PickupVerificationScreen() {
 
         <Text style={styles.submitNote}>
           This will confirm that you have verified the item condition at pickup.
-          {photos.length < 3 && ' You need at least 3 photos to continue.'}
+          {booking && user && booking.renter_id === user.id && photos.length < 3 && ' You need at least 3 photos to continue.'}
+          {booking && user && booking.owner_id === user.id && photos.length === 0 && ' You can confirm without photos if you agree with the renter\'s verification.'}
         </Text>
+        
+        {/* Bottom Spacing */}
+        <View style={styles.bottomSpacing} />
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -610,6 +723,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: mobileTokens.colors.background.secondary,
+  },
+  scrollContainer: {
+    flex: 1,
+  },
+  topSpacing: {
+    height: mobileTokens.spacing.lg,
   },
   loadingContainer: {
     flex: 1,
@@ -646,22 +765,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: mobileTokens.typography.sizes.base,
     fontWeight: mobileTokens.typography.weights.semibold,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: mobileTokens.spacing.md,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: mobileTokens.colors.gray[200],
-  },
-  backIcon: {
-    marginRight: mobileTokens.spacing.md,
-  },
-  title: {
-    fontSize: mobileTokens.typography.sizes.lg,
-    fontWeight: mobileTokens.typography.weights.semibold,
-    color: mobileTokens.colors.text.primary,
   },
   bookingCard: {
     backgroundColor: 'white',
@@ -741,7 +844,6 @@ const styles = StyleSheet.create({
   },
   photoHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: mobileTokens.spacing.md,
   },
@@ -768,7 +870,7 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: mobileTokens.typography.sizes.sm,
     color: mobileTokens.colors.text.secondary,
-    fontStyle: 'italic',
+    marginBottom: mobileTokens.spacing.md,
   },
   photoGrid: {
     flexDirection: 'row',
@@ -841,5 +943,8 @@ const styles = StyleSheet.create({
     color: mobileTokens.colors.text.secondary,
     textAlign: 'center',
     lineHeight: 18,
+  },
+  bottomSpacing: {
+    height: mobileTokens.spacing.xl,
   },
 });

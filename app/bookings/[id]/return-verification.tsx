@@ -16,10 +16,12 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { mobileTokens } from '../../../src/lib/design-system';
 import { useAuth } from '../../../src/components/AuthProvider';
+import { useBookingRealtime } from '../../../src/hooks/useBookingRealtime';
 import { supabase } from '../../../src/lib/supabase';
+import { isUserAdmin } from '../../../src/utils/admin';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -90,9 +92,7 @@ export default function ReturnVerificationScreen() {
   const { id: bookingId } = useLocalSearchParams();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [booking, setBooking] = useState<BookingDetails | null>(null);
   const [photos, setPhotos] = useState<ReturnPhoto[]>([]);
-  const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
   const [showDamageModal, setShowDamageModal] = useState(false);
@@ -100,18 +100,19 @@ export default function ReturnVerificationScreen() {
   const [ownerNotes, setOwnerNotes] = useState('');
   const [selectedPickupPhoto, setSelectedPickupPhoto] = useState<PickupPhoto | null>(null);
 
-  useEffect(() => {
-    loadBookingDetails();
-    getCurrentLocation();
-  }, [bookingId]);
+  // Set up real-time subscription for this booking
+  const { isConnected } = useBookingRealtime({
+    bookingId: bookingId as string,
+    userId: user?.id,
+    enabled: !!bookingId && !!user?.id,
+  });
 
-  const loadBookingDetails = async () => {
-    try {
-      if (!bookingId || typeof bookingId !== 'string') {
-        throw new Error('No booking ID provided');
-      }
+  // Use React Query for booking data so it updates with real-time changes
+  const { data: booking, isLoading: loading, error } = useQuery({
+    queryKey: ['booking-details', bookingId],
+    queryFn: async () => {
+      if (!bookingId) throw new Error('No booking ID');
       
-      // Fetch booking details from Supabase directly
       const { data, error } = await supabase
         .from('bookings')
         .select(`
@@ -125,42 +126,40 @@ export default function ReturnVerificationScreen() {
         .eq('id', bookingId)
         .single();
 
-      if (error) {
-        console.error('Error loading booking:', error);
-        Alert.alert('Error', 'Failed to load booking details');
-        return;
-      }
+      if (error) throw error;
+      
+      // Transform data to match expected structure
+      const transformedBooking = {
+        ...data,
+        title: data.listings?.title || 'Unknown Item',
+        listing_images: data.listings?.images || [],
+      };
+      
+      return transformedBooking as BookingDetails;
+    },
+    enabled: !!bookingId,
+  });
 
-      if (data) {
-        // Transform data to match expected structure
-        const transformedBooking = {
-          ...data,
-          title: data.listings?.title || 'Unknown Item',
-          listing_images: data.listings?.images || [],
-        };
-        
-        setBooking(transformedBooking);
-        
-        // Load existing return photos if any
-        if (data.return_images && Array.isArray(data.return_images)) {
-          setPhotos(data.return_images);
-        }
-        
-        // Load existing damage report and owner notes
-        if (data.damage_report) {
-          setDamageReport(data.damage_report);
-        }
-        if (data.owner_notes) {
-          setOwnerNotes(data.owner_notes);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading booking:', error);
-      Alert.alert('Error', 'Failed to load booking details');
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    getCurrentLocation();
+  }, []);
+
+  // Load existing photos when booking data is available
+  useEffect(() => {
+    if (booking?.return_images && Array.isArray(booking.return_images)) {
+      setPhotos(booking.return_images);
     }
-  };
+  }, [booking?.return_images]);
+
+  // Load existing damage report and owner notes when booking data is available
+  useEffect(() => {
+    if (booking?.damage_report) {
+      setDamageReport(booking.damage_report);
+    }
+    if (booking?.owner_notes) {
+      setOwnerNotes(booking.owner_notes);
+    }
+  }, [booking?.damage_report, booking?.owner_notes]);
 
   const getCurrentLocation = async () => {
     try {
@@ -199,6 +198,8 @@ export default function ReturnVerificationScreen() {
         const newPhoto: ReturnPhoto = {
           uri: asset.uri,
           timestamp: new Date().toISOString(),
+          user_id: user?.id,
+          user_type: booking?.renter_id === user?.id ? 'renter' : 'owner',
           location: currentLocation ? {
             latitude: currentLocation.coords.latitude,
             longitude: currentLocation.coords.longitude,
@@ -303,8 +304,9 @@ export default function ReturnVerificationScreen() {
       // Determine if the current user is the renter or owner
       const isRenter = booking.renter_id === user.id;
       const isOwner = booking.owner_id === user.id;
+      const isAdmin = isUserAdmin(user);
 
-      if (!isRenter && !isOwner) {
+      if (!isRenter && !isOwner && !isAdmin) {
         Alert.alert('Error', 'You are not authorized to verify this booking.');
         return;
       }
@@ -316,25 +318,108 @@ export default function ReturnVerificationScreen() {
       for (let i = 0; i < photos.length; i++) {
         const photo = photos[i];
         try {
-          // Convert image to blob for upload
-          const response = await fetch(photo.uri!);
-          const blob = await response.blob();
+          console.log(`Return photo object ${i + 1}:`, photo);
+          
+          // Skip photos that are already uploaded (have URL but no URI)
+          if (photo.url && !photo.uri) {
+            console.log(`Return photo ${i + 1} already uploaded, adding to list:`, photo.url);
+            uploadedPhotos.push(photo);
+            continue;
+          }
+          
+          // Only upload photos that have a URI (new photos from camera)
+          if (!photo.uri) {
+            console.log(`Return photo ${i + 1} has no URI, skipping upload`);
+            continue;
+          }
           
           // Generate unique filename
-          const fileExt = photo.uri?.split('.').pop() || 'jpg';
+          const fileExt = photo.uri.split('.').pop() || 'jpg';
           const fileName = `return_${bookingId}_${user.id}_${Date.now()}_${i}.${fileExt}`;
           
-          // Upload to Supabase Storage
-          const { data, error } = await supabase.storage
-            .from('booking-confirmations')
-            .upload(fileName, blob);
+          console.log(`Uploading new return photo ${i + 1}: ${fileName}`);
+          console.log(`Return photo URI: ${photo.uri}`);
           
-          if (error) throw error;
+          let publicUrl: string;
           
-          // Get public URL
-          const { data: { publicUrl } } = supabase.storage
-            .from('booking-confirmations')
-            .getPublicUrl(fileName);
+          // Try blob approach first (like profile upload)
+          try {
+            console.log(`Trying blob upload for return ${fileName}`);
+            const response = await fetch(photo.uri);
+            const blob = await response.blob();
+            console.log(`Return blob created, size: ${blob.size}`);
+            
+            // Try listing-images bucket with blob
+            const { data, error } = await supabase.storage
+              .from('listing-images')
+              .upload(fileName, blob);
+            
+            if (error) {
+              console.error(`Return blob upload error for ${fileName}:`, error);
+              throw error;
+            }
+            
+            console.log(`Successfully uploaded return ${fileName} to listing-images bucket via blob`);
+            
+            // Get public URL
+            const { data: { publicUrl: url } } = supabase.storage
+              .from('listing-images')
+              .getPublicUrl(fileName);
+            
+            publicUrl = url;
+            console.log(`Return public URL: ${publicUrl}`);
+            
+          } catch (blobError) {
+            console.error(`Return blob upload failed, trying FormData:`, blobError);
+            
+            // Fallback to FormData approach
+            const uploadFormData = new FormData();
+            uploadFormData.append('file', {
+              uri: photo.uri,
+              type: `image/${fileExt}`,
+              name: fileName,
+            } as any);
+            
+            console.log(`Return FormData created for ${fileName}`);
+            
+            // Try using listing-images bucket first (known to work)
+            const { data, error } = await supabase.storage
+              .from('listing-images')
+              .upload(fileName, uploadFormData);
+            
+            if (error) {
+              console.error(`Return FormData upload error for ${fileName}:`, error);
+              // Try booking-confirmations bucket as fallback
+              console.log('Trying booking-confirmations bucket as fallback for return...');
+              const { data: fallbackData, error: fallbackError } = await supabase.storage
+                .from('booking-confirmations')
+                .upload(fileName, uploadFormData);
+              
+              if (fallbackError) {
+                console.error(`Return fallback upload error for ${fileName}:`, fallbackError);
+                throw fallbackError;
+              }
+              console.log(`Successfully uploaded return ${fileName} to booking-confirmations bucket`);
+              
+              // Get public URL from booking-confirmations
+              const { data: { publicUrl: url } } = supabase.storage
+                .from('booking-confirmations')
+                .getPublicUrl(fileName);
+              
+              publicUrl = url;
+              console.log(`Return public URL: ${publicUrl}`);
+            } else {
+              console.log(`Successfully uploaded return ${fileName} to listing-images bucket via FormData`);
+              
+              // Get public URL from listing-images
+              const { data: { publicUrl: url } } = supabase.storage
+                .from('listing-images')
+                .getPublicUrl(fileName);
+              
+              publicUrl = url;
+              console.log(`Return public URL: ${publicUrl}`);
+            }
+          }
           
           // Create photo object with cloud URL
           uploadedPhotos.push({
@@ -350,7 +435,7 @@ export default function ReturnVerificationScreen() {
             },
           });
         } catch (uploadError) {
-          console.error('Error uploading photo:', uploadError);
+          console.error('Error uploading return photo:', uploadError);
           Alert.alert('Upload Failed', `Failed to upload photo ${i + 1}. Please try again.`);
           return;
         }
@@ -379,34 +464,48 @@ export default function ReturnVerificationScreen() {
         updateData.return_confirmed_at = new Date().toISOString();
       }
 
-      // Add damage report if provided (only renter can create/edit damage report)
-      if (isRenter && damageReport.trim()) {
-        updateData.damage_report = damageReport.trim();
-        updateData.damage_reported_by = user.id;
-        updateData.damage_reported_at = new Date().toISOString();
-      }
-      
-      // Add owner notes if provided (only owner can add notes)
-      if (isOwner && ownerNotes.trim()) {
-        updateData.owner_notes = ownerNotes.trim();
+      // Add damage report if provided (both parties can report damage/issues)
+      if (damageReport.trim()) {
+        if (isRenter) {
+          // Renter uses the existing damage_report field
+          updateData.damage_report = damageReport.trim();
+          updateData.damage_reported_by = user.id;
+          updateData.damage_reported_at = new Date().toISOString();
+        } else {
+          // Owner uses the owner_notes field for now (until database schema is updated)
+          updateData.owner_notes = damageReport.trim();
+        }
       }
 
       // Check if both parties have now confirmed return
       // Note: We need to check the current state from database first
       const { data: currentBooking } = await supabase
         .from('bookings')
-        .select('return_confirmed_by_renter, return_confirmed_by_owner')
+        .select('return_confirmed_by_renter, return_confirmed_by_owner, damage_report, owner_notes')
         .eq('id', bookingId)
         .single();
 
       const renterConfirmed = isRenter ? true : (currentBooking?.return_confirmed_by_renter || false);
       const ownerConfirmed = isOwner ? true : (currentBooking?.return_confirmed_by_owner || false);
       
-      // If both parties have confirmed, update status to 'completed'
+      // Check if there are any damage reports that need resolution
+      const hasDamageReport = currentBooking?.damage_report || updateData.damage_report;
+      const hasOwnerNotes = currentBooking?.owner_notes || updateData.owner_notes;
+      
+      // If there are damage reports, the booking should NOT auto-complete
+      // It should go to a "pending_damage_resolution" status instead
       const bothConfirmed = renterConfirmed && ownerConfirmed;
-      if (bothConfirmed) {
+      const hasDamageReports = hasDamageReport || hasOwnerNotes;
+      
+      // Only complete if both confirmed AND no damage reports exist
+      const canComplete = bothConfirmed && !hasDamageReports;
+      
+      if (canComplete) {
         updateData.status = 'completed';
         updateData.completed_at = new Date().toISOString();
+      } else if (bothConfirmed && hasDamageReports) {
+        // Both parties confirmed but there are damage reports - needs resolution
+        updateData.status = 'disputed';
       }
 
       const { error: updateError } = await supabase
@@ -509,18 +608,53 @@ export default function ReturnVerificationScreen() {
       queryClient.invalidateQueries({ queryKey: ['booking-details', bookingId] });
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
       
-      Alert.alert(
-        'Return Confirmed!',
-        'Your return has been confirmed successfully.',
-        [
-          {
-            text: 'Continue',
-            onPress: () => {
-              router.back();
+      // Show appropriate success message based on completion status
+      if (canComplete) {
+        Alert.alert(
+          'Return Completed!',
+          'The return has been confirmed by both parties with no damage reports. Payment will be processed.',
+          [
+            {
+              text: 'Continue',
+              onPress: () => {
+                // Ensure cache is invalidated right before navigation
+                queryClient.invalidateQueries({ queryKey: ['booking-details', bookingId] });
+                router.back();
+              },
             },
-          },
-        ]
-      );
+          ]
+        );
+      } else if (bothConfirmed && hasDamageReports) {
+        Alert.alert(
+          'Return Confirmed - Dispute Resolution Required',
+          'Both parties have confirmed the return, but damage reports need to be resolved before payment can be processed. The booking is now marked as disputed and our support team will review the reports and contact you.',
+          [
+            {
+              text: 'Continue',
+              onPress: () => {
+                // Ensure cache is invalidated right before navigation
+                queryClient.invalidateQueries({ queryKey: ['booking-details', bookingId] });
+                router.back();
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Return Confirmed!',
+          'Your return has been confirmed successfully. Waiting for the other party to confirm.',
+          [
+            {
+              text: 'Continue',
+              onPress: () => {
+                // Ensure cache is invalidated right before navigation
+                queryClient.invalidateQueries({ queryKey: ['booking-details', bookingId] });
+                router.back();
+              },
+            },
+          ]
+        );
+      }
     } catch (error) {
       console.error('Error submitting verification:', error);
       Alert.alert('Error', 'Failed to submit verification. Please try again.');
@@ -615,29 +749,14 @@ export default function ReturnVerificationScreen() {
         <View style={styles.photoSection}>
           <View style={styles.photoHeader}>
             <Text style={styles.sectionTitle}>Return Photos ({photos.length}/10)</Text>
-            <View style={styles.photoActions}>
-              <TouchableOpacity 
-                style={styles.damageButton}
-                onPress={reportDamage}
-              >
-                <Ionicons 
-                  name={booking && user && booking.renter_id === user.id ? "warning" : "document-text"} 
-                  size={16} 
-                  color={mobileTokens.colors.warning} 
-                />
-                <Text style={styles.damageButtonText}>
-                  {booking && user && booking.renter_id === user.id ? "Report Damage" : "Add Notes"}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.addPhotoButton}
-                onPress={takePhoto}
-                disabled={photos.length >= 10}
-              >
-                <Ionicons name="camera-outline" size={20} color="white" />
-                <Text style={styles.addPhotoText}>Take Photo</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity 
+              style={styles.addPhotoButton}
+              onPress={takePhoto}
+              disabled={photos.length >= 10}
+            >
+              <Ionicons name="camera-outline" size={20} color="white" />
+              <Text style={styles.addPhotoText}>Take Photo</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.photoGrid}>
@@ -645,7 +764,7 @@ export default function ReturnVerificationScreen() {
               // Determine photo ownership - for backward compatibility, assume renter if no owner specified
               const photoOwner = photo.uploaded_by || photo.user_id || booking?.renter_id;
               const canDelete = photoOwner === user?.id;
-              const ownerLabel = photoOwner === booking?.renter_id ? 'Renter' : 'Owner';
+              const ownerLabel = photoOwner === booking?.owner_id ? 'Owner' : 'Renter';
               
               return (
                 <View key={index} style={styles.photoContainer}>
@@ -693,16 +812,86 @@ export default function ReturnVerificationScreen() {
           )}
         </View>
 
-        {/* Damage Report Section */}
-        {damageReport && (
-          <View style={styles.damageReportSection}>
-            <View style={styles.damageReportHeader}>
-              <Ionicons name="warning" size={24} color={mobileTokens.colors.warning} />
-              <Text style={styles.damageReportTitle}>Damage Report</Text>
-            </View>
-            <Text style={styles.damageReportText}>{damageReport}</Text>
+        {/* Damage/Issues Section */}
+        <View style={styles.damageSection}>
+          <View style={styles.damageSectionHeader}>
+            <Ionicons name="warning" size={24} color={mobileTokens.colors.warning} />
+            <Text style={styles.sectionTitle}>Damage & Issues Report</Text>
           </View>
-        )}
+          
+          {/* Show existing damage reports */}
+          {(booking?.damage_report || booking?.owner_notes) ? (
+            <View style={styles.existingReportsContainer}>
+              {/* Warning about damage resolution */}
+              <View style={styles.damageWarningCard}>
+                <Ionicons name="alert-circle" size={20} color={mobileTokens.colors.warning} />
+                <Text style={styles.damageWarningText}>
+                  Damage reports require resolution before payment can be processed
+                </Text>
+              </View>
+              
+              {/* Renter's damage report */}
+              {booking?.damage_report && (
+                <View style={styles.existingReportCard}>
+                  <View style={styles.reportHeader}>
+                    <Ionicons name="person" size={16} color={mobileTokens.colors.primary.main} />
+                    <Text style={styles.reportAuthor}>Renter's Report</Text>
+                    {booking.damage_reported_at && (
+                      <Text style={styles.reportDate}>
+                        {new Date(booking.damage_reported_at).toLocaleDateString()}
+                      </Text>
+                    )}
+                  </View>
+                  <Text style={styles.reportText}>{booking.damage_report}</Text>
+                </View>
+              )}
+              
+              {/* Owner's notes/damage report */}
+              {booking?.owner_notes && (
+                <View style={styles.existingReportCard}>
+                  <View style={styles.reportHeader}>
+                    <Ionicons name="business" size={16} color={mobileTokens.colors.primary.main} />
+                    <Text style={styles.reportAuthor}>Owner's Notes</Text>
+                  </View>
+                  <Text style={styles.reportText}>{booking.owner_notes}</Text>
+                </View>
+              )}
+            </View>
+          ) : (
+            <View style={styles.noDamageContainer}>
+              <Ionicons name="checkmark-circle" size={32} color={mobileTokens.colors.success} />
+              <Text style={styles.noDamageText}>No damage or issues reported yet</Text>
+              <Text style={styles.noDamageSubtext}>
+                If you notice any damage or issues, please report them below
+              </Text>
+            </View>
+          )}
+          
+          {/* Report damage button */}
+          <TouchableOpacity 
+            style={styles.reportDamageButton}
+            onPress={reportDamage}
+          >
+            <Ionicons name="warning" size={20} color="white" />
+            <Text style={styles.reportDamageButtonText}>
+              {(booking?.damage_report || booking?.owner_notes) ? 'Add Additional Report' : 'Report Damage/Issues'}
+            </Text>
+          </TouchableOpacity>
+          
+          {/* Current user's draft report */}
+          {damageReport && (
+            <View style={styles.draftReportContainer}>
+              <View style={styles.draftReportHeader}>
+                <Ionicons name="document-text" size={16} color={mobileTokens.colors.warning} />
+                <Text style={styles.draftReportTitle}>Your Draft Report</Text>
+              </View>
+              <Text style={styles.draftReportText}>{damageReport}</Text>
+              <Text style={styles.draftReportNote}>
+                This report will be submitted when you confirm the return
+              </Text>
+            </View>
+          )}
+        </View>
 
         {/* Submit Button */}
         <View style={styles.submitSection}>
@@ -752,7 +941,7 @@ export default function ReturnVerificationScreen() {
                     <Text style={styles.modalCancelButton}>Cancel</Text>
                   </TouchableOpacity>
                   <Text style={styles.modalTitle}>
-                    {isRenter ? 'Report Damage' : 'Owner Notes'}
+                    Report Damage/Issues
                   </Text>
                   <TouchableOpacity onPress={submitDamageReport}>
                     <Text style={styles.modalSubmitButton}>Submit</Text>
@@ -792,20 +981,14 @@ export default function ReturnVerificationScreen() {
                     style={styles.damageInput}
                     multiline
                     numberOfLines={8}
-                    placeholder={isRenter 
-                      ? 'Describe the damage or issue in detail...'
-                      : 'Add your notes about item condition, damage assessment, etc...'
-                    }
-                    value={isRenter ? damageReport : ownerNotes}
-                    onChangeText={isRenter ? setDamageReport : setOwnerNotes}
+                    placeholder="Describe any damage, issues, or concerns about the item condition..."
+                    value={damageReport}
+                    onChangeText={setDamageReport}
                     textAlignVertical="top"
                   />
                   
                   <Text style={styles.modalNote}>
-                    {isRenter 
-                      ? 'This report will be reviewed by our team and may affect the security deposit.'
-                      : 'Your notes will be added to the return verification record.'
-                    }
+                    This report will be reviewed by both parties before completing the return process and releasing payment.
                   </Text>
                 </ScrollView>
               </>
@@ -1275,5 +1458,132 @@ const styles = StyleSheet.create({
     fontSize: mobileTokens.typography.sizes.sm,
     marginTop: mobileTokens.spacing.xs,
     textAlign: 'center',
+  },
+  // New damage section styles
+  damageSection: {
+    backgroundColor: 'white',
+    marginHorizontal: mobileTokens.spacing.md,
+    marginBottom: mobileTokens.spacing.md,
+    padding: mobileTokens.spacing.md,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: mobileTokens.colors.gray[200],
+  },
+  damageSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: mobileTokens.spacing.md,
+  },
+  existingReportsContainer: {
+    marginBottom: mobileTokens.spacing.md,
+  },
+  damageWarningCard: {
+    backgroundColor: mobileTokens.colors.warning + '20', // 20% opacity
+    padding: mobileTokens.spacing.sm,
+    borderRadius: 8,
+    marginBottom: mobileTokens.spacing.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: mobileTokens.colors.warning,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  damageWarningText: {
+    fontSize: mobileTokens.typography.sizes.sm,
+    color: mobileTokens.colors.warning,
+    fontWeight: mobileTokens.typography.weights.medium,
+    marginLeft: mobileTokens.spacing.xs,
+    flex: 1,
+  },
+  existingReportCard: {
+    backgroundColor: mobileTokens.colors.gray[50],
+    padding: mobileTokens.spacing.md,
+    borderRadius: 8,
+    marginBottom: mobileTokens.spacing.sm,
+    borderLeftWidth: 4,
+    borderLeftColor: mobileTokens.colors.warning,
+  },
+  reportHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: mobileTokens.spacing.sm,
+  },
+  reportAuthor: {
+    fontSize: mobileTokens.typography.sizes.sm,
+    fontWeight: mobileTokens.typography.weights.semibold,
+    color: mobileTokens.colors.text.primary,
+    marginLeft: mobileTokens.spacing.xs,
+    flex: 1,
+  },
+  reportDate: {
+    fontSize: mobileTokens.typography.sizes.xs,
+    color: mobileTokens.colors.text.tertiary,
+  },
+  reportText: {
+    fontSize: mobileTokens.typography.sizes.base,
+    color: mobileTokens.colors.text.primary,
+    lineHeight: 20,
+  },
+  noDamageContainer: {
+    alignItems: 'center',
+    paddingVertical: mobileTokens.spacing.lg,
+    marginBottom: mobileTokens.spacing.md,
+  },
+  noDamageText: {
+    fontSize: mobileTokens.typography.sizes.base,
+    fontWeight: mobileTokens.typography.weights.semibold,
+    color: mobileTokens.colors.success,
+    marginTop: mobileTokens.spacing.sm,
+    textAlign: 'center',
+  },
+  noDamageSubtext: {
+    fontSize: mobileTokens.typography.sizes.sm,
+    color: mobileTokens.colors.text.secondary,
+    marginTop: mobileTokens.spacing.xs,
+    textAlign: 'center',
+  },
+  reportDamageButton: {
+    backgroundColor: mobileTokens.colors.warning,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: mobileTokens.spacing.md,
+    paddingHorizontal: mobileTokens.spacing.lg,
+    borderRadius: 8,
+    marginBottom: mobileTokens.spacing.md,
+  },
+  reportDamageButtonText: {
+    color: 'white',
+    fontSize: mobileTokens.typography.sizes.base,
+    fontWeight: mobileTokens.typography.weights.semibold,
+    marginLeft: mobileTokens.spacing.sm,
+  },
+  draftReportContainer: {
+    backgroundColor: '#FFF3CD',
+    padding: mobileTokens.spacing.md,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: mobileTokens.colors.warning,
+  },
+  draftReportHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: mobileTokens.spacing.sm,
+  },
+  draftReportTitle: {
+    fontSize: mobileTokens.typography.sizes.sm,
+    fontWeight: mobileTokens.typography.weights.semibold,
+    color: mobileTokens.colors.warning,
+    marginLeft: mobileTokens.spacing.xs,
+  },
+  draftReportText: {
+    fontSize: mobileTokens.typography.sizes.base,
+    color: mobileTokens.colors.text.primary,
+    lineHeight: 20,
+    marginBottom: mobileTokens.spacing.sm,
+  },
+  draftReportNote: {
+    fontSize: mobileTokens.typography.sizes.xs,
+    color: mobileTokens.colors.text.secondary,
+    fontStyle: 'italic',
   },
 });

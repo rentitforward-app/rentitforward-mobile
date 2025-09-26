@@ -9,7 +9,7 @@ import { setSentryUser, clearSentryUser, addSentryBreadcrumb, captureSentryExcep
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children, onReady }: { children: React.ReactNode; onReady?: () => void }) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -167,9 +167,6 @@ export function AuthProvider({ children, onReady }: { children: React.ReactNode;
               userId: session.user.id,
               email: session.user.email,
             });
-
-            // Notify that auth is ready
-            onReady?.();
           } else {
             setState({
               user: null,
@@ -181,9 +178,6 @@ export function AuthProvider({ children, onReady }: { children: React.ReactNode;
             // Clear Sentry user context
             clearSentryUser();
             addSentryBreadcrumb('User signed out', 'auth');
-
-            // Notify that auth is ready (even when signed out)
-            onReady?.();
           }
         }
       } catch (error) {
@@ -201,9 +195,6 @@ export function AuthProvider({ children, onReady }: { children: React.ReactNode;
             error: error instanceof Error ? error.message : 'Unknown error',
             platform: 'mobile'
           });
-
-          // Notify that auth is ready (even on error)
-          onReady?.();
         }
       }
     };

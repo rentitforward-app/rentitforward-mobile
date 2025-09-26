@@ -1,12 +1,19 @@
 import React from 'react';
 import { Stack } from 'expo-router';
+import { AuthProvider, useAuth } from '../src/components/AuthProvider';
+import { FCMProvider } from '../src/components/FCMProvider';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '../src/lib/query-client';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SplashScreenManager } from '../src/components/SplashScreenManager';
-import { AppInitializationProvider, useAppInitialization } from '../src/components/AppInitializationManager';
+import { initSentry } from '../src/lib/sentry';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { NotificationService } from '../src/components/NotificationService';
 // import { TrackingPermissionProvider } from '../src/components/TrackingPermissionProvider';
+
+// Initialize Sentry as early as possible
+initSentry();
 
 // Suppress Text component warnings in development mode
 if (__DEV__) {
@@ -24,10 +31,10 @@ if (__DEV__) {
 }
 
 function RootLayoutNav() {
-  const { isAppReady } = useAppInitialization();
+  const { loading } = useAuth();
   
   return (
-    <SplashScreenManager isReady={isAppReady}>
+    <SplashScreenManager isReady={!loading}>
       <NotificationService />
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -38,6 +45,8 @@ function RootLayoutNav() {
         <Stack.Screen name="listing/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="profile/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="bookings/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="bookings/[id]/pickup-verification" options={{ headerShown: false }} />
+        <Stack.Screen name="bookings/[id]/return-verification" options={{ headerShown: false }} />
         <Stack.Screen name="bookings/[id]/report-issue" options={{ headerShown: false }} />
         <Stack.Screen name="messages/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="notifications" options={{ 
@@ -55,13 +64,17 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <AppInitializationProvider>
-          {/* <TrackingPermissionProvider> */}
-            <SafeAreaProvider>
-              <RootLayoutNav />
-            </SafeAreaProvider>
-          {/* </TrackingPermissionProvider> */}
-        </AppInitializationProvider>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <FCMProvider>
+              {/* <TrackingPermissionProvider> */}
+                <SafeAreaProvider>
+                  <RootLayoutNav />
+                </SafeAreaProvider>
+              {/* </TrackingPermissionProvider> */}
+            </FCMProvider>
+          </AuthProvider>
+        </QueryClientProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>
   );

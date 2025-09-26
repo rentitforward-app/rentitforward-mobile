@@ -7,20 +7,24 @@ import {
   ScrollView,
   ActivityIndicator,
   Image,
-  Alert
+  Alert,
+  Modal,
+  RefreshControl
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../src/lib/supabase';
 import { useAuth } from '../../src/components/AuthProvider';
 import { colors, spacing, typography } from '../../src/lib/design-system';
+import { useBookingRealtime } from '../../src/hooks/useBookingRealtime';
 import { Header } from '../../src/components/Header';
 import { CancelBookingModal } from '../../src/components/booking/CancelBookingModal';
 import { IssueReportsSection } from '../../src/components/booking/IssueReportsSection';
 import { ReviewModal } from '../../src/components/ReviewModal';
 import { getNotificationApiService } from '../../src/lib/notification-api';
+import { isUserAdmin } from '../../src/utils/admin';
 
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -32,6 +36,93 @@ export default function BookingDetailScreen() {
   const [showReviewModal, setShowReviewModal] = React.useState(false);
   const [existingReview, setExistingReview] = React.useState<any>(null);
   const [reviewCheckLoading, setReviewCheckLoading] = React.useState(true);
+  const [showVerificationModal, setShowVerificationModal] = React.useState(false);
+  const [showDamageReportsModal, setShowDamageReportsModal] = React.useState(false);
+  const [refreshing, setRefreshing] = React.useState(false);
+
+  // Set up real-time subscription for this booking
+  const { isConnected } = useBookingRealtime({
+    bookingId: id,
+    userId: user?.id,
+    enabled: !!id && !!user?.id,
+  });
+
+  // Pull-to-refresh function
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      console.log('🔄 Starting manual refresh for booking:', id);
+      
+      // First, remove the cached data completely
+      queryClient.removeQueries({ queryKey: ['booking-details', id] });
+      queryClient.removeQueries({ queryKey: ['booking-status', id] });
+      
+      // Then force a fresh fetch with staleTime: 0 to bypass cache
+      await queryClient.fetchQuery({
+        queryKey: ['booking-details', id],
+        queryFn: async () => {
+          console.log('🔄 Fetching fresh booking data from database...');
+          
+          const { data, error } = await supabase
+            .from('bookings')
+            .select(`
+              *,
+              listings!listing_id (
+                id,
+                title,
+                description,
+                category,
+                images,
+                price_per_day,
+                profiles!owner_id (
+                  id,
+                  full_name,
+                  email,
+                  phone_number,
+                  avatar_url
+                )
+              ),
+              renter:profiles!renter_id (
+                id,
+                full_name,
+                email,
+                phone_number,
+                avatar_url
+              )
+            `)
+            .eq('id', id)
+            .single();
+
+          if (error) {
+            console.error('❌ Error fetching fresh booking data:', error);
+            throw error;
+          }
+
+          console.log('✅ Fresh booking data fetched:', {
+            id: data.id,
+            status: data.status,
+            renterPickupConfirmed: data.pickup_confirmed_by_renter,
+            ownerPickupConfirmed: data.pickup_confirmed_by_owner,
+            renterReturnConfirmed: data.return_confirmed_by_renter,
+            ownerReturnConfirmed: data.return_confirmed_by_owner,
+          });
+
+          return data;
+        },
+        staleTime: 0, // Force fresh data
+        gcTime: 0,    // Don't cache this fetch
+      });
+      
+      // Also invalidate related queries
+      await queryClient.invalidateQueries({ queryKey: ['bookings', user?.id] });
+      
+      console.log('✅ Manual refresh completed for booking:', id);
+    } catch (error) {
+      console.error('❌ Error during manual refresh:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [id, user?.id, queryClient]);
 
   // Fetch booking details
   const { data: booking, isLoading, error } = useQuery({
@@ -80,7 +171,44 @@ export default function BookingDetailScreen() {
       return data;
     },
     enabled: !!id,
+    staleTime: 30 * 1000, // Consider data stale after 30 seconds
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+    refetchOnWindowFocus: true, // Refetch when app comes back to foreground
+    refetchOnReconnect: true, // Refetch when network reconnects
   });
+
+  // Debug: Log when booking data changes
+  React.useEffect(() => {
+    if (booking) {
+      console.log('📊 Booking data updated:', {
+        id: booking.id,
+        status: booking.status,
+        renterPickupConfirmed: booking.pickup_confirmed_by_renter,
+        ownerPickupConfirmed: booking.pickup_confirmed_by_owner,
+        renterReturnConfirmed: booking.return_confirmed_by_renter,
+        ownerReturnConfirmed: booking.return_confirmed_by_owner,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }, [booking?.status, booking?.pickup_confirmed_by_renter, booking?.pickup_confirmed_by_owner, booking?.return_confirmed_by_renter, booking?.return_confirmed_by_owner]);
+
+  // Auto-refresh when screen comes into focus (e.g., returning from verification screens)
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('📱 Booking details screen focused - checking for updates');
+      
+      // Force refresh the booking data when screen comes into focus
+      queryClient.invalidateQueries({ queryKey: ['booking-details', id] });
+      
+      // Small delay to ensure any pending database updates are processed
+      setTimeout(() => {
+        queryClient.refetchQueries({ 
+          queryKey: ['booking-details', id],
+          type: 'active'
+        });
+      }, 500);
+    }, [id, queryClient])
+  );
 
   // Effect to check for existing review after booking loads
   React.useEffect(() => {
@@ -298,21 +426,54 @@ export default function BookingDetailScreen() {
     
     const hasBeenPickedUp = booking.status === 'active' || booking.status === 'in_progress' || booking.status === 'picked_up' || bothPickupConfirmed;
     
-    const canConfirmPickup = isWithinPickupPeriod && booking.status === 'confirmed' && !hasBeenPickedUp && !currentUserPickupConfirmed;
+    // Admin override for testing - allow pickup confirmation regardless of date/state
+    const canConfirmPickup = isUserAdmin(user) ? 
+      (!currentUserPickupConfirmed) : 
+      (isWithinPickupPeriod && booking.status === 'confirmed' && !hasBeenPickedUp && !currentUserPickupConfirmed);
     
     // Can return if both parties have confirmed pickup and we're within or after the rental period
+    // Admin override: allow return testing regardless of date restrictions
     const isWithinOrAfterRentalPeriod = today >= startOfPickupPeriod;
-    const canReturn = bothPickupConfirmed && isWithinOrAfterRentalPeriod && booking.status !== 'completed' && !currentUserReturnConfirmed;
+    const canReturn = isUserAdmin(user) ? 
+      (!currentUserReturnConfirmed) : 
+      (bothPickupConfirmed && isWithinOrAfterRentalPeriod && booking.status !== 'completed' && !currentUserReturnConfirmed);
     
     // Show pickup/return section when booking is confirmed, payment required, or return is available
-    const showPickupButton = booking.status === 'confirmed' || booking.status === 'payment_required' || canReturn || bothPickupConfirmed || currentUserReturnConfirmed;
+    // Admin override: always show button for testing
+    const showPickupButton = isUserAdmin(user) || booking.status === 'confirmed' || booking.status === 'payment_required' || canReturn || bothPickupConfirmed || currentUserReturnConfirmed;
     
     // Generate button text
     let pickupButtonText: string;
     let pickupButtonNote: string | null = null;
     
+    // Admin override for testing - provide admin-specific messaging
+    // PRIORITY: Pickup first, then return (proper flow)
+    if (isUserAdmin(user)) {
+      if (canConfirmPickup && !currentUserPickupConfirmed) {
+        pickupButtonText = 'Verify Pickup (Admin Test)';
+        pickupButtonNote = 'Admin testing: Pickup verification available regardless of date/state restrictions.';
+      } else if (currentUserPickupConfirmed && !otherPartyPickupConfirmed) {
+        pickupButtonText = 'Waiting for other party pickup confirmation (Admin)';
+        pickupButtonNote = 'Admin testing: You\'ve confirmed pickup, waiting for other party.';
+      } else if (bothPickupConfirmed && canReturn && !currentUserReturnConfirmed) {
+        pickupButtonText = 'Verify Return (Admin Test)';
+        pickupButtonNote = 'Admin testing: Return verification available regardless of date restrictions.';
+      } else if (currentUserReturnConfirmed && !otherPartyReturnConfirmed) {
+        pickupButtonText = 'Waiting for other party return confirmation (Admin)';
+        pickupButtonNote = 'Admin testing: You\'ve confirmed return, waiting for other party.';
+      } else if (bothReturnConfirmed) {
+        pickupButtonText = 'Return Completed (Admin Test)';
+        pickupButtonNote = 'Admin testing: Both parties confirmed return.';
+      } else if (bothPickupConfirmed) {
+        pickupButtonText = 'Pickup Confirmed - Return Available (Admin Test)';
+        pickupButtonNote = 'Admin testing: Both parties confirmed pickup. Return verification now available.';
+      } else {
+        pickupButtonText = 'Verify Pickup (Admin Test)';
+        pickupButtonNote = 'Admin testing: Start with pickup verification first.';
+      }
+    }
     // Return confirmation states (highest priority)
-    if (currentUserReturnConfirmed && !otherPartyReturnConfirmed) {
+    else if (currentUserReturnConfirmed && !otherPartyReturnConfirmed) {
       // Current user confirmed return, waiting for other party
       const otherPartyName = isRenter ? 'owner' : 'renter';
       pickupButtonText = `Waiting for ${otherPartyName} return confirmation`;
@@ -431,6 +592,25 @@ export default function BookingDetailScreen() {
   };
 
   const getPickupButtonAction = () => {
+    // Admin users can always access verification screens for testing
+    // PRIORITY: Pickup first, then return (proper flow)
+    if (isUserAdmin(user)) {
+      // 1. First priority: Pickup verification if not confirmed by current user
+      if (canConfirmPickup && !currentUserPickupConfirmed) {
+        return handleConfirmPickup;
+      }
+      // 2. Second priority: Return verification if pickup is done and return not confirmed
+      if (bothPickupConfirmed && canReturn && !currentUserReturnConfirmed) {
+        return handleConfirmReturn;
+      }
+      // 3. Allow re-testing return flow if already confirmed
+      if (currentUserReturnConfirmed) {
+        return handleConfirmReturn;
+      }
+      // 4. Default to pickup verification for admin testing
+      return handleConfirmPickup;
+    }
+    
     // Return verification actions (highest priority)
     if (!currentUserReturnConfirmed && otherPartyReturnConfirmed) {
       // Other party confirmed return, current user needs to confirm
@@ -454,16 +634,42 @@ export default function BookingDetailScreen() {
   };
 
   const isPickupButtonDisabled = () => {
-    // Enable for return verification when other party confirmed or return available
-    if (!currentUserReturnConfirmed && otherPartyReturnConfirmed) return false;
-    if (canReturn && !currentUserReturnConfirmed) return false;
-    
-    // Enable for pickup verification when other party confirmed or pickup available  
-    if (!currentUserPickupConfirmed && otherPartyPickupConfirmed) return false;
-    if (canConfirmPickup) return false;
-    
-    // Disable in all other cases (waiting states, completed states, etc.)
-    return true;
+    const disabled = (() => {
+      // Disable if booking is completed or disputed - no further action needed
+      if (booking?.status === 'completed' || booking?.status === 'disputed') {
+        return true;
+      }
+      
+      // Admin users can access verification buttons for testing (except when completed/disputed)
+      if (isUserAdmin(user)) return false;
+      
+      // Enable for return verification when other party confirmed or return available
+      if (!currentUserReturnConfirmed && otherPartyReturnConfirmed) return false;
+      if (canReturn && !currentUserReturnConfirmed) return false;
+      
+      // Enable for pickup verification when other party confirmed or pickup available  
+      if (!currentUserPickupConfirmed && otherPartyPickupConfirmed) return false;
+      if (canConfirmPickup) return false;
+      
+      // Disable in all other cases (waiting states, completed states, etc.)
+      return true;
+    })();
+
+    console.log('🔘 Button state calculation:', {
+      bookingId: booking?.id,
+      status: booking?.status,
+      isRenter,
+      currentUserPickupConfirmed,
+      otherPartyPickupConfirmed,
+      currentUserReturnConfirmed,
+      otherPartyReturnConfirmed,
+      canConfirmPickup,
+      canReturn,
+      isDisabled: disabled,
+      timestamp: new Date().toISOString()
+    });
+
+    return disabled;
   };
 
   if (isLoading) {
@@ -518,7 +724,18 @@ export default function BookingDetailScreen() {
         onBackPress={() => router.back()}
       />
 
-      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.scrollContainer} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[colors.primary.main]}
+            tintColor={colors.primary.main}
+          />
+        }
+      >
         {/* Top Spacing */}
         <View style={styles.topSpacing} />
         
@@ -757,15 +974,39 @@ export default function BookingDetailScreen() {
             )}
             
             
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.reportButton]}
-              onPress={() => {
-                router.push(`/bookings/${booking.id}/report-issue`);
-              }}
-            >
-              <Ionicons name="warning" size={20} color={colors.semantic.error} />
-              <Text style={styles.reportButtonText}>Report Issue</Text>
-            </TouchableOpacity>
+            {/* Show verification images if any exist */}
+            {(booking?.pickup_images?.length > 0 || booking?.return_images?.length > 0 || booking?.damage_report || booking?.owner_notes) && (
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.verificationButton]}
+                onPress={() => setShowVerificationModal(true)}
+              >
+                <Ionicons name="images" size={20} color={colors.primary.main} />
+                <Text style={styles.verificationButtonText}>View Verification Photos & Reports</Text>
+              </TouchableOpacity>
+            )}
+            
+            {/* Show Report Issue button only if booking is not completed/disputed, or repurpose it to view damage reports */}
+            {booking?.status === 'completed' || booking?.status === 'disputed' ? (
+              (booking?.damage_report || booking?.owner_notes) && (
+                <TouchableOpacity 
+                  style={[styles.actionButton, styles.reportButton]}
+                  onPress={() => setShowDamageReportsModal(true)}
+                >
+                  <Ionicons name="document-text" size={20} color={colors.semantic.warning} />
+                  <Text style={styles.reportButtonText}>View Damage Reports</Text>
+                </TouchableOpacity>
+              )
+            ) : (
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.reportButton]}
+                onPress={() => {
+                  router.push(`/bookings/${booking.id}/report-issue`);
+                }}
+              >
+                <Ionicons name="warning" size={20} color={colors.semantic.error} />
+                <Text style={styles.reportButtonText}>Report Issue</Text>
+              </TouchableOpacity>
+            )}
             
             
             <TouchableOpacity 
@@ -902,7 +1143,7 @@ export default function BookingDetailScreen() {
           const renterConfirmedReturn = booking.return_confirmed_by_renter || false;
           const ownerConfirmedReturn = booking.return_confirmed_by_owner || false;
           const bothReturnConfirmed = renterConfirmedReturn && ownerConfirmedReturn;
-          const canShowReview = booking.status === 'completed' || bothReturnConfirmed;
+          const canShowReview = (booking.status === 'completed' || bothReturnConfirmed) && booking.status !== 'disputed';
           const canLeaveReview = canShowReview && !existingReview && !reviewCheckLoading;
 
           if (!canShowReview) return null;
@@ -1035,6 +1276,139 @@ export default function BookingDetailScreen() {
           renterId={booking.renter_id}
         />
       )}
+
+      {/* Verification Images Modal */}
+      <Modal
+        visible={showVerificationModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Verification Photos & Reports</Text>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setShowVerificationModal(false)}
+            >
+              <Ionicons name="close" size={24} color={colors.text.primary} />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.modalContent}>
+            {/* Pickup Images */}
+            {booking?.pickup_images && booking.pickup_images.length > 0 && (
+              <View style={styles.verificationSection}>
+                <Text style={styles.verificationSectionTitle}>Pickup Verification Photos</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {booking.pickup_images.map((photo: any, index: number) => (
+                    <Image
+                      key={index}
+                      source={{ uri: photo.url || photo.uri }}
+                      style={styles.verificationImage}
+                      resizeMode="cover"
+                    />
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+            
+            {/* Return Images */}
+            {booking?.return_images && booking.return_images.length > 0 && (
+              <View style={styles.verificationSection}>
+                <Text style={styles.verificationSectionTitle}>Return Verification Photos</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {booking.return_images.map((photo: any, index: number) => (
+                    <Image
+                      key={index}
+                      source={{ uri: photo.url || photo.uri }}
+                      style={styles.verificationImage}
+                      resizeMode="cover"
+                    />
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+            
+            {/* Damage Reports */}
+            {(booking?.damage_report || booking?.owner_notes) && (
+              <View style={styles.verificationSection}>
+                <Text style={styles.verificationSectionTitle}>Damage & Issues Reports</Text>
+                
+                {booking.damage_report && (
+                  <View style={styles.damageReportCard}>
+                    <View style={styles.damageReportHeader}>
+                      <Ionicons name="person" size={16} color={colors.primary.main} />
+                      <Text style={styles.damageReportAuthor}>Renter's Report</Text>
+                      {booking.damage_reported_at && (
+                        <Text style={styles.damageReportDate}>
+                          {new Date(booking.damage_reported_at).toLocaleDateString()}
+                        </Text>
+                      )}
+                    </View>
+                    <Text style={styles.damageReportText}>{booking.damage_report}</Text>
+                  </View>
+                )}
+                
+                {booking.owner_notes && (
+                  <View style={styles.damageReportCard}>
+                    <View style={styles.damageReportHeader}>
+                      <Ionicons name="business" size={16} color={colors.primary.main} />
+                      <Text style={styles.damageReportAuthor}>Owner's Notes</Text>
+                    </View>
+                    <Text style={styles.damageReportText}>{booking.owner_notes}</Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Damage Reports Modal */}
+      <Modal
+        visible={showDamageReportsModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Damage Reports</Text>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setShowDamageReportsModal(false)}
+            >
+              <Ionicons name="close" size={24} color={colors.text.primary} />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.modalContent}>
+            {booking?.damage_report && (
+              <View style={styles.damageReportCard}>
+                <View style={styles.damageReportHeader}>
+                  <Ionicons name="person" size={16} color={colors.primary.main} />
+                  <Text style={styles.damageReportAuthor}>Renter's Report</Text>
+                  {booking.damage_reported_at && (
+                    <Text style={styles.damageReportDate}>
+                      {new Date(booking.damage_reported_at).toLocaleDateString()}
+                    </Text>
+                  )}
+                </View>
+                <Text style={styles.damageReportText}>{booking.damage_report}</Text>
+              </View>
+            )}
+            
+            {booking?.owner_notes && (
+              <View style={styles.damageReportCard}>
+                <View style={styles.damageReportHeader}>
+                  <Ionicons name="business" size={16} color={colors.primary.main} />
+                  <Text style={styles.damageReportAuthor}>Owner's Notes</Text>
+                </View>
+                <Text style={styles.damageReportText}>{booking.owner_notes}</Text>
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1481,6 +1855,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.gray[300],
   },
+  verificationButton: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.primary.main,
+  },
   cancelBookingButtonText: {
     color: colors.semantic.error,
     fontSize: typography.sizes.base,
@@ -1501,6 +1880,12 @@ const styles = StyleSheet.create({
   },
   viewButtonText: {
     color: colors.text.primary,
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold,
+    marginLeft: spacing.sm,
+  },
+  verificationButtonText: {
+    color: colors.primary.main,
     fontSize: typography.sizes.base,
     fontWeight: typography.weights.semibold,
     marginLeft: spacing.sm,
@@ -1666,5 +2051,72 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     color: colors.text.secondary,
     marginLeft: spacing.sm,
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: colors.white,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray[200],
+  },
+  modalTitle: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.primary,
+  },
+  modalCloseButton: {
+    padding: spacing.xs,
+  },
+  modalContent: {
+    flex: 1,
+    padding: spacing.md,
+  },
+  verificationSection: {
+    marginBottom: spacing.lg,
+  },
+  verificationSectionTitle: {
+    fontSize: typography.sizes.base,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
+  },
+  verificationImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 8,
+    marginRight: spacing.sm,
+  },
+  damageReportCard: {
+    backgroundColor: colors.gray[50],
+    borderRadius: 8,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  damageReportHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  damageReportAuthor: {
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+    color: colors.text.primary,
+    marginLeft: spacing.xs,
+    flex: 1,
+  },
+  damageReportDate: {
+    fontSize: typography.sizes.xs,
+    color: colors.text.secondary,
+  },
+  damageReportText: {
+    fontSize: typography.sizes.sm,
+    color: colors.text.primary,
+    lineHeight: 20,
   },
 });
