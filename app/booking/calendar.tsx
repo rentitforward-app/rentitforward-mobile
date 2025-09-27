@@ -332,20 +332,16 @@ export default function CalendarScreen() {
         <Text style={styles.legendTitle}>Legend</Text>
         <View style={styles.legendItems}>
           <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#fee2e2' }]} />
-            <Text style={styles.legendText}>Booked</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#f3f4f6' }]} />
-            <Text style={styles.legendText}>Blocked</Text>
-          </View>
-          <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#44d62c' }]} />
             <Text style={styles.legendText}>Selected</Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#dcfce7' }]} />
-            <Text style={styles.legendText}>Selected Range</Text>
+            <Text style={styles.legendText}>Range</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: '#ef4444' }]} />
+            <Text style={styles.legendText}>Booked</Text>
           </View>
         </View>
       </View>
@@ -431,7 +427,8 @@ const styles = StyleSheet.create({
   },
   legendItems: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'center',
+    gap: 24,
   },
   legendItem: {
     flexDirection: 'row',

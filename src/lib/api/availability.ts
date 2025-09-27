@@ -17,6 +17,12 @@ export const availabilityAPI = {
     startDate: string,
     endDate: string
   ): Promise<CalendarAvailability[]> => {
+    console.log(`📞 Calling RPC get_listing_availability with:`, {
+      p_listing_id: listingId,
+      p_start_date: startDate,
+      p_end_date: endDate,
+    });
+
     const { data, error } = await supabase
       .rpc('get_listing_availability', {
         p_listing_id: listingId,
@@ -25,16 +31,30 @@ export const availabilityAPI = {
       });
 
     if (error) {
-      console.error('Error fetching availability from RPC:', error);
-      throw new Error('Failed to fetch availability data');
+      console.error('❌ Error fetching availability from RPC:', error);
+      console.error('❌ RPC call details:', {
+        listingId,
+        startDate,
+        endDate,
+        errorCode: error.code,
+        errorMessage: error.message,
+        errorDetails: error.details,
+      });
+      throw new Error(`Failed to fetch availability data: ${error.message}`);
     }
 
-    return (data || []).map((item: any) => ({
+    console.log(`📊 RPC returned ${data?.length || 0} availability records:`, data);
+
+    const mappedData = (data || []).map((item: any) => ({
       date: item.date,
       status: item.status || 'available',
       bookingId: item.booking_id,
       blockedReason: item.blocked_reason,
     }));
+
+    console.log(`🔄 Mapped availability data:`, mappedData);
+
+    return mappedData;
   },
 
   /**
@@ -50,8 +70,12 @@ export const availabilityAPI = {
     endDate: string
   ): Promise<CalendarAvailability[]> => {
     try {
-      return await availabilityAPI.getAvailability(listingId, startDate, endDate);
+      console.log(`🔍 Fetching availability for listing ${listingId} from ${startDate} to ${endDate}`);
+      const result = await availabilityAPI.getAvailability(listingId, startDate, endDate);
+      console.log(`✅ Availability fetched successfully:`, result);
+      return result;
     } catch (error) {
+      console.error('❌ Availability API failed:', error);
       console.warn('Availability API not available, returning empty data:', error);
       return [];
     }

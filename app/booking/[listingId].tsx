@@ -986,24 +986,6 @@ export default function BookingScreen() {
                       Booked
                     </Text>
                   </View>
-                  <View style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: spacing.xs
-                  }}>
-                    <View style={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: 6,
-                      backgroundColor: colors.gray[500]
-                    }} />
-                    <Text style={{
-                      fontSize: typography.sizes.xs,
-                      color: colors.text.secondary
-                    }}>
-                      Blocked
-                    </Text>
-                  </View>
                 </View>
               </View>
 
