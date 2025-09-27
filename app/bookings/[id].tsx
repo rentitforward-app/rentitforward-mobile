@@ -23,7 +23,6 @@ import { Header } from '../../src/components/Header';
 import { CancelBookingModal } from '../../src/components/booking/CancelBookingModal';
 import { IssueReportsSection } from '../../src/components/booking/IssueReportsSection';
 import { ReviewModal } from '../../src/components/ReviewModal';
-import { getNotificationApiService } from '../../src/lib/notification-api';
 import { isUserAdmin } from '../../src/utils/admin';
 
 export default function BookingDetailScreen() {
@@ -354,37 +353,92 @@ export default function BookingDetailScreen() {
     return diffDays + 1;
   };
 
-  // Cancel booking mutation - Call web API for email notifications
+  // Cancel booking mutation - Direct Supabase update
   const cancelBookingMutation = useMutation({
     mutationFn: async ({ reason, note }: { reason: string; note: string }) => {
       if (!booking || !user?.id) {
         throw new Error('Booking or user not found');
       }
 
-      // Call web API to cancel booking (includes email notifications)
-      const notificationApi = getNotificationApiService();
-      const response = await notificationApi.cancelBooking(
-        booking.id,
-        user.id,
-        reason,
-        note
-      );
-
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to cancel booking');
+      // Calculate cancellation fee based on timing
+      const startDate = new Date(booking.start_date);
+      const now = new Date();
+      const hoursUntilStart = (startDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+      
+      let cancellationFee = 0;
+      let refundAmount = booking.total_amount;
+      
+      // If less than 24 hours before pickup, charge 50% cancellation fee
+      if (hoursUntilStart < 24) {
+        cancellationFee = booking.total_amount * 0.5;
+        refundAmount = booking.total_amount - cancellationFee;
       }
 
-      return response;
+      // Update booking status directly in Supabase
+      const { error: updateError } = await supabase
+        .from('bookings')
+        .update({
+          status: 'cancelled',
+          cancelled_at: new Date().toISOString(),
+          cancellation_reason: reason,
+          cancellation_note: note || null,
+          cancellation_fee: cancellationFee,
+          refund_amount: refundAmount,
+        })
+        .eq('id', booking.id)
+        .or(`renter_id.eq.${user.id},owner_id.eq.${user.id}`); // Allow both renter and owner to cancel
+
+      if (updateError) {
+        console.error('Failed to cancel booking:', updateError);
+        throw new Error('Failed to cancel booking. Please try again.');
+      }
+
+      return {
+        success: true,
+        cancellationFee,
+        refundAmount,
+        message: 'Booking cancelled successfully'
+      };
     },
     onSuccess: (data) => {
       // Invalidate and refetch booking details
       queryClient.invalidateQueries({ queryKey: ['booking-details', id] });
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
       setShowCancelModal(false);
-      Alert.alert('Success', 'Booking has been cancelled successfully');
+      
+      const message = data.cancellationFee > 0 
+        ? `Booking cancelled successfully. Refund amount: $${data.refundAmount.toFixed(2)} (after $${data.cancellationFee.toFixed(2)} cancellation fee)`
+        : `Booking cancelled successfully. Full refund of $${data.refundAmount.toFixed(2)} will be processed.`;
+      
+      Alert.alert(
+        'Success', 
+        message,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Redirect to bookings page after user acknowledges the success
+              router.push('/bookings');
+            }
+          }
+        ]
+      );
     },
-    onError: (error) => {
-      Alert.alert('Error', error.message || 'Failed to cancel booking');
+    onError: (error: any) => {
+      console.error('Cancel booking error:', error);
+      
+      let errorMessage = 'Failed to cancel booking';
+      
+      // Handle specific error types
+      if (error?.message?.includes('Authentication failed') || error?.message?.includes('user may no longer exist')) {
+        errorMessage = 'Your session has expired. Please sign out and sign back in to continue.';
+      } else if (error?.message?.includes('Network')) {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Error', errorMessage);
     },
   });
 
@@ -1038,21 +1092,33 @@ export default function BookingDetailScreen() {
                         text: 'Approve', 
                         onPress: async () => {
                           try {
-                            const notificationApi = getNotificationApiService();
-                            const response = await notificationApi.notifyBookingAction({
-                              bookingId: booking.id,
-                              action: 'approve',
-                              userId: user.id
-                            });
+                            const { error } = await supabase
+                              .from('bookings')
+                              .update({ 
+                                status: 'confirmed',
+                                confirmed_at: new Date().toISOString()
+                              })
+                              .eq('id', booking.id)
+                              .eq('owner_id', user.id);
                             
-                            if (response.success) {
-                              queryClient.invalidateQueries({ queryKey: ['booking-details', id] });
-                              queryClient.invalidateQueries({ queryKey: ['bookings'] });
-                              Alert.alert('Success', 'Booking has been approved!');
-                            } else {
-                              Alert.alert('Error', response.error || 'Failed to approve booking');
+                            if (error) {
+                              throw error;
                             }
+                            
+                            queryClient.invalidateQueries({ queryKey: ['booking-details', id] });
+                            queryClient.invalidateQueries({ queryKey: ['bookings'] });
+                            Alert.alert(
+                              'Success', 
+                              'Booking has been approved!',
+                              [
+                                {
+                                  text: 'OK',
+                                  onPress: () => router.push('/bookings')
+                                }
+                              ]
+                            );
                           } catch (error) {
+                            console.error('Failed to approve booking:', error);
                             Alert.alert('Error', 'Failed to approve booking');
                           }
                         }
@@ -1076,21 +1142,33 @@ export default function BookingDetailScreen() {
                         text: 'Decline', 
                         onPress: async () => {
                           try {
-                            const notificationApi = getNotificationApiService();
-                            const response = await notificationApi.notifyBookingAction({
-                              bookingId: booking.id,
-                              action: 'reject',
-                              userId: user.id
-                            });
+                            const { error } = await supabase
+                              .from('bookings')
+                              .update({ 
+                                status: 'rejected',
+                                rejected_at: new Date().toISOString()
+                              })
+                              .eq('id', booking.id)
+                              .eq('owner_id', user.id);
                             
-                            if (response.success) {
-                              queryClient.invalidateQueries({ queryKey: ['booking-details', id] });
-                              queryClient.invalidateQueries({ queryKey: ['bookings'] });
-                              Alert.alert('Success', 'Booking has been declined.');
-                            } else {
-                              Alert.alert('Error', response.error || 'Failed to decline booking');
+                            if (error) {
+                              throw error;
                             }
+                            
+                            queryClient.invalidateQueries({ queryKey: ['booking-details', id] });
+                            queryClient.invalidateQueries({ queryKey: ['bookings'] });
+                            Alert.alert(
+                              'Success', 
+                              'Booking has been declined.',
+                              [
+                                {
+                                  text: 'OK',
+                                  onPress: () => router.push('/bookings')
+                                }
+                              ]
+                            );
                           } catch (error) {
+                            console.error('Failed to decline booking:', error);
                             Alert.alert('Error', 'Failed to decline booking');
                           }
                         }

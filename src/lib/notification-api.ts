@@ -46,13 +46,24 @@ export class MobileNotificationApiService {
    */
   private async getAuthHeaders(): Promise<Record<string, string>> {
     try {
-      // Try to get auth token from AsyncStorage
-      const token = await AsyncStorage.getItem('supabase_auth_token');
-      if (token) {
+      // Import supabase client dynamically to avoid circular dependencies
+      const { supabase } = await import('./supabase');
+      
+      // Get current session from Supabase
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('Failed to get Supabase session:', error);
+        return {};
+      }
+      
+      if (session?.access_token) {
         return {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${session.access_token}`,
         };
       }
+      
+      console.warn('No active Supabase session found');
       return {};
     } catch (error) {
       console.error('Failed to get auth headers:', error);
@@ -152,6 +163,13 @@ export class MobileNotificationApiService {
    */
   async cancelBooking(bookingId: string, userId: string, reason: string, note: string): Promise<NotificationApiResponse> {
     console.log('Cancelling booking:', { bookingId, userId, reason, note });
+    
+    // Debug: Check auth headers before making request
+    const authHeaders = await this.getAuthHeaders();
+    console.log('Auth headers for cancel booking:', { 
+      hasAuth: !!authHeaders.Authorization,
+      authLength: authHeaders.Authorization?.length || 0 
+    });
     
     const endpoint = `/api/bookings/${bookingId}/cancel`;
     return this.makeRequest(endpoint, 'POST', { 

@@ -15,12 +15,20 @@ import { colors, spacing, typography } from '../../lib/design-system';
 
 // Define cancellation reasons locally
 const BookingCancellationReason = {
-  USER_REQUESTED: 'user_requested',
-  OWNER_CANCELLED: 'owner_cancelled',
-  ITEM_UNAVAILABLE: 'item_unavailable',
+  // Renter reasons
+  CHANGE_OF_PLANS: 'change_of_plans',
+  NO_LONGER_NEED_ITEM: 'no_longer_need_item',
+  FOUND_ALTERNATIVE_RENTAL: 'found_alternative_rental',
+  
+  // Owner reasons
+  ITEM_NO_LONGER_AVAILABLE: 'item_no_longer_available',
+  ITEM_DAMAGED: 'item_damaged',
+  EMERGENCY_SITUATION: 'emergency_situation',
+  DOUBLE_BOOKED: 'double_booked',
+  
+  // General reasons
   PAYMENT_FAILED: 'payment_failed',
   POLICY_VIOLATION: 'policy_violation',
-  DAMAGE_REPORTED: 'damage_reported',
   OTHER: 'other'
 } as const;
 
@@ -40,11 +48,25 @@ interface CancelBookingModalProps {
   isRenter: boolean;
 }
 
-const cancellationReasons = [
-  { value: BookingCancellationReason.USER_REQUESTED, label: 'Change of plans' },
-  { value: BookingCancellationReason.ITEM_UNAVAILABLE, label: 'Item no longer available' },
-  { value: BookingCancellationReason.OTHER, label: 'Other reason' }
-];
+// Define role-specific cancellation reasons
+const getCancellationReasons = (isRenter: boolean) => {
+  if (isRenter) {
+    return [
+      { value: BookingCancellationReason.CHANGE_OF_PLANS, label: 'Change of plans' },
+      { value: BookingCancellationReason.NO_LONGER_NEED_ITEM, label: 'No longer need the item' },
+      { value: BookingCancellationReason.FOUND_ALTERNATIVE_RENTAL, label: 'Found an alternative rental' },
+      { value: BookingCancellationReason.OTHER, label: 'Other reason' }
+    ];
+  } else {
+    return [
+      { value: BookingCancellationReason.ITEM_NO_LONGER_AVAILABLE, label: 'Item no longer available' },
+      { value: BookingCancellationReason.ITEM_DAMAGED, label: 'Item damaged' },
+      { value: BookingCancellationReason.EMERGENCY_SITUATION, label: 'Emergency situation' },
+      { value: BookingCancellationReason.DOUBLE_BOOKED, label: 'Double booked' },
+      { value: BookingCancellationReason.OTHER, label: 'Other reason' }
+    ];
+  }
+};
 
 export function CancelBookingModal({ 
   isOpen, 
@@ -80,8 +102,23 @@ export function CancelBookingModal({
     try {
       await onConfirm(selectedReason, note);
       onClose();
-    } catch (err) {
-      setError('Failed to cancel booking. Please try again.');
+    } catch (err: any) {
+      console.error('Cancellation error:', err);
+      
+      // Handle specific error types
+      if (err?.message?.includes('Authentication failed') || err?.message?.includes('user may no longer exist')) {
+        setError('Authentication failed - user may no longer exist. Please sign in again.');
+      } else if (err?.message?.includes('Network')) {
+        setError('Network error. Please check your connection and try again.');
+      } else if (err?.response?.status === 401) {
+        setError('Session expired. Please sign in again.');
+      } else if (err?.response?.status === 403) {
+        setError('You do not have permission to cancel this booking.');
+      } else if (err?.response?.status === 404) {
+        setError('Booking not found. It may have already been cancelled.');
+      } else {
+        setError(err?.message || 'Failed to cancel booking. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -196,7 +233,7 @@ export function CancelBookingModal({
             <View style={styles.reasonSection}>
               <Text style={styles.label}>Why are you cancelling? *</Text>
               <View style={styles.reasonContainer}>
-                {cancellationReasons.map((reason) => (
+                {getCancellationReasons(isRenter).map((reason) => (
                   <TouchableOpacity
                     key={reason.value}
                     style={[
