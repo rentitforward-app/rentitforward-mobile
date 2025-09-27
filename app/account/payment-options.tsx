@@ -260,7 +260,7 @@ export default function PaymentOptionsScreen() {
                   color: colors.gray[900],
                   marginLeft: spacing.sm,
                 }}>
-                  Seller Account
+                  Owner Account
                 </Text>
               </View>
               
@@ -290,7 +290,7 @@ export default function PaymentOptionsScreen() {
               paddingHorizontal: spacing.lg,
               marginBottom: spacing.lg,
             }}>
-              Required for receiving payments as a sharer
+              Required for receiving payments for owner / sharer
             </Text>
 
             <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.lg }}>

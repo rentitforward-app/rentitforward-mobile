@@ -1050,7 +1050,7 @@ export default function BookingScreen() {
               </View>
             </View>
 
-            {/* Price Breakdown Section */}
+            {/* Booking Details Section */}
             <View style={{
               backgroundColor: colors.white,
               borderRadius: 12,
@@ -1067,7 +1067,7 @@ export default function BookingScreen() {
                 color: colors.text.primary,
                 marginBottom: spacing.md
               }}>
-                Price Breakdown
+                Booking Details
               </Text>
 
               <View style={{ gap: spacing.sm }}>
@@ -1252,6 +1252,135 @@ export default function BookingScreen() {
                   </View>
                 )}
 
+                {/* Delivery Method Section */}
+                <View style={{
+                  borderTopWidth: 1,
+                  borderTopColor: colors.gray[200],
+                  paddingTop: spacing.md,
+                  marginTop: spacing.sm
+                }}>
+                  <Text style={{
+                    fontSize: typography.sizes.base,
+                    fontWeight: typography.weights.medium,
+                    color: colors.text.primary,
+                    marginBottom: spacing.sm
+                  }}>
+                    Delivery Method
+                  </Text>
+                  
+                  <View style={{ gap: spacing.sm, marginBottom: spacing.md }}>
+                    <TouchableOpacity
+                      onPress={() => setDeliveryMethod('pickup')}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: spacing.sm,
+                        padding: spacing.sm,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: deliveryMethod === 'pickup' ? colors.primary.main : colors.gray[300],
+                        backgroundColor: deliveryMethod === 'pickup' ? colors.primary.main + '10' : colors.white
+                      }}
+                    >
+                      <View style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: 10,
+                        borderWidth: 2,
+                        borderColor: deliveryMethod === 'pickup' ? colors.primary.main : colors.gray[400],
+                        backgroundColor: deliveryMethod === 'pickup' ? colors.primary.main : colors.white,
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        {deliveryMethod === 'pickup' && (
+                          <View style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: 4,
+                            backgroundColor: colors.white
+                          }} />
+                        )}
+                      </View>
+                      <Text style={{
+                        fontSize: typography.sizes.base,
+                        color: colors.text.primary
+                      }}>
+                        Pickup
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => setDeliveryMethod('delivery')}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: spacing.sm,
+                        padding: spacing.sm,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: deliveryMethod === 'delivery' ? colors.primary.main : colors.gray[300],
+                        backgroundColor: deliveryMethod === 'delivery' ? colors.primary.main + '10' : colors.white
+                      }}
+                    >
+                      <View style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: 10,
+                        borderWidth: 2,
+                        borderColor: deliveryMethod === 'delivery' ? colors.primary.main : colors.gray[400],
+                        backgroundColor: deliveryMethod === 'delivery' ? colors.primary.main : colors.white,
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        {deliveryMethod === 'delivery' && (
+                          <View style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: 4,
+                            backgroundColor: colors.white
+                          }} />
+                        )}
+                      </View>
+                      <Text style={{
+                        fontSize: typography.sizes.base,
+                        color: colors.text.primary
+                      }}>
+                        Delivery (+$20)
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Delivery Address (if delivery selected) */}
+                  {deliveryMethod === 'delivery' && (
+                    <View style={{ marginBottom: spacing.md }}>
+                      <Text style={{
+                        fontSize: typography.sizes.base,
+                        fontWeight: typography.weights.medium,
+                        color: colors.text.primary,
+                        marginBottom: spacing.sm
+                      }}>
+                        Delivery Address
+                      </Text>
+                      <TextInput
+                        value={deliveryAddress}
+                        onChangeText={setDeliveryAddress}
+                        placeholder="Enter your delivery address..."
+                        multiline
+                        numberOfLines={2}
+                        style={{
+                          borderWidth: 1,
+                          borderColor: colors.gray[300],
+                          borderRadius: 8,
+                          padding: spacing.sm,
+                          fontSize: typography.sizes.base,
+                          color: colors.text.primary,
+                          textAlignVertical: 'top'
+                        }}
+                      />
+                    </View>
+                  )}
+                </View>
+
                 <View style={{
                   borderTopWidth: 1,
                   borderTopColor: colors.gray[200],
@@ -1275,6 +1404,39 @@ export default function BookingScreen() {
                     ${pricing.total.toFixed(2)}
                   </Text>
                 </View>
+
+                {/* Notes Section */}
+                <View style={{
+                  borderTopWidth: 1,
+                  borderTopColor: colors.gray[200],
+                  paddingTop: spacing.md,
+                  marginTop: spacing.sm
+                }}>
+                  <Text style={{
+                    fontSize: typography.sizes.base,
+                    fontWeight: typography.weights.medium,
+                    color: colors.text.primary,
+                    marginBottom: spacing.sm
+                  }}>
+                    Notes for Host (Optional)
+                  </Text>
+                  <TextInput
+                    value={specialInstructions}
+                    onChangeText={setSpecialInstructions}
+                    placeholder="Any special requests or information..."
+                    multiline
+                    numberOfLines={3}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: colors.gray[300],
+                      borderRadius: 8,
+                      padding: spacing.sm,
+                      fontSize: typography.sizes.base,
+                      color: colors.text.primary,
+                      textAlignVertical: 'top'
+                    }}
+                  />
+                </View>
               </View>
 
               <View style={{
@@ -1296,179 +1458,6 @@ export default function BookingScreen() {
               </View>
             </View>
 
-            {/* Booking Details Section */}
-            <View style={{
-              backgroundColor: colors.white,
-              borderRadius: 12,
-              padding: spacing.md,
-              marginBottom: spacing.lg,
-              shadowColor: colors.black,
-              shadowOpacity: 0.05,
-              shadowRadius: 8,
-              elevation: 2
-            }}>
-              <Text style={{
-                fontSize: typography.sizes.lg,
-                fontWeight: typography.weights.semibold,
-                color: colors.text.primary,
-                marginBottom: spacing.md
-              }}>
-                Booking Details
-              </Text>
-
-              {/* Delivery Method */}
-              <View style={{ marginBottom: spacing.md }}>
-                <Text style={{
-                  fontSize: typography.sizes.base,
-                  fontWeight: typography.weights.medium,
-                  color: colors.text.primary,
-                  marginBottom: spacing.sm
-                }}>
-                  Delivery Method
-                </Text>
-                
-                <View style={{ gap: spacing.sm }}>
-                  <TouchableOpacity
-                    onPress={() => setDeliveryMethod('pickup')}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: spacing.sm,
-                      padding: spacing.sm,
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: deliveryMethod === 'pickup' ? colors.primary.main : colors.gray[300],
-                      backgroundColor: deliveryMethod === 'pickup' ? colors.primary.main + '10' : colors.white
-                    }}
-                  >
-                    <View style={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: 10,
-                      borderWidth: 2,
-                      borderColor: deliveryMethod === 'pickup' ? colors.primary.main : colors.gray[400],
-                      backgroundColor: deliveryMethod === 'pickup' ? colors.primary.main : colors.white,
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      {deliveryMethod === 'pickup' && (
-                        <View style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: 4,
-                          backgroundColor: colors.white
-                        }} />
-                      )}
-                    </View>
-                    <Text style={{
-                      fontSize: typography.sizes.base,
-                      color: colors.text.primary
-                    }}>
-                      Pickup
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => setDeliveryMethod('delivery')}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: spacing.sm,
-                      padding: spacing.sm,
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: deliveryMethod === 'delivery' ? colors.primary.main : colors.gray[300],
-                      backgroundColor: deliveryMethod === 'delivery' ? colors.primary.main + '10' : colors.white
-                    }}
-                  >
-                    <View style={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: 10,
-                      borderWidth: 2,
-                      borderColor: deliveryMethod === 'delivery' ? colors.primary.main : colors.gray[400],
-                      backgroundColor: deliveryMethod === 'delivery' ? colors.primary.main : colors.white,
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      {deliveryMethod === 'delivery' && (
-                        <View style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: 4,
-                          backgroundColor: colors.white
-                        }} />
-                      )}
-                    </View>
-                    <Text style={{
-                      fontSize: typography.sizes.base,
-                      color: colors.text.primary
-                    }}>
-                      Delivery (+$20)
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Delivery Address (if delivery selected) */}
-              {deliveryMethod === 'delivery' && (
-                <View style={{ marginBottom: spacing.md }}>
-                  <Text style={{
-                    fontSize: typography.sizes.base,
-                    fontWeight: typography.weights.medium,
-                    color: colors.text.primary,
-                    marginBottom: spacing.sm
-                  }}>
-                    Delivery Address
-                  </Text>
-                  <TextInput
-                    value={deliveryAddress}
-                    onChangeText={setDeliveryAddress}
-                    placeholder="Enter your delivery address..."
-                    multiline
-                    numberOfLines={2}
-                    style={{
-                      borderWidth: 1,
-                      borderColor: colors.gray[300],
-                      borderRadius: 8,
-                      padding: spacing.sm,
-                      fontSize: typography.sizes.base,
-                      color: colors.text.primary,
-                      textAlignVertical: 'top'
-                    }}
-                  />
-                </View>
-              )}
-
-              {/* Notes */}
-              <View>
-                <Text style={{
-                  fontSize: typography.sizes.base,
-                  fontWeight: typography.weights.medium,
-                  color: colors.text.primary,
-                  marginBottom: spacing.sm
-                }}>
-                  Notes for Host (Optional)
-                </Text>
-                <TextInput
-                  value={specialInstructions}
-                  onChangeText={setSpecialInstructions}
-                  placeholder="Any special requests or information..."
-                  multiline
-                  numberOfLines={3}
-                  style={{
-                    borderWidth: 1,
-                    borderColor: colors.gray[300],
-                    borderRadius: 8,
-                    padding: spacing.sm,
-                    fontSize: typography.sizes.base,
-                    color: colors.text.primary,
-                    textAlignVertical: 'top'
-                  }}
-                />
-              </View>
-            </View>
-
             {/* Book Now Button */}
             <TouchableOpacity
               onPress={handleCreateBooking}
@@ -1478,7 +1467,7 @@ export default function BookingScreen() {
                 padding: spacing.lg,
                 borderRadius: 12,
                 alignItems: 'center',
-                marginBottom: spacing.xl,
+                marginBottom: spacing['2xl'], // Increased bottom spacing
                 shadowColor: colors.black,
                 shadowOpacity: 0.1,
                 shadowRadius: 8,
