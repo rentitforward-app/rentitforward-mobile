@@ -9,9 +9,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Keyboard,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../src/components/AuthProvider';
 import { supabase } from '../../src/lib/supabase';
@@ -57,12 +59,50 @@ export default function ConversationScreen() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const flatListRef = useRef<FlatList>(null);
+  const textInputRef = useRef<TextInput>(null);
   
   const [messageText, setMessageText] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   // Debug: Log the route parameters
   console.log('🚀 ConversationScreen loaded with:', { conversationId, userId: user?.id });
+
+  // Keyboard handling and auto-focus
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+      // Scroll to bottom when keyboard shows
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    });
+    
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSubscription?.remove();
+      hideSubscription?.remove();
+    };
+  }, []);
+
+  // Auto-focus text input when screen is focused (especially when coming from booking details)
+  useFocusEffect(
+    React.useCallback(() => {
+      // Small delay to ensure the screen is fully loaded before focusing
+      const focusTimeout = setTimeout(() => {
+        if (textInputRef.current) {
+          textInputRef.current.focus();
+        }
+      }, 500);
+
+      return () => {
+        clearTimeout(focusTimeout);
+      };
+    }, [])
+  );
 
   // Early return for debugging - show basic screen first
   if (!conversationId) {
@@ -126,11 +166,17 @@ export default function ConversationScreen() {
           listing:listings(title)
         `)
         .eq('id', conversationId)
-        .single();
+        .contains('participants', [user?.id])
+        .maybeSingle();
       
       if (conversationError) {
         console.error('❌ Error fetching conversation:', conversationError);
         throw conversationError;
+      }
+
+      if (!conversationData) {
+        console.error('❌ Conversation not found or inaccessible for user');
+        throw new Error('Conversation not found or you no longer have access.');
       }
       
       // Get the other participant
@@ -144,36 +190,65 @@ export default function ConversationScreen() {
         .from('profiles')
         .select('id, full_name, avatar_url, verified')
         .eq('id', otherUserId)
-        .single();
+        .maybeSingle();
       
       if (userError) {
         console.error('❌ Error fetching other user:', userError);
         throw userError;
       }
+
+      if (!otherUserData) {
+        throw new Error('Participant profile not found');
+      }
       
-      // Check if this is an inquiry conversation (no booking_id) or a booking conversation
+      // Determine conversation type and handle accordingly
       if (!conversationData.booking_id) {
-        // This is an inquiry conversation
-        return {
-          id: conversationData.id,
-          bookingId: conversationData.id, // Use conversation ID as bookingId for compatibility
-          booking: {
+        // Check if this is an inquiry conversation (has listing_id) or admin conversation (no listing_id)
+        if (conversationData.listing_id) {
+          // This is a pre-booking inquiry conversation
+          return {
             id: conversationData.id,
-            status: 'inquiry', // Special status for inquiries
-            listingId: conversationData.listing_id,
-            ownerId: otherUserId, // The other user is the owner in inquiries
-            renterId: user?.id,
-            startDate: new Date().toISOString(),
-            endDate: new Date().toISOString(),
-            listing: Array.isArray(conversationData.listing) ? conversationData.listing[0] : conversationData.listing,
-          },
-          otherUser: {
-            id: otherUserData.id,
-            full_name: otherUserData.full_name || '',
-            avatar_url: otherUserData.avatar_url,
-            verified: otherUserData.verified || false,
-          },
-        } as ConversationData;
+            bookingId: conversationData.id, // Use conversation ID as bookingId for compatibility
+            booking: {
+              id: conversationData.id,
+              status: 'inquiry', // Special status for inquiries
+              listingId: conversationData.listing_id,
+              ownerId: otherUserId, // The other user is the owner in inquiries
+              renterId: user?.id,
+              startDate: new Date().toISOString(),
+              endDate: new Date().toISOString(),
+              listing: Array.isArray(conversationData.listing) ? conversationData.listing[0] : conversationData.listing,
+            },
+            otherUser: {
+              id: otherUserData.id,
+              full_name: otherUserData.full_name || '',
+              avatar_url: otherUserData.avatar_url,
+              verified: otherUserData.verified || false,
+            },
+          } as ConversationData;
+        } else {
+          // This is an admin conversation (no booking_id, no listing_id)
+          return {
+            id: conversationData.id,
+            bookingId: conversationData.id, // Use conversation ID as bookingId for compatibility
+            booking: {
+              id: conversationData.id,
+              status: 'admin', // Special status for admin conversations
+              listingId: '', // No listing for admin conversations
+              ownerId: otherUserId, // Admin is treated as "owner" for consistency
+              renterId: user?.id,
+              startDate: new Date().toISOString(),
+              endDate: new Date().toISOString(),
+              listing: null,
+            },
+            otherUser: {
+              id: otherUserData.id,
+              full_name: otherUserData.full_name || '',
+              avatar_url: otherUserData.avatar_url,
+              verified: otherUserData.verified || false,
+            },
+          } as ConversationData;
+        }
       } else {
         // This is a booking conversation - fetch booking data
         const { data: bookingData, error: bookingError } = await supabase
@@ -191,11 +266,15 @@ export default function ConversationScreen() {
             renter:profiles!bookings_renter_id_fkey(id, full_name, avatar_url, verified)
           `)
           .eq('id', conversationData.booking_id)
-          .single();
+          .maybeSingle();
         
         if (bookingError) {
           console.error('❌ Error fetching booking data:', bookingError);
           throw bookingError;
+        }
+
+        if (!bookingData) {
+          throw new Error('Booking not found for this conversation');
         }
         
         console.log('✅ Booking data fetched:', bookingData.id, bookingData.status);
@@ -261,10 +340,21 @@ export default function ConversationScreen() {
 
       // If no messages exist, add a system message
       if (transformedMessages.length === 0) {
-        const isInquiry = conversation?.booking.status === 'inquiry';
-        const welcomeMessage = isInquiry 
-          ? `Inquiry started for ${conversation?.booking.listing?.title || 'this listing'}. You can ask questions about availability, condition, and other details.`
-          : `Conversation started for ${conversation?.booking.listing?.title || 'this booking'}. You can now discuss pickup details and other arrangements.`;
+        const status = conversation?.booking.status;
+        let welcomeMessage = '';
+        
+        switch (status) {
+          case 'inquiry':
+            welcomeMessage = `Pre-booking inquiry started for ${conversation?.booking.listing?.title || 'this listing'}. You can ask questions about availability, condition, pricing, and other details before making a booking.`;
+            break;
+          case 'admin':
+            welcomeMessage = `Admin support conversation started. Our team is here to help you with any questions or issues you may have with the platform.`;
+            break;
+          default:
+            // Regular booking conversation
+            welcomeMessage = `Booking conversation started for ${conversation?.booking.listing?.title || 'this booking'}. You can now discuss pickup/delivery details, item condition checks, and other arrangements.`;
+            break;
+        }
         
         transformedMessages.push({
           id: 'system-welcome',
@@ -338,10 +428,17 @@ export default function ConversationScreen() {
       setMessageText('');
       setIsSending(false);
       
+      // Keep input focused after sending
+      setTimeout(() => {
+        if (textInputRef.current) {
+          textInputRef.current.focus();
+        }
+      }, 100);
+      
       // Scroll to bottom
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      }, 200);
     },
     onError: (error) => {
       console.error('Send message error:', error);
@@ -426,18 +523,20 @@ export default function ConversationScreen() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'inquiry':
-        return '#3b82f6'; // Blue for inquiries
+        return '#3b82f6'; // Blue for pre-booking inquiries
+      case 'admin':
+        return '#8b5cf6'; // Purple for admin conversations
       case 'pending':
-        return '#f59e0b';
+        return '#f59e0b'; // Orange for pending bookings
       case 'confirmed':
       case 'active':
-        return '#10b981';
+        return '#10b981'; // Green for active bookings
       case 'completed':
-        return '#6b7280';
+        return '#6b7280'; // Gray for completed bookings
       case 'cancelled':
-        return '#ef4444';
+        return '#ef4444'; // Red for cancelled bookings
       default:
-        return '#6b7280';
+        return '#6b7280'; // Default gray
     }
   };
 
@@ -508,8 +607,8 @@ export default function ConversationScreen() {
           showBackButton={true}
           showNotificationIcon={true}
           rightAction={
-            // Only show booking details button for actual bookings, not inquiries
-            conversation.booking.status !== 'inquiry' ? {
+            // Only show booking details button for actual bookings (not inquiries or admin conversations)
+            conversation.booking.status !== 'inquiry' && conversation.booking.status !== 'admin' ? {
               icon: 'information-circle-outline',
               onPress: () => router.push(`/bookings/${conversation.bookingId}`),
               testID: 'conversation-details-button'
@@ -518,17 +617,23 @@ export default function ConversationScreen() {
           onBackPress={() => router.back()}
         />
 
-      {/* Booking Context */}
+      {/* Conversation Context */}
       <View style={styles.bookingContext}>
         <View style={styles.contextHeader}>
           <View style={[styles.statusDot, { backgroundColor: getStatusColor(conversation.booking.status) }]} />
           <Text style={styles.contextTitle}>
-            {conversation.booking.listing?.title || `Booking #${conversation.booking.id.substring(0, 8)}`}
+            {conversation.booking.status === 'admin' 
+              ? `Admin Support`
+              : conversation.booking.listing?.title || `Booking #${conversation.booking.id.substring(0, 8)}`}
           </Text>
         </View>
         {conversation.booking.status === 'inquiry' ? (
           <Text style={styles.contextDates}>
             Pre-booking inquiry
+          </Text>
+        ) : conversation.booking.status === 'admin' ? (
+          <Text style={styles.contextDates}>
+            Platform support conversation
           </Text>
         ) : (
           <Text style={styles.contextDates}>
@@ -558,9 +663,11 @@ export default function ConversationScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.inputContainer}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <View style={styles.messageInputContainer}>
           <TextInput
+            ref={textInputRef}
             style={styles.messageInput}
             placeholder="Type a message..."
             value={messageText}
@@ -570,6 +677,12 @@ export default function ConversationScreen() {
             returnKeyType="send"
             onSubmitEditing={handleSendMessage}
             blurOnSubmit={false}
+            onFocus={() => {
+              // Scroll to bottom when input is focused
+              setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+              }, 100);
+            }}
           />
           
           <TouchableOpacity
@@ -720,6 +833,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
+    position: 'relative',
   },
   messageInputContainer: {
     flexDirection: 'row',

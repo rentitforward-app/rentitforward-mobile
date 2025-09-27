@@ -309,18 +309,20 @@ export default function MessagesTab() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'inquiry':
-        return '#3b82f6'; // Blue for inquiries
+        return '#3b82f6'; // Blue for pre-booking inquiries
+      case 'admin':
+        return '#8b5cf6'; // Purple for admin conversations
       case 'pending':
-        return '#f59e0b';
+        return '#f59e0b'; // Orange for pending bookings
       case 'confirmed':
       case 'active':
-        return '#10b981';
+        return '#10b981'; // Green for active bookings
       case 'completed':
-        return '#6b7280';
+        return '#6b7280'; // Gray for completed bookings
       case 'cancelled':
-        return '#ef4444';
+        return '#ef4444'; // Red for cancelled bookings
       default:
-        return '#6b7280';
+        return '#6b7280'; // Default gray
     }
   };
 
@@ -344,9 +346,8 @@ export default function MessagesTab() {
       onPress={() => {
         // Mark as read before navigating
         markConversationAsRead(item.id);
-        // For inquiries, navigate to conversation ID; for bookings, use booking ID
-        const navigationId = item.booking?.status === 'inquiry' ? item.id : item.bookingId;
-        router.push(`/conversations/${navigationId}`);
+        // Always navigate using the conversation ID
+        router.push(`/conversations/${item.id}`);
       }}
     >
       <View style={styles.messageHeader}>

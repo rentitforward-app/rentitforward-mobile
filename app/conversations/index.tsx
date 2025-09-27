@@ -187,17 +187,21 @@ export default function ConversationsScreen() {
   // Get status indicator color
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'inquiry':
+        return '#3b82f6'; // Blue for pre-booking inquiries
+      case 'admin':
+        return '#8b5cf6'; // Purple for admin conversations
       case 'pending':
-        return '#f59e0b';
+        return '#f59e0b'; // Orange for pending bookings
       case 'confirmed':
       case 'active':
-        return '#10b981';
+        return '#10b981'; // Green for active bookings
       case 'completed':
-        return '#6b7280';
+        return '#6b7280'; // Gray for completed bookings
       case 'cancelled':
-        return '#ef4444';
+        return '#ef4444'; // Red for cancelled bookings
       default:
-        return '#6b7280';
+        return '#6b7280'; // Default gray
     }
   };
 
@@ -205,7 +209,7 @@ export default function ConversationsScreen() {
   const renderConversation = ({ item }: { item: Conversation }) => (
     <TouchableOpacity
       style={styles.conversationCard}
-      onPress={() => router.push(`/conversations/${item.bookingId}`)}
+      onPress={() => router.push(`/conversations/${item.id}`)}
     >
       <View style={styles.conversationHeader}>
         {/* Avatar placeholder */}
